@@ -1,0 +1,41 @@
+{
+  "repository": "DeepSeek Harness",
+  "commit": "b150a551b8d465e31e418e1b2eaf5e79bbb7d28e",
+  "adaptations": [
+    "Public type import in place of private type-only path",
+    "ESM .js import suffixes",
+    "Local ReferenceIcon location"
+  ],
+  "files": [
+    {
+      "source": "packages/client/ui-conversation/src/client/chat/ContextInjectionRow.tsx",
+      "output": "ContextInjectionRow.tsx",
+      "sha256": "afb41e6285f2abaf0eb6a1f843dbc135c8480bd48848beed1f94e395ac0f68c8"
+    },
+    {
+      "source": "packages/client/ui-conversation/src/client/chat/ContextInjectionRow.module.css",
+      "output": "ContextInjectionRow.module.css",
+      "sha256": "af61636789223d2476ec818a76d795bc7c13ca1a433f834d78702a825bd000de"
+    },
+    {
+      "source": "packages/client/ui-conversation/src/client/chat/ContextBody.tsx",
+      "output": "ContextBody.tsx",
+      "sha256": "94f41356d59bdcdae7225f3cb8cd9b0c0b1a32d24153d82512bfba7c40443cc8"
+    },
+    {
+      "source": "packages/client/ui-conversation/src/client/chat/ContextBody.module.css",
+      "output": "ContextBody.module.css",
+      "sha256": "b3838bf9cf38af53b31fd6333b4766ad063024d9a59cd636a38e3e0e07d7bf61"
+    },
+    {
+      "source": "packages/client/ui-conversation/src/client/reference/ReferenceIcon.tsx",
+      "output": "ReferenceIcon.tsx",
+      "sha256": "6315cb1ceafa830cd9e38ce296ddf5791ab93562e4f5a7bdbda1ef9ac6f7ed57"
+    },
+    {
+      "source": "packages/client/ui-tool/src/client/tool/models/tool-call-model.ts",
+      "output": "tool-call-model.ts",
+      "sha256": "02536cb0be80168351857083d0f0b71554216cd3195bad8016b1e4bb567acc7f"
+    }
+  ]
+}

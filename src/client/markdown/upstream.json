@@ -1,0 +1,14 @@
+{
+  "repository": "https://github.com/deepseek-ai/deepseek-harness",
+  "commit": "b150a551b8d465e31e418e1b2eaf5e79bbb7d28e",
+  "sha256BeforeAdaptation": {
+    "MarkdownText.tsx": "b0ce4cf0986cadf624436136186b16f108ed2365aec0350b195f02dae036017a",
+    "MarkdownText.module.css": "e226e878c45037b1cf537e4361f59e052ef979321593be3369bd31200d0342bc",
+    "render.tsx": "d4fefca41ab709526933e47144a01df14bd3d5619558cd6ed35b663d1640d779",
+    "parse.ts": "6be57559995c4e717d6d704207eb2fec86db9714c2a4bcc5b0c3f6648c8990f0",
+    "incremental.ts": "2975a332ac74b931a7cb489e2eea28469aa3d9596328d5a474d41379b6c7b640",
+    "cjkFriendlyStrong.ts": "bc4adf3183f7d0feea17e3a176e7c4b1db5bdddc29e7fc87261f627ff8a39b53",
+    "mathCompatibility.ts": "5f8cec86fd613fd2f67510e22b0a9d661f4173b3d49fb13fef71b25f4abb652b",
+    "katex.tsx": "8227e04d29333d2568021ed012143237b457852bce25d82cf394d72b941e74a5"
+  }
+}

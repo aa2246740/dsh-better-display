@@ -1,0 +1,5 @@
+id: dsh-better-display
+entry: src/dsh-better-display.ts
+marker: '[my-plugins/dsh-better-display] loaded'
+kind: client
+profile: web

@@ -1,0 +1,10 @@
+node_modules/
+lib/
+artifacts/
+.evidence/
+.dsh*/
+.env
+.env.*
+*.log
+*.tgz
+.DS_Store

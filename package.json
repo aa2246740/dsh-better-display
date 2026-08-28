@@ -1,0 +1,101 @@
+{
+  "name": "dsh-better-display",
+  "version": "0.1.0",
+  "description": "A calmer reading view for DeepSeek Harness: native process details, live reasoning, and clean final answers.",
+  "type": "module",
+  "license": "MIT",
+  "main": "lib/dsh-better-display.js",
+  "types": "lib/types/dsh-better-display.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/dsh-better-display.d.ts",
+      "default": "./lib/dsh-better-display.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx/esm --test tests/*.test.ts",
+    "link:harness": "node scripts/link-harness-dependencies.mjs"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-attachment": "^0.1.1-rc.2",
+    "@deepseek-ai/dsh-client-runtime": "^0.1.1-rc.2",
+    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.1-rc.2",
+    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.1-rc.2",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.1.1-rc.2",
+    "react": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/mdast": "^4.0.4",
+    "@types/node": "^22.20.0",
+    "@types/react": "~18.3.1",
+    "tsdown": "^0.22.2",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "clsx": "^2.0.0",
+    "katex": "^0.16.47",
+    "mdast-util-from-markdown": "^2.0.3",
+    "mdast-util-gfm": "^3.1.0",
+    "mdast-util-math": "^3.0.0",
+    "micromark-core-commonmark": "^2.0.3",
+    "micromark-extension-gfm": "^3.0.0",
+    "micromark-extension-math": "^3.1.0",
+    "micromark-factory-space": "^2.0.1",
+    "micromark-util-character": "^2.1.1",
+    "micromark-util-classify-character": "^2.0.1",
+    "micromark-util-sanitize-uri": "^2.0.1",
+    "micromark-util-symbol": "^2.0.1",
+    "micromark-util-types": "^2.0.2"
+  },
+  "files": [
+    "lib",
+    "src",
+    "tests",
+    "scripts",
+    "cordis.yml",
+    "dshx.yml",
+    "tsconfig.json",
+    "tsdown.config.ts",
+    "README.md",
+    "DESIGN.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aa2246740/dsh-better-display.git"
+  },
+  "homepage": "https://github.com/aa2246740/dsh-better-display#readme",
+  "bugs": {
+    "url": "https://github.com/aa2246740/dsh-better-display/issues"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dshx",
+    "conversation",
+    "reasoning",
+    "streaming",
+    "accessibility"
+  ]
+}
