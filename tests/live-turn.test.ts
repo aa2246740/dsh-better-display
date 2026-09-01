@@ -66,6 +66,24 @@ test('a second reasoning folds every prior step into one box, then a third folds
   assert.deepEqual(latest.open.map(step => step.key), ['6', '7']);
 });
 
+test('fold presentation keeps prior step keys so the reader can collapse the same process fragments in place', () => {
+  const chain = [reasoning('1'), body('2'), tool('3')];
+  const before = presentLiveTurn(chain, open);
+  assert.deepEqual(before.map(item => item.key), ['1', '2', '3']);
+
+  const second = presentLiveTurn([...chain, reasoning('4')], open);
+  assert.equal(second[0]?.kind, 'fold');
+  if (second[0]?.kind !== 'fold') throw new Error('missing fold');
+  assert.equal(second[0].key, 'live-fold:1');
+  assert.deepEqual(second[0].steps.map(step => step.key), before.map(item => item.key));
+  assert.deepEqual(second.filter(item => item.kind === 'open').map(item => item.key), ['4']);
+
+  const third = presentLiveTurn([...chain, reasoning('4'), tool('5'), reasoning('6')], open);
+  if (third[0]?.kind !== 'fold') throw new Error('missing grown fold');
+  assert.equal(third[0].key, 'live-fold:1');
+  assert.deepEqual(third[0].steps.map(step => step.key), ['1', '2', '3', '4', '5']);
+});
+
 test('presentLiveTurn keeps a single prior box rather than one fold per step', () => {
   const items = presentLiveTurn([reasoning('1'), body('2'), tool('3'), reasoning('4'), tool('5'), reasoning('6'), body('7')], open);
   const folds = items.filter(item => item.kind === 'fold');

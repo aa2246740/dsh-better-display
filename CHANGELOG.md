@@ -2,7 +2,7 @@
 
 ## 0.1.1
 
-Experimental live fold on the reading tab: a new reasoning step collapses prior steps of the current chain into one expandable box. Structural count summary only; literal Think text is unchanged. Mid-turn user inserts reset the chain. Successful turn-close, errors, interrupts and approvals keep the existing DESIGN.md rules. 51 unit tests.
+Experimental live fold on the reading tab: a new reasoning step collapses prior steps of the current chain in place through the existing process Disclosure / ProcessFragment / RetiringContent / StatusText motion. Structural count summary only; literal Think text is unchanged. Mid-turn user inserts reset the chain. Successful turn-close, errors, interrupts and approvals keep the existing DESIGN.md rules. 52 unit tests.
 
 ## 0.1.0
 

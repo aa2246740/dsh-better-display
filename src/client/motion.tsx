@@ -87,20 +87,22 @@ export function StatusText({ text, motion, shimmer = false }: { text: string; mo
   </span>;
 }
 
-export function Disclosure({ open, onChange, label, status, controls, buttonRef }: {
+export function Disclosure({ open, onChange, label, status, controls, buttonRef, ariaLabel, showMeta = true }: {
   open: boolean; onChange: (value: boolean) => void; label: ReactNode;
-  status?: string; controls: string; buttonRef: RefObject<HTMLButtonElement>;
+  status?: string; controls?: string; buttonRef: RefObject<HTMLButtonElement>;
+  ariaLabel?: string; showMeta?: boolean;
 }) {
+  const name = ariaLabel ?? '思考与过程';
   return <div className={css.disclosure} data-reader-disclosure data-expanded={open}>
-    <button ref={buttonRef} type="button" className={css.disclosureButton} aria-label={`${open ? '收起' : '展开'}思考与过程`} aria-expanded={open} aria-controls={controls} onClick={() => onChange(!open)}>
+    <button ref={buttonRef} type="button" className={css.disclosureButton} aria-label={`${open ? '收起' : '展开'}${name}`} aria-expanded={open} {...(controls ? { 'aria-controls': controls } : {})} onClick={() => onChange(!open)}>
       {label}
       <svg className={css.chevron} data-open={open} viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="m6 4 4 4-4 4" /></svg>
     </button>
-    <div className={css.processMeta} data-reader-process-meta data-open={open} aria-hidden={!open}>
+    {showMeta && <div className={css.processMeta} data-reader-process-meta data-open={open} aria-hidden={!open}>
       <div className={css.processMetaInner}><div className={css.processMetaLine}>
         <span>思考与过程</span>{status && <span className={css.meta}>{status}</span>}
       </div></div>
-    </div>
+    </div>}
   </div>;
 }
 

@@ -1,29 +1,28 @@
-import { useId, useRef, useState } from 'react';
-import type { ReactNode, RefObject } from 'react';
-import { ProcessFragment } from './motion.js';
-import css from './Reader.module.css';
+import { useLayoutEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
+import { Disclosure, ProcessFragment, StatusText } from './motion.js';
 
-export function PriorChainFold({ summary, motion, onRead, processKey, children }: {
-  summary: string; motion: boolean; onRead: () => void; processKey: string; children: ReactNode;
+/** Prior-chain control on the live process stack: same Disclosure / StatusText
+ *  / ProcessFragment paths as the 阅读 tab, not a parallel fold box. */
+export function PriorChainFold({ summary, motion, foldOpen, onFoldOpenChange, processKey, processOpen, onRead, returnFocusTo }: {
+  summary: string;
+  motion: boolean;
+  foldOpen: boolean;
+  onFoldOpenChange: (value: boolean) => void;
+  processKey: string;
+  processOpen: boolean;
+  onRead: () => void;
+  returnFocusTo: RefObject<HTMLElement>;
 }) {
-  const [open, setOpen] = useState(false);
-  const controls = useId();
+  // Mount closed so the header uses the same 0→auto process-open path as a
+  // newly disclosed process fragment, instead of popping in at full height.
+  const [headerOpen, setHeaderOpen] = useState(false);
+  useLayoutEffect(() => { setHeaderOpen(processOpen); }, [processOpen]);
   const button = useRef<HTMLButtonElement>(null);
-  const expand = () => {
-    onRead();
-    setOpen(true);
-  };
-  return <div className={css.priorFold} data-reader-live-fold data-expanded={open} data-reader-live-fold-summary={summary}>
-    <button ref={button} type="button" className={css.priorFoldButton} aria-expanded={open} aria-controls={controls}
-      aria-label={`${open ? '收起' : '展开'}此前步骤，${summary}`} onClick={() => { onRead(); setOpen(value => !value); }}>
-      <span className={css.priorFoldCopy}>
-        <span className={css.priorFoldLabel}>此前步骤</span>
-        <span className={css.priorFoldCounts}>{summary}</span>
-      </span>
-      <svg className={css.chevron} data-open={open} viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="m6 4 4 4-4 4" /></svg>
-    </button>
-    <ProcessFragment open={open} motion={motion} onRead={expand} returnFocusTo={button as RefObject<HTMLElement>} nodeKey={processKey} framed>
-      <div id={controls} className={css.priorFoldBody} data-reader-live-fold-body>{children}</div>
-    </ProcessFragment>
-  </div>;
+  return <ProcessFragment open={headerOpen} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={processKey} framed>
+    <div data-reader-live-fold data-expanded={foldOpen} data-reader-live-fold-summary={summary}>
+      <Disclosure open={foldOpen} onChange={value => { onRead(); onFoldOpenChange(value); }} buttonRef={button}
+        ariaLabel="此前步骤" showMeta={false} label={<StatusText text={summary} motion={motion} />} />
+    </div>
+  </ProcessFragment>;
 }

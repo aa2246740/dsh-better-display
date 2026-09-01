@@ -38,8 +38,8 @@ const ProcessNode = memo(function ProcessNode({ useSession, t, nodeKey, open, mo
   return content && <ProcessFragment open={open} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={nodeKey} framed>{content}</ProcessFragment>;
 });
 
-const AssistantNode = memo(function AssistantNode({ useSession, nodeKey, boundary, processOpen = false, pinned = false, partStart, motion, onRead, returnFocusTo, ...render }: SeatProps & {
-  motion: boolean; onRead: () => void; returnFocusTo: RefObject<HTMLButtonElement>; partStart?: number;
+const AssistantNode = memo(function AssistantNode({ useSession, nodeKey, boundary, processOpen = false, pinned = false, folded = false, partStart, motion, onRead, returnFocusTo, ...render }: SeatProps & {
+  motion: boolean; onRead: () => void; returnFocusTo: RefObject<HTMLButtonElement>; partStart?: number; folded?: boolean;
 }) {
   const node = useSession(snapshot => snapshot.chat.nodes.get(nodeKey));
   if (!node || node.visibility === 'hidden' || !isNode(node, 'assistant-step')) return null;
@@ -58,11 +58,11 @@ const AssistantNode = memo(function AssistantNode({ useSession, nodeKey, boundar
           holdFormatting={pinned} startedAt={data.time} interrupted={data.status === 'interrupted'} liveText />
       </ReasoningCard>
     </ProcessFragment>
-    : hasVisibleBody(part.blocks) && <RetiringContent key={part.start} visible={pinned || processOpen || !earlier}>
-      <article className={css.answer} data-reader-answer data-reader-anchor data-reader-key={nodeKey} data-reader-source-start={part.start} data-answer-status={data.status} data-answer-phase={earlier ? 'process' : 'body'}>
+    : hasVisibleBody(part.blocks) && <RetiringContent key={part.start} visible={pinned || processOpen || (!earlier && !folded)}>
+      <article className={css.answer} data-reader-answer data-reader-anchor data-reader-key={nodeKey} data-reader-source-start={part.start} data-answer-status={data.status} data-answer-phase={earlier || folded ? 'process' : 'body'}>
         <Blocks {...render} blocks={part.blocks} streaming={data.status === 'running'} holdFormatting={pinned} startedAt={data.time} interrupted={data.status === 'interrupted'} liveText />
         {last && data.status === 'interrupted' && <span className={css.stopped}>已停止</span>}
-        {last && !earlier && data.status !== 'running' && boundary.status === 'closed' && <CopyAnswer blocks={body} />}
+        {last && !earlier && !folded && data.status !== 'running' && boundary.status === 'closed' && <CopyAnswer blocks={body} />}
       </article>
     </RetiringContent>;
   })}</>;
@@ -148,13 +148,16 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   // focusing or scrolling the live card does not create a permanent override.
   const holdingSelection = selectedProcessKeys.some(key =>
     flow.some(item => item.key === key)
-    || liveItems.some(item => item.key === key || (item.kind !== 'fold' && 'nodeKey' in item.step && item.step.nodeKey === key)));
+    || liveItems.some(item => item.kind === 'fold'
+      ? item.key === key || item.steps.some(step => step.key === key || ('nodeKey' in step && step.nodeKey === key))
+      : item.key === key || ('nodeKey' in item.step && item.step.nodeKey === key)));
   const expanded = holdingSelection || processExpanded(expansionChoice, boundary);
+  const [foldOpenByKey, setFoldOpenByKey] = useState<Record<string, boolean>>({});
   const shared = { useSession: props.useSession, renderSlotChain: props.renderSlotChain, loadImage: props.loadImage };
   const terminal = terminalLabel(boundary.reason);
-  const renderStep = (step: LiveStep, processOpen: boolean) => {
+  const renderStep = (step: LiveStep, processOpen: boolean, folded: boolean) => {
     if (step.kind === 'reasoning' || step.kind === 'body') return <BlockBoundary>
-      <AssistantNode {...shared} boundary={boundary} nodeKey={step.nodeKey} partStart={step.start} pinned={pinnedKeys.includes(step.nodeKey)} processOpen={processOpen} motion={motion} onRead={pinProcess} returnFocusTo={processButton} />
+      <AssistantNode {...shared} boundary={boundary} nodeKey={step.nodeKey} partStart={step.start} pinned={pinnedKeys.includes(step.nodeKey)} processOpen={processOpen} folded={folded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} />
     </BlockBoundary>;
     if (step.kind === 'tool') return <Fragment>
       <BlockBoundary><ProcessFragment open={processOpen} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={step.key} framed>
@@ -176,13 +179,17 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
       <GroupStatus group={group} useSession={props.useSession} motion={motion} />
     </div>}
     <div id={flowId} className={css.mainFlow} data-reader-flow>
-      {liveItems.map(item => {
+      {liveItems.flatMap(item => {
         if (item.kind === 'fold') {
-          return <Fragment key={item.key}>{expanded && <PriorChainFold processKey={item.key} summary={item.summary} motion={motion} onRead={pinProcess}>
-            {item.steps.map(step => <Fragment key={step.key}>{renderStep(step, true)}</Fragment>)}
-          </PriorChainFold>}</Fragment>;
+          const foldOpen = foldOpenByKey[item.key] ?? false;
+          return [
+            <PriorChainFold key={item.key} summary={item.summary} motion={motion} foldOpen={foldOpen}
+              onFoldOpenChange={value => setFoldOpenByKey(current => current[item.key] === value ? current : { ...current, [item.key]: value })}
+              processKey={item.key} processOpen={expanded} onRead={pinProcess} returnFocusTo={processButton} />,
+            ...item.steps.map(step => <Fragment key={step.key}>{renderStep(step, expanded && foldOpen, true)}</Fragment>),
+          ];
         }
-        return <Fragment key={item.key}>{renderStep(item.step, expanded)}</Fragment>;
+        return [<Fragment key={item.key}>{renderStep(item.step, expanded, false)}</Fragment>];
       })}
     </div>
     {terminal && <div className={css.notice} data-reader-terminal>{terminal}</div>}
