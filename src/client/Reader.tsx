@@ -10,6 +10,9 @@ import { preparingLabel, readerFlow } from './tool-activity.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelection, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
 import { assistantSegments, boundaryOf, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
+import { presentLiveTurn, segmentLiveTurn } from './live-turn.js';
+import type { LiveStep } from './live-turn.js';
+import { PriorChainFold } from './LiveFold.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import type { ReaderGroup, TurnBoundary } from './projection.js';
 import type { BlockRenderProps, ReaderProps } from './types.js';
@@ -35,8 +38,8 @@ const ProcessNode = memo(function ProcessNode({ useSession, t, nodeKey, open, mo
   return content && <ProcessFragment open={open} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={nodeKey} framed>{content}</ProcessFragment>;
 });
 
-const AssistantNode = memo(function AssistantNode({ useSession, nodeKey, boundary, processOpen = false, pinned = false, motion, onRead, returnFocusTo, ...render }: SeatProps & {
-  motion: boolean; onRead: () => void; returnFocusTo: RefObject<HTMLButtonElement>;
+const AssistantNode = memo(function AssistantNode({ useSession, nodeKey, boundary, processOpen = false, pinned = false, folded = false, partStart, motion, onRead, returnFocusTo, ...render }: SeatProps & {
+  motion: boolean; onRead: () => void; returnFocusTo: RefObject<HTMLButtonElement>; partStart?: number; folded?: boolean;
 }) {
   const node = useSession(snapshot => snapshot.chat.nodes.get(nodeKey));
   if (!node || node.visibility === 'hidden' || !isNode(node, 'assistant-step')) return null;
@@ -44,20 +47,25 @@ const AssistantNode = memo(function AssistantNode({ useSession, nodeKey, boundar
   const parts = assistantSegments(data.blocks);
   const earlier = isEarlierNarration(data, boundary);
   const body = data.blocks.filter(block => block.kind !== 'reasoning' && block.kind !== 'tool-call');
-  return <>{parts.map((part, index) => part.kind === 'reasoning'
+  const visible = partStart === undefined ? parts : parts.filter(part => part.start === partStart);
+  return <>{visible.map(part => {
+    const index = parts.findIndex(item => item.start === part.start);
+    const last = index === parts.length - 1;
+    return part.kind === 'reasoning'
     ? <ProcessFragment key={part.start} open={processOpen} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={nodeKey} framed>
       <ReasoningCard step={data.step} active={processOpen && boundary.status === 'open' && data.step === boundary.latestStep} motion={motion} selected={pinned} onRead={onRead}>
-        <Blocks {...render} blocks={part.blocks} streaming={data.status === 'running' && index === parts.length - 1 && data.blocks.at(-1)?.kind === 'reasoning'}
+        <Blocks {...render} blocks={part.blocks} streaming={data.status === 'running' && last && data.blocks.at(-1)?.kind === 'reasoning'}
           holdFormatting={pinned} startedAt={data.time} interrupted={data.status === 'interrupted'} liveText />
       </ReasoningCard>
     </ProcessFragment>
-    : hasVisibleBody(part.blocks) && <RetiringContent key={part.start} visible={pinned || processOpen || !earlier}>
-      <article className={css.answer} data-reader-answer data-reader-anchor data-reader-key={nodeKey} data-reader-source-start={part.start} data-answer-status={data.status} data-answer-phase={earlier ? 'process' : 'body'}>
+    : hasVisibleBody(part.blocks) && <RetiringContent key={part.start} visible={pinned || processOpen || (!earlier && !folded)}>
+      <article className={css.answer} data-reader-answer data-reader-anchor data-reader-key={nodeKey} data-reader-source-start={part.start} data-answer-status={data.status} data-answer-phase={earlier || folded ? 'process' : 'body'}>
         <Blocks {...render} blocks={part.blocks} streaming={data.status === 'running'} holdFormatting={pinned} startedAt={data.time} interrupted={data.status === 'interrupted'} liveText />
-        {index === parts.length - 1 && data.status === 'interrupted' && <span className={css.stopped}>已停止</span>}
-        {index === parts.length - 1 && !earlier && data.status !== 'running' && boundary.status === 'closed' && <CopyAnswer blocks={body} />}
+        {last && data.status === 'interrupted' && <span className={css.stopped}>已停止</span>}
+        {last && !earlier && !folded && data.status !== 'running' && boundary.status === 'closed' && <CopyAnswer blocks={body} />}
       </article>
-    </RetiringContent>)}</>;
+    </RetiringContent>;
+  })}</>;
 });
 
 const MainNode = memo(function MainNode({ useSession, nodeKey, boundary, pinned, processOpen = false, ...render }: SeatProps) {
@@ -133,13 +141,36 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   const startsWithUser = firstKind === 'user';
   const mainKeys = startsWithUser ? group.keys.slice(1) : group.keys;
   const flow = useMemo(() => readerFlow({ ...group, keys: mainKeys }, turn, key => chat.nodes.get(key)), [chat, group, mainKeys, turn]);
+  const steps = useMemo(() => segmentLiveTurn(flow, key => chat.nodes.get(key)), [flow, chat]);
+  const liveItems = useMemo(() => presentLiveTurn(steps, boundary), [steps, boundary]);
   const hasProcess = flow.some(item => item.kind === 'tool' || hasProcessContent(chat.nodes.get(item.nodeKey), boundary));
   // Only a real, still-active text selection delays folding. Merely clicking,
   // focusing or scrolling the live card does not create a permanent override.
-  const holdingSelection = flow.some(item => selectedProcessKeys.includes(item.key));
+  const holdingSelection = selectedProcessKeys.some(key =>
+    flow.some(item => item.key === key)
+    || liveItems.some(item => item.kind === 'fold'
+      ? item.key === key || item.steps.some(step => step.key === key || ('nodeKey' in step && step.nodeKey === key))
+      : item.key === key || ('nodeKey' in item.step && item.step.nodeKey === key)));
   const expanded = holdingSelection || processExpanded(expansionChoice, boundary);
+  const [foldOpenByKey, setFoldOpenByKey] = useState<Record<string, boolean>>({});
   const shared = { useSession: props.useSession, renderSlotChain: props.renderSlotChain, loadImage: props.loadImage };
   const terminal = terminalLabel(boundary.reason);
+  const renderStep = (step: LiveStep, processOpen: boolean, folded: boolean) => {
+    if (step.kind === 'reasoning' || step.kind === 'body') return <BlockBoundary>
+      <AssistantNode {...shared} boundary={boundary} nodeKey={step.nodeKey} partStart={step.start} pinned={pinnedKeys.includes(step.nodeKey)} processOpen={processOpen} folded={folded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} />
+    </BlockBoundary>;
+    if (step.kind === 'tool') return <Fragment>
+      <BlockBoundary><ProcessFragment open={processOpen} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={step.key} framed>
+        <ToolActivity {...shared} entry={step.entry} motion={motion} turnClosed={boundary.status === 'closed'} onRead={pinProcess} />
+      </ProcessFragment></BlockBoundary>
+      {step.entry.block && <BlockBoundary><ToolMedia {...shared} block={step.entry.block} /></BlockBoundary>}
+    </Fragment>;
+    if (step.kind === 'user') return <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={step.nodeKey} /></BlockBoundary>;
+    return <Fragment>
+      <BlockBoundary><ProcessNode useSession={props.useSession} t={props.t} nodeKey={step.nodeKey} open={processOpen} motion={motion} onRead={pinProcess} returnFocusTo={processButton} /></BlockBoundary>
+      <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={step.nodeKey} pinned={pinnedKeys.includes(step.nodeKey)} processOpen={processOpen} /></BlockBoundary>
+    </Fragment>;
+  };
   return <section className={css.turn} data-reader-turn={group.turn ?? 'unresolved'} data-reader-turn-state={boundary.status} data-reader-turn-result={boundary.reason ?? undefined}>
     {startsWithUser && <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={group.keys[0]} /></BlockBoundary>}
     {hasProcess && <Disclosure open={expanded} onChange={setExpanded} controls={flowId} buttonRef={processButton}
@@ -148,16 +179,18 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
       <GroupStatus group={group} useSession={props.useSession} motion={motion} />
     </div>}
     <div id={flowId} className={css.mainFlow} data-reader-flow>
-      {flow.map(item => item.kind === 'node' ? <Fragment key={item.key}>
-        <BlockBoundary><ProcessNode useSession={props.useSession} t={props.t} nodeKey={item.nodeKey} open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} /></BlockBoundary>
-        <BlockBoundary><AssistantNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} /></BlockBoundary>
-        <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} /></BlockBoundary>
-      </Fragment> : <Fragment key={item.key}>
-        <BlockBoundary><ProcessFragment open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={item.key} framed>
-          <ToolActivity {...shared} entry={item} motion={motion} turnClosed={boundary.status === 'closed'} onRead={pinProcess} />
-        </ProcessFragment></BlockBoundary>
-        {item.block && <BlockBoundary><ToolMedia {...shared} block={item.block} /></BlockBoundary>}
-      </Fragment>)}
+      {liveItems.flatMap(item => {
+        if (item.kind === 'fold') {
+          const foldOpen = foldOpenByKey[item.key] ?? false;
+          return [
+            <PriorChainFold key={item.key} summary={item.summary} motion={motion} foldOpen={foldOpen}
+              onFoldOpenChange={value => setFoldOpenByKey(current => current[item.key] === value ? current : { ...current, [item.key]: value })}
+              processKey={item.key} processOpen={expanded} onRead={pinProcess} returnFocusTo={processButton} />,
+            ...item.steps.map(step => <Fragment key={step.key}>{renderStep(step, expanded && foldOpen, true)}</Fragment>),
+          ];
+        }
+        return [<Fragment key={item.key}>{renderStep(item.step, expanded, false)}</Fragment>];
+      })}
     </div>
     {terminal && <div className={css.notice} data-reader-terminal>{terminal}</div>}
   </section>;
@@ -182,7 +215,7 @@ export function Reader(props: ReaderProps) {
   const pinnedKeys = usePinnedSelection(root);
   const selectedProcessKeys = usePinnedSelection(root, '[data-reader-process]');
   const [historyError, setHistoryError] = useState(false);
-  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} data-dsh-better-display="0.1.0" data-motion={motion ? 'on' : 'off'}>
+  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} data-dsh-better-display="0.1.1" data-motion={motion ? 'on' : 'off'}>
     <div className={css.column}>
       <div className={css.toolbar} data-ud-check="reader-toolbar">
         <span title="基于真实消息类型和轮次边界整理。当前协议没有独立的正文阶段标记，无法确认的内容会继续保留。">阅读 · 原始记录完整保留</span>

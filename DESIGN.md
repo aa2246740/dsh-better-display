@@ -16,6 +16,8 @@ Keep native DeepSeek Harness process information readable while separating the f
 
 During a turn, show its real process in chronological order. Starting body output, preparing tool input, finishing one tool, or entering another step is not whole-turn completion.
 
+While a turn is still open, a new reasoning step may collapse earlier steps of the current chain in place through the same process open/close motion as the rest of the reading tab. One disclosure (not a second chrome) carries a structural summary only (for example `思考×2 · 输出×1 · 工具×1`); it does not rewrite Think text. Body and tool steps alone never trigger this fold. A mid-turn user insert or steering message starts a fresh chain, so the next reasoning after that insert is what folds post-insert priors. Context-only prefixes before the first reasoning are not treated as a fold trigger.
+
 Only a successful public turn-close boundary folds process and intermediate commentary, leaving the final answer in place. Failures, interruptions, unknown terminal states and approval requests remain visible. A live text selection defers folding until the selection is released. A historical turn can always be reopened.
 
 ## Long reasoning
@@ -40,4 +42,4 @@ Trusted plugins may register `dsh-better-display.block`. Native content remains 
 
 ## Verification
 
-Use unit coverage for projection, lifecycle, source-ordered streaming, graphemes, Markdown and two-line stepping. Verify live Host manifest, served bundle, native process details, literal reasoning, motion, successful folding, reopening, narrow layouts and reduced motion separately. Keep private session evidence outside this repository.
+Use unit coverage for projection, lifecycle, source-ordered streaming, graphemes, Markdown, two-line stepping and live fold-on-next-reasoning. Verify live Host manifest, served bundle, native process details, literal reasoning, motion, successful folding, reopening, narrow layouts and reduced motion separately. Keep private session evidence outside this repository.
