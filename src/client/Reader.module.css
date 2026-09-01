@@ -35,6 +35,24 @@
 .blocks > :first-child { margin-top: 0; }
 .blocks > :last-child { margin-bottom: 0; }
 .blocks :global(.md-table-wide) { max-width: 100%; }
+.priorFold {
+  min-width: 0;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-module-platform);
+}
+.priorFoldButton {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; min-height: 36px; margin: 0; padding: 8px 12px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; text-align: left; cursor: pointer;
+}
+.priorFoldButton:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.priorFoldCopy { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; min-width: 0; }
+.priorFoldLabel { font-size: 13px; line-height: 22px; font-weight: 500; color: var(--dsw-alias-label-secondary); }
+.priorFoldCounts { font-size: 12px; line-height: 20px; color: var(--dsw-alias-label-tertiary); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.priorFoldBody { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 0 12px 12px; }
+.priorFoldBody:empty { display: none; }
+@media (pointer: coarse) { .priorFoldButton { min-height: 44px; } }
 .disclosure { min-width: 0; }
 .disclosureButton { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 32px; border: 0; background: transparent; border-radius: 7px; color: var(--dsw-alias-label-tertiary); font-size: 14px; line-height: 24px; font-weight: 400; padding: 4px 6px; margin-left: -6px; text-align: left; }
 .disclosure[data-reader-status-only] { display: flex; align-items: center; min-height: 32px; }
