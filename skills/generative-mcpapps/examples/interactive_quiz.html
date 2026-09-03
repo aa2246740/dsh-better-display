@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>双盲方案盲选评测器</title>
+  <style>
+    :root {
+      --app-bg: var(--background, #ffffff);
+      --card-bg: var(--card, #f8fafc);
+      --border-color: var(--border, #e2e8f0);
+      --text-main: var(--foreground, #0f172a);
+      --text-muted: var(--muted-foreground, #64748b);
+      --primary-color: var(--primary, #2563eb);
+      --primary-text: var(--primary-foreground, #ffffff);
+      --hover-bg: rgba(148, 163, 184, 0.12);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --app-bg: var(--background, #0f172a);
+        --card-bg: var(--card, #1e293b);
+        --border-color: var(--border, #334155);
+        --text-main: var(--foreground, #f8fafc);
+        --text-muted: var(--muted-foreground, #94a3b8);
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: transparent;
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 12px;
+    }
+    .quiz-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 8px;
+    }
+    .title { font-size: 15px; font-weight: 600; }
+    .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      background: var(--hover-bg);
+      color: var(--text-muted);
+    }
+    .prompt {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+      line-height: 1.4;
+    }
+    .options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+    .option-btn {
+      text-align: left;
+      background: transparent;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--text-main);
+      font-size: 13px;
+      cursor: pointer;
+      line-height: 1.4;
+      transition: all 0.15s ease;
+    }
+    .option-btn:hover { background: var(--hover-bg); }
+    .option-btn.selected {
+      border-color: var(--primary-color);
+      background: var(--hover-bg);
+      font-weight: 500;
+    }
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+    }
+    .submit-btn {
+      background: var(--primary-color);
+      color: var(--primary-text);
+      border: none;
+      border-radius: 6px;
+      padding: 7px 16px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <div class="quiz-card">
+    <div class="header">
+      <span class="title">⚡ 架构方案盲选评测</span>
+      <span class="badge" id="step-indicator">第 1/2 题</span>
+    </div>
+    <p class="prompt" id="question-text">
+      【场景】：订单超时自动关单，选 Redis 过期监听还是延迟消息队列？
+    </p>
+
+    <div class="options" id="options-container">
+      <button class="option-btn" onclick="selectOption('A')">A: 选 Redis 监听，轻量便捷无需额外运维</button>
+      <button class="option-btn" onclick="selectOption('B')">B: 坚决选延迟消息队列，Redis 监听会静默丢事件</button>
+    </div>
+
+    <div class="footer">
+      <span style="font-size: 12px; color: var(--text-muted);" id="status-text">请选择最符合你直觉的方案</span>
+      <button class="submit-btn" id="submit-btn" disabled onclick="submitChoice()">确认选择并提交</button>
+    </div>
+  </div>
+
+  <script>
+    let currentSelection = null;
+
+    function selectOption(key) {
+      currentSelection = key;
+      document.querySelectorAll('.option-btn').forEach((btn, idx) => {
+        btn.classList.toggle('selected', (idx === 0 && key === 'A') || (idx === 1 && key === 'B'));
+      });
+      document.getElementById('submit-btn').disabled = false;
+    }
+
+    function submitChoice() {
+      if (!currentSelection) return;
+
+      document.getElementById('status-text').innerText = "已提交给 Agent！";
+      document.getElementById('submit-btn').disabled = true;
+
+      // 通过 SEP-1865 标准向 Host 提交结果
+      window.parent.postMessage({
+        jsonrpc: "2.0",
+        id: "eval-" + Date.now(),
+        method: "ui/submit",
+        params: {
+          task: "architecture_quiz_completed",
+          choice: currentSelection,
+          desc: currentSelection === 'A' ? 'Redis 监听' : '延迟消息队列'
+        }
+      }, "*");
+    }
+  </script>
+</body>
+</html>

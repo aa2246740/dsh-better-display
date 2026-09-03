@@ -7,6 +7,7 @@ import { installReaderEntry } from './entry.js';
 import type { ReaderInjected } from './types.js';
 
 export type { ReaderBlockOwner } from './types.js';
+export { McpAppFrame } from './McpAppFrame.js';
 export const name = 'dsh-better-display-client';
 export const inject = ['slots', 'sessions'];
 

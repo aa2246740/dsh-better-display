@@ -8,6 +8,7 @@ import { activityPhase, activitySummary, executionFacts, toolIdentity } from './
 import type { ToolActivityEntry, ToolCategory, ToolPhase } from './tool-activity.js';
 import type { BlockRenderProps } from './types.js';
 import { classifyTool, toolRowModel, VARIANT_TITLES } from './native/tool-call-model.js';
+import { McpAppFrame, StreamingMcpAppPlaceholder } from './McpAppFrame.js';
 import css from './Reader.module.css';
 
 const LABEL: Record<ToolPhase, string> = { preparing: '输入生成中', running: '执行中', returned: '已返回', succeeded: '已完成', failed: '失败', interrupted: '已中断' };
@@ -25,12 +26,20 @@ function generatedInput(content: string, target: string | undefined, preparing: 
 }
 
 function InputView({ model, preparing }: { model: ReturnType<typeof activitySummary>; preparing: boolean }) {
+  if ((model.name === 'render_ui' || model.name === 'show_widget') && typeof model.args?.html === 'string') {
+    return preparing
+      ? <StreamingMcpAppPlaceholder title={typeof model.args.title === 'string' ? (model.args.title as string) : undefined} />
+      : <McpAppFrame html={model.args.html as string} title={typeof model.args.title === 'string' ? (model.args.title as string) : undefined} />;
+  }
   if (model.content) return generatedInput(model.content, model.target, preparing);
   if (model.command) return <div data-reader-tool-terminal><p className={css.toolDetailNote}>{preparing ? '正在生成命令 · 尚未执行' : '提交的命令'}</p><TerminalBlock command={model.command} cwd={model.cwd} /></div>;
   return <JsonTree data={model.args} label={preparing ? '已收到的输入字段' : '工具输入'} />;
 }
 
 function ResultView({ entry, model, phase, ...render }: BlockRenderProps & { entry: ToolActivityEntry; model: ReturnType<typeof activitySummary>; phase: ToolPhase }) {
+  if ((model.name === 'render_ui' || model.name === 'show_widget') && typeof model.args?.html === 'string') {
+    return <McpAppFrame html={model.args.html as string} title={typeof model.args.title === 'string' ? (model.args.title as string) : undefined} />;
+  }
   const block = entry.block;
   if (!block || !('kind' in block)) return <>
     <p className={css.toolDetailNote}>{phase === 'interrupted' ? '已中断，没有工具结果。已生成的输入仍可查看。' : phase === 'preparing' ? '模型正在生成工具输入，工具还未开始执行。' : '工具已开始执行，正在等待结果。'}</p>

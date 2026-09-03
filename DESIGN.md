@@ -36,7 +36,7 @@ Manual reading, selection and keyboard access take precedence over automatic fol
 
 ## Extensions and safety
 
-Trusted plugins may register `dsh-better-display.block`. Native content remains the fallback. This release does not execute arbitrary generated markup, embed an MCP App host or grant capabilities to generated UI.
+Trusted plugins may register `dsh-better-display.block`. Native content remains the fallback. Generative MCP Apps (SEP-1865 / `io.modelcontextprotocol/ui`) are supported via an isolated, sandboxed iframe (`sandbox="allow-scripts allow-forms"`, strictly without `allow-same-origin`) communicating via bidirectional JSON-RPC `postMessage` (`ui/initialize`, `ui/resize`, `ui/update-model-context`, `ui/submit`).
 
 ## Verification
 
