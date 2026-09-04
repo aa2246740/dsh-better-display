@@ -21,13 +21,11 @@
     "client": {
       "platform": "web",
       "inject": [
+        "@deepseek-ai/dsh-api-session-controller",
         "@deepseek-ai/dsh-client-ui-chat",
         "@deepseek-ai/dsh-client-ui-conversation",
         "@deepseek-ai/dsh-client-ui-renderer",
         "@deepseek-ai/dsh-client-ui-session"
-      ],
-      "external": [
-        "@deepseek-ai/dsh-util-workspace-path"
       ]
     }
   },
@@ -39,6 +37,7 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-api-session-controller": "^0.1.2-rc.1",
     "@deepseek-ai/dsh-attachment": "^0.1.2-rc.1",
     "@deepseek-ai/dsh-client-store": "^0.1.2-rc.1",
     "@deepseek-ai/dsh-client-ui-chat": "^0.1.2-rc.1",
@@ -52,6 +51,7 @@
     "react": "^18.2.0"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-api-session-controller": "0.1.2-rc.1",
     "@types/mdast": "^4.0.4",
     "@types/node": "^22.20.0",
     "@types/react": "~18.3.1",
