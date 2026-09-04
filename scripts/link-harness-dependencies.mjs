@@ -8,11 +8,16 @@ const local = resolve('node_modules');
 mkdirSync(local, { recursive: true });
 const shared = {
   '@deepseek-ai/cordis': 'vendor/cordis',
-  '@deepseek-ai/dsh-client-runtime': 'packages/client/runtime',
+  '@deepseek-ai/dsh-client-store': 'packages/client/store',
+  '@deepseek-ai/dsh-client-ui-chat': 'packages/client/ui-chat',
   '@deepseek-ai/dsh-client-ui-conversation': 'packages/client/ui-conversation',
   '@deepseek-ai/dsh-client-ui-primitives': 'packages/client/ui-primitives',
+  '@deepseek-ai/dsh-client-ui-renderer': 'packages/client/ui-renderer',
+  '@deepseek-ai/dsh-client-ui-session': 'packages/client/ui-session',
   '@deepseek-ai/dsh-client-ui-slots': 'packages/client/ui-slots',
   '@deepseek-ai/dsh-attachment': 'packages/attachment/attachment',
+  '@deepseek-ai/dsh-session': 'packages/core/session',
+  '@deepseek-ai/dsh-util-workspace-path': 'packages/util/workspace-path',
 };
 function link(name, target) {
   const destination = join(local, name);

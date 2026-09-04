@@ -1,7 +1,6 @@
 import { Fragment, memo, useCallback, useId, useMemo, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
-import type { ChatConversationViewNode } from '@deepseek-ai/dsh-client-runtime/client';
-import type { ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-conversation/client';
+import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
 import { JsonBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives';
 import { BlockBoundary, Blocks, contentBlocks, CopyAnswer } from './Blocks.js';
 import { ReasoningCard } from './ReasoningCard.js';
@@ -14,31 +13,32 @@ import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import type { ReaderGroup, TurnBoundary } from './projection.js';
 import type { BlockRenderProps, ReaderProps } from './types.js';
 import css from './Reader.module.css';
+import { markdownLabels, truncatedJsonLabel } from './primitive-labels.js';
 
 function isNode<K extends ChatNodeKind>(node: ChatConversationViewNode, kind: K): node is ChatNode<K> {
   return node.kind === kind;
 }
 
-type SeatProps = BlockRenderProps & Pick<ReaderProps, 'useSession'> & {
+type SeatProps = BlockRenderProps & Pick<ReaderProps, 'useChat'> & {
   nodeKey: string; boundary: TurnBoundary; pinned?: boolean; processOpen?: boolean;
 };
 
-const ProcessNode = memo(function ProcessNode({ useSession, t, nodeKey, open, motion, onRead, returnFocusTo }: Pick<ReaderProps, 'useSession' | 't'> & {
+const ProcessNode = memo(function ProcessNode({ useChat, t, nodeKey, open, motion, onRead, returnFocusTo }: Pick<ReaderProps, 'useChat' | 't'> & {
   nodeKey: string; open: boolean; motion: boolean; onRead: () => void; returnFocusTo: RefObject<HTMLButtonElement>;
 }) {
-  const node = useSession(snapshot => snapshot.chat.nodes.get(nodeKey));
+  const node = useChat(snapshot => snapshot.nodes.get(nodeKey));
   if (!node || node.visibility === 'hidden') return null;
   let content: ReactNode = null;
   if (isNode(node, 'context')) content = <ContextInjectionRow {...node.data} t={t} />;
-  else if (isNode(node, 'model-retry')) content = <JsonBlock label="模型重试记录" payload={node.data.attempts} />;
-  else if (isNode(node, 'command') || isNode(node, 'manual-compaction')) content = <JsonBlock label="命令记录" payload={node.data} />;
+  else if (isNode(node, 'model-retry')) content = <JsonBlock label="模型重试记录" payload={node.data.attempts} truncatedLabel={truncatedJsonLabel} />;
+  else if (isNode(node, 'command') || isNode(node, 'manual-compaction')) content = <JsonBlock label="命令记录" payload={node.data} truncatedLabel={truncatedJsonLabel} />;
   return content && <ProcessFragment open={open} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={nodeKey} framed>{content}</ProcessFragment>;
 });
 
-const AssistantNode = memo(function AssistantNode({ useSession, nodeKey, boundary, processOpen = false, pinned = false, motion, onRead, returnFocusTo, ...render }: SeatProps & {
+const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, processOpen = false, pinned = false, motion, onRead, returnFocusTo, ...render }: SeatProps & {
   motion: boolean; onRead: () => void; returnFocusTo: RefObject<HTMLButtonElement>;
 }) {
-  const node = useSession(snapshot => snapshot.chat.nodes.get(nodeKey));
+  const node = useChat(snapshot => snapshot.nodes.get(nodeKey));
   if (!node || node.visibility === 'hidden' || !isNode(node, 'assistant-step')) return null;
   const data = node.data;
   const parts = assistantSegments(data.blocks);
@@ -60,8 +60,8 @@ const AssistantNode = memo(function AssistantNode({ useSession, nodeKey, boundar
     </RetiringContent>)}</>;
 });
 
-const MainNode = memo(function MainNode({ useSession, nodeKey, boundary, pinned, processOpen = false, ...render }: SeatProps) {
-  const node = useSession(snapshot => snapshot.chat.nodes.get(nodeKey));
+const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, processOpen = false, ...render }: SeatProps) {
+  const node = useChat(snapshot => snapshot.nodes.get(nodeKey));
   if (!node || node.visibility === 'hidden') return null;
   if (isNode(node, 'user') || isNode(node, 'steering')) return <div className={css.user} data-reader-anchor data-reader-key={nodeKey}>
     {node.kind === 'steering' && <p className={css.meta}>补充消息</p>}
@@ -77,35 +77,36 @@ const MainNode = memo(function MainNode({ useSession, nodeKey, boundary, pinned,
     ? <div className={css.notice} role="status">模型请求未成功，正在等待重试。详情保留在执行过程中。</div> : null;
   if (isNode(node, 'command')) {
     if (node.data.outcome?.kind === 'error') return <div className={css.error} role="alert">命令执行失败：{node.data.outcome.text ?? node.data.name ?? '查看原对话中的命令记录'}</div>;
-    return node.data.outcome?.text ? <MarkdownText text={node.data.outcome.text} /> : null;
+    return node.data.outcome?.text ? <MarkdownText text={node.data.outcome.text} labels={markdownLabels} /> : null;
   }
   if (isNode(node, 'manual-compaction')) {
     if (node.data.command.outcome?.kind === 'error') return <div className={css.error} role="alert">上下文压缩失败：{node.data.command.outcome.text}</div>;
     return node.data.compaction ? <p className={css.meta}>上下文已整理，原始记录仍保留。</p> : <p className={css.meta}>正在整理上下文…</p>;
   }
-  if (node.kind === 'compaction') return <details className={css.detail}><summary>上下文已整理，查看记录</summary><JsonBlock label="压缩记录" payload={node.data} /></details>;
+  if (node.kind === 'compaction') return <details className={css.detail}><summary>上下文已整理，查看记录</summary><JsonBlock label="压缩记录" payload={node.data} truncatedLabel={truncatedJsonLabel} /></details>;
   if (node.kind === 'context' || node.kind === 'turn-tail') return null;
   return <div className={css.unknown} data-reader-anchor>
     <p>此记录类型暂未接入阅读页：{node.kind}</p>
-    <JsonBlock label="查看原始记录" payload={node.data} />
+    <JsonBlock label="查看原始记录" payload={node.data} truncatedLabel={truncatedJsonLabel} />
   </div>;
 });
 
-function GroupStatus({ group, useSession, motion }: Pick<ReaderProps, 'useSession'> & { group: ReaderGroup; motion: boolean }) {
-  const text = useSession(snapshot => {
-    const turn = group.turn === null ? undefined : snapshot.chat.timeline.turns.get(group.turn);
+function GroupStatus({ group, sessionId, useChat, useSessionPendingInteraction, motion }: Pick<ReaderProps, 'sessionId' | 'useChat' | 'useSessionPendingInteraction'> & { group: ReaderGroup; motion: boolean }) {
+  const pending = useSessionPendingInteraction(snapshot => snapshot.get(sessionId));
+  const text = useChat(snapshot => {
+    const turn = group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn);
     if (turn?.status === 'closed') {
       if (turn.end?.data.reason.kind !== 'completed') return '执行过程';
       const elapsed = turn.start && turn.end ? Math.max(0, Math.round((turn.end.time - turn.start.time) / 1000)) : null;
       return elapsed === null ? '执行过程' : elapsed < 60 ? `用时 ${elapsed} 秒` : `用时 ${Math.floor(elapsed / 60)} 分 ${elapsed % 60} 秒`;
     }
     if (turn?.status !== 'open') return '执行过程';
-    if (snapshot.pending.length) return '等待你的操作';
+    if (pending !== undefined) return '等待你的操作';
     const current = turn.steps.at(-1)?.data.get('assistant-step');
     const last = current?.blocks.at(-1);
     if (current?.status === 'running' && last?.kind === 'tool-call') return preparingLabel(last.name);
     for (let index = group.keys.length - 1; index >= 0; index--) {
-      const node = snapshot.chat.nodes.get(group.keys[index]);
+      const node = snapshot.nodes.get(group.keys[index]);
       if (!node) continue;
       if (isNode(node, 'tool-call') && !('kind' in node.data.root)) return '正在使用工具';
       if (isNode(node, 'assistant-step') && node.data.status === 'running') {
@@ -115,13 +116,13 @@ function GroupStatus({ group, useSession, motion }: Pick<ReaderProps, 'useSessio
     }
     return '正在处理';
   });
-  const busy = useSession(snapshot => group.turn !== null && snapshot.chat.timeline.turns.get(group.turn)?.status === 'open' && snapshot.pending.length === 0);
+  const busy = useChat(snapshot => group.turn !== null && snapshot.timeline.turns.get(group.turn)?.status === 'open' && pending === undefined);
   return <StatusText text={text} motion={motion} shimmer={busy} />;
 }
 
 const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[] }) {
-  const chat = props.useSession(snapshot => snapshot.chat);
-  const turn = props.useSession(snapshot => group.turn === null ? undefined : snapshot.chat.timeline.turns.get(group.turn));
+  const chat = props.useChat(snapshot => snapshot);
+  const turn = props.useChat(snapshot => group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn));
   const boundary = useMemo(() => boundaryOf(turn), [turn]);
   const choiceKey = processChoiceKey(group.key, boundary);
   const expansionChoice = props.useStore(state => state.expanded[choiceKey]);
@@ -129,7 +130,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   const processButton = useRef<HTMLButtonElement>(null);
   const setExpanded = useCallback((value: boolean) => props.actions.setExpanded(choiceKey, value), [props.actions, choiceKey]);
   const pinProcess = useCallback(() => setExpanded(true), [setExpanded]);
-  const firstKind = props.useSession(snapshot => snapshot.chat.nodes.get(group.keys[0])?.kind);
+  const firstKind = props.useChat(snapshot => snapshot.nodes.get(group.keys[0])?.kind);
   const startsWithUser = firstKind === 'user';
   const mainKeys = startsWithUser ? group.keys.slice(1) : group.keys;
   const flow = useMemo(() => readerFlow({ ...group, keys: mainKeys }, turn, key => chat.nodes.get(key)), [chat, group, mainKeys, turn]);
@@ -138,18 +139,18 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   // focusing or scrolling the live card does not create a permanent override.
   const holdingSelection = flow.some(item => selectedProcessKeys.includes(item.key));
   const expanded = holdingSelection || processExpanded(expansionChoice, boundary);
-  const shared = { useSession: props.useSession, renderSlotChain: props.renderSlotChain, loadImage: props.loadImage };
+  const shared = { useChat: props.useChat, renderSlotChain: props.renderSlotChain, loadImage: props.loadImage };
   const terminal = terminalLabel(boundary.reason);
   return <section className={css.turn} data-reader-turn={group.turn ?? 'unresolved'} data-reader-turn-state={boundary.status} data-reader-turn-result={boundary.reason ?? undefined}>
     {startsWithUser && <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={group.keys[0]} /></BlockBoundary>}
     {hasProcess && <Disclosure open={expanded} onChange={setExpanded} controls={flowId} buttonRef={processButton}
-      label={<GroupStatus group={group} useSession={props.useSession} motion={motion} />} status={turn?.steps.length ? `${turn.steps.length} 个步骤` : undefined} />}
+      label={<GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSessionPendingInteraction={props.useSessionPendingInteraction} motion={motion} />} status={turn?.steps.length ? `${turn.steps.length} 个步骤` : undefined} />}
     {!hasProcess && boundary.status === 'open' && <div className={css.disclosure} data-reader-status-only>
-      <GroupStatus group={group} useSession={props.useSession} motion={motion} />
+      <GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSessionPendingInteraction={props.useSessionPendingInteraction} motion={motion} />
     </div>}
     <div id={flowId} className={css.mainFlow} data-reader-flow>
       {flow.map(item => item.kind === 'node' ? <Fragment key={item.key}>
-        <BlockBoundary><ProcessNode useSession={props.useSession} t={props.t} nodeKey={item.nodeKey} open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} /></BlockBoundary>
+        <BlockBoundary><ProcessNode useChat={props.useChat} t={props.t} nodeKey={item.nodeKey} open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} /></BlockBoundary>
         <BlockBoundary><AssistantNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} /></BlockBoundary>
         <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={item.nodeKey} pinned={pinnedKeys.includes(item.nodeKey)} processOpen={expanded} /></BlockBoundary>
       </Fragment> : <Fragment key={item.key}>
@@ -166,10 +167,10 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
 export function Reader(props: ReaderProps) {
   const root = useRef<HTMLDivElement>(null);
   const activatedAt = useRef(Date.now());
-  const order = props.useSession(snapshot => snapshot.chat.order);
-  const nodes = props.useSession(snapshot => snapshot.chat.nodes);
-  const timeline = props.useSession(snapshot => snapshot.chat.timeline);
-  const pending = props.useSession(snapshot => snapshot.pending);
+  const order = props.useChat(snapshot => snapshot.order);
+  const nodes = props.useChat(snapshot => snapshot.nodes);
+  const timeline = props.useChat(snapshot => snapshot.timeline);
+  const pending = props.useSessionPendingInteraction(snapshot => snapshot.get(props.sessionId));
   const openError = props.useSession(snapshot => snapshot.openError);
   const loading = props.useSession(snapshot => snapshot.openState === 'loading');
   const hasMore = props.useSession(snapshot => snapshot.hasMore);
@@ -196,8 +197,8 @@ export function Reader(props: ReaderProps) {
       {openError && <div className={css.error} role="alert">会话暂时无法读取：{openError.message}</div>}
       {loading && groups.length === 0 && <p className={css.empty} role="status">正在读取会话…</p>}
       {groups.map(group => <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} />)}
-      {pending.length > 0 && <div className={css.attention} role="alert" data-reader-attention>
-        <strong>{pending.some(item => item.kind === 'question') ? '需要你回答一个问题' : '需要你的确认'}</strong>
+      {pending !== undefined && <div className={css.attention} role="alert" data-reader-attention>
+        <strong>{pending.kind === 'question' ? '需要你回答一个问题' : '需要你的确认'}</strong>
         <span>请在下方原生操作区处理。此提示不会收进执行过程。</span>
       </div>}
       {scroll.detached && <div className={css.jumpDock}><button type="button" className={css.jump} onClick={scroll.jump}>↓ 回到最新</button></div>}

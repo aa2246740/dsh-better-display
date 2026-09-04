@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { AssistantChatData } from '@deepseek-ai/dsh-client-ui-conversation/client';
-import type { AssistantBlock, ChatConversationViewNode, TurnLocation, ToolCallBlock } from '@deepseek-ai/dsh-client-runtime/client';
+import type { AssistantBlock, ToolCallBlock, TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
+import type { AssistantChatData, ChatConversationViewNode } from '@deepseek-ai/dsh-client-ui-chat/client';
 import { assistantSegments, boundaryOf, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel, toolFailed } from '../src/client/projection.ts';
 import type { TurnBoundary } from '../src/client/projection.ts';
 import { activityPhase, activitySummary, inputFields, readerFlow } from '../src/client/tool-activity.ts';
@@ -118,8 +118,8 @@ test('missing historical boundaries remain explicit uncertainty', () => {
 });
 
 test('a failed child tool is not hidden by a successful parent summary', () => {
-  const failed = { kind: 'tool-result', isError: true, subCalls: [] } as unknown as ToolCallBlock;
-  const parent = { kind: 'tool-result', isError: false, subCalls: [failed] } as unknown as ToolCallBlock;
+  const failed = { kind: 'tool-result', isError: true, content: [], subCalls: [] } as unknown as ToolCallBlock;
+  const parent = { kind: 'tool-result', isError: false, content: [], subCalls: [failed] } as unknown as ToolCallBlock;
   assert.equal(toolFailed(parent), true);
 });
 
@@ -155,9 +155,9 @@ test('partial argument parsing respects JSON nesting, escapes and unfinished uni
 });
 
 test('a nonzero terminal exit is a failure even when the tool transport is non-error', () => {
-  const block = { kind: 'tool-result', isError: false, resultView: { card: 'terminal', exitCode: 7 }, subCalls: [] } as unknown as ToolCallBlock;
+  const block = { kind: 'tool-result', isError: false, content: [], meta: { exitCode: 7 }, subCalls: [] } as unknown as ToolCallBlock;
   assert.equal(toolFailed(block), true);
   assert.equal(activityPhase({ block }), 'failed');
-  assert.equal(activityPhase({ block: { ...block, resultView: null } as ToolCallBlock }), 'returned');
+  assert.equal(activityPhase({ block: { ...block, meta: null } as ToolCallBlock }), 'returned');
   assert.equal(activityPhase({}, true), 'interrupted');
 });

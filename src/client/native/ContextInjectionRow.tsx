@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { ContextMessageNode } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ChatViewSlotProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ContextMessageNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { DisclosureRow, IconBrowseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ReferenceIcon } from './ReferenceIcon.js'
 import { contextBody } from './ContextBody.js'
@@ -15,7 +15,7 @@ export interface ContextInjectionRowProps {
   /** Producer-declared information form; null renders the opaque body. */
   form: ContextMessageNode['form']
   /** The owning view's locale seat, passed down as a plain prop. */
-  t: ChatViewSlotProps['t']
+  t: TranslateNS<'chat'>
 }
 
 /**

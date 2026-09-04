@@ -1,5 +1,5 @@
-import type { AssistantBlock, ChatConversationViewNode, TurnLocation, ToolCallBlock } from '@deepseek-ai/dsh-client-runtime/client';
-import type { AssistantChatData } from '@deepseek-ai/dsh-client-ui-conversation/client';
+import type { AssistantBlock, ToolCallBlock, TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
+import type { AssistantChatData, ChatConversationViewNode } from '@deepseek-ai/dsh-client-ui-chat/client';
 import { executionFacts } from './tool-activity.js';
 
 export interface ReaderGroup { key: string; turn: number | null; keys: readonly string[] }

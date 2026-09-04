@@ -1,16 +1,17 @@
 import { useLayoutEffect } from 'react';
 import type { Context } from '@deepseek-ai/cordis';
-import type { ChatStore } from '@deepseek-ai/dsh-client-ui-conversation/client';
+import type { ConversationStore } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type { PropsRuntime, PropsStore, StoreDecl } from '@deepseek-ai/dsh-client-ui-slots';
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client';
 import { ReaderEntryPolicy, readerEntryRequested } from './entry-policy.js';
 
-function isChatStore(store: StoreDecl | undefined): store is ChatStore {
+function isConversationStore(store: StoreDecl | undefined): store is ConversationStore {
   return typeof store === 'object' && store !== null
-    && store.spec.persist === 'dsh.conversation.chat'
+    && store.spec.persist === 'dsh.conversation'
     && typeof store.spec.actions.setView === 'function';
 }
 
-type EntryProps = PropsRuntime<'conversation.input.dock'> & PropsStore<ChatStore> & { policy: ReaderEntryPolicy };
+type EntryProps = PropsRuntime<'conversation.input.dock'> & PropsStore<ConversationStore> & { policy: ReaderEntryPolicy };
 
 function ReaderEntry({ useStore, actions, policy }: EntryProps) {
   const view = useStore(state => state.view);
@@ -24,7 +25,7 @@ function ReaderEntry({ useStore, actions, policy }: EntryProps) {
 /** Reuse the native store handle; its framework-owned instance preserves drafts. */
 export function installReaderEntry(ctx: Context): () => void {
   const native = ctx.slots.entriesOfSlot('conversation.session')[0]?.store;
-  if (!isChatStore(native)) throw new Error('DSH Reader cannot bind the native conversation view store.');
+  if (!isConversationStore(native)) throw new Error('DSH Reader cannot bind the native conversation view store.');
   const policy = new ReaderEntryPolicy(readerEntryRequested(location.search), () => {
     const url = new URL(location.href);
     url.searchParams.delete('reader');

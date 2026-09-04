@@ -1,5 +1,5 @@
-import { defineStore } from '@deepseek-ai/dsh-client-runtime/client';
-import type { EngineStoreHandle } from '@deepseek-ai/dsh-client-runtime/client';
+import { defineStore } from '@deepseek-ai/dsh-client-store';
+import type { EngineStoreHandle } from '@deepseek-ai/dsh-client-store';
 
 export interface ReaderState { expanded: Record<string, boolean>; motion: boolean }
 type ReaderActions = {
