@@ -8,6 +8,7 @@ if (!root) throw new Error('Set DSHX_HARNESS to the checkout used for this build
 const adapter = resolve(root, 'tools/dshx/src/client-build.js');
 if (!existsSync(adapter)) throw new Error('DSHX externalClientBundle adapter is missing.');
 const { externalClientBundle } = await import(pathToFileURL(adapter).href);
-export default externalClientBundle('dsh-better-display', ['lib/types/dsh-better-display.js'], {
+export default externalClientBundle('dsh-deckseek', ['src/dsh-deckseek.ts'], {
   clientEntry: 'src/client/index.tsx',
 });
+

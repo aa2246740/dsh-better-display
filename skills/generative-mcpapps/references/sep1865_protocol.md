@@ -83,7 +83,7 @@ window.parent.postMessage({
 ```
 
 ### 2.3 Resizing Request (`ui/resize`)
-When dynamic content inside the card expands or contracts, request an iframe height adjustment (note: `dsh-better-display` also automatically auto-measures via ResizeObserver):
+When dynamic content inside the card expands or contracts, request an iframe height adjustment (note: `dsh-deckseek` also automatically auto-measures via ResizeObserver):
 
 ```javascript
 window.parent.postMessage({

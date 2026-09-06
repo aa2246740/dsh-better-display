@@ -23,18 +23,20 @@ function ReaderEntry({ useStore, actions, policy }: EntryProps) {
 }
 
 /** Reuse the native store handle; its framework-owned instance preserves drafts. */
-export function installReaderEntry(ctx: Context): () => void {
-  const native = ctx.slots.entriesOfSlot('conversation.session')[0]?.store;
-  if (!isConversationStore(native)) throw new Error('DSH Reader cannot bind the native conversation view store.');
-  const policy = new ReaderEntryPolicy(readerEntryRequested(location.search), () => {
-    const url = new URL(location.href);
-    url.searchParams.delete('reader');
-    history.replaceState(history.state, '', `${url.pathname}${url.search}${url.hash}`);
+export function installReaderEntry(ctx: Context): void {
+  ctx.slots.inject('conversation.input.dock', () => {
+    const native = ctx.slots.entriesOfSlot('conversation.session')[0]?.store;
+    if (!isConversationStore(native)) return;
+    const policy = new ReaderEntryPolicy(readerEntryRequested(location.search), () => {
+      const url = new URL(location.href);
+      url.searchParams.delete('reader');
+      history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+    });
+    return ctx.slots.register({
+      name: 'conversation.input.dock',
+      id: 'dsh-deckseek-entry',
+      store: native,
+      inject: () => ({ policy }),
+    }, ReaderEntry);
   });
-  return ctx.slots.register({
-    name: 'conversation.input.dock',
-    id: 'dsh-better-display-entry',
-    store: native,
-    inject: () => ({ policy }),
-  }, ReaderEntry);
 }

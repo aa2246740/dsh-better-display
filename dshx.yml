@@ -1,5 +1,5 @@
-id: dsh-better-display
-entry: src/dsh-better-display.ts
-marker: '[my-plugins/dsh-better-display] loaded'
+id: dsh-deckseek
+entry: src/dsh-deckseek.ts
+marker: '[my-plugins/dsh-deckseek] loaded'
 kind: client
 profile: web

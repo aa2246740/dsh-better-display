@@ -3,6 +3,14 @@
 The MIT license in this repository covers original plugin code. It does not
 replace third-party licenses or the Transitions.dev recipe terms below.
 
+## Fork provenance
+
+This repository is a fork of
+[aa2246740/dsh-better-display](https://github.com/aa2246740/dsh-better-display)
+(MIT), independently maintained by JNNarrator. The forked material remains
+subject to the upstream MIT license and the notices below; this entry records
+the fork relationship and the current maintainer.
+
 ## Transitions.dev product-use terms
 
 The three free recipes used in this DSH-specific display are Streaming text,

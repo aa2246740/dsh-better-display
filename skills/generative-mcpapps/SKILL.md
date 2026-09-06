@@ -3,7 +3,7 @@ name: generative-mcpapps
 description: >-
   Render interactive, dynamic HTML/JS components and widgets inside any AI harness
   supporting the MCP Apps standard (SEP-1865 / io.modelcontextprotocol/ui), such as
-  DeepSeek Harness with dsh-better-display. Use this skill whenever presenting interactive
+  DeepSeek Harness with dsh-deckseek. Use this skill whenever presenting interactive
   data visualizations, multi-variant double-blind evaluations, dynamic calculators, stateful
   forms, configuration wizards, or rich controls that exceed plain Markdown capabilities.
 ---
@@ -60,7 +60,7 @@ Compose the HTML document following the structure in [references/html_boilerplat
 
 Deliver the assembled HTML to the host through one of the available dynamic pathways:
 
-- **Path A (Markdown Code Block — Direct & Universal in dsh-better-display)**:
+- **Path A (Markdown Code Block — Direct & Universal in dsh-deckseek)**:
   Directly output the HTML within a ````mcp-app` code fence. The reading view will automatically mount it inside an isolated, theme-aware sandbox:
   ````markdown
   ```mcp-app title="双盲方案盲选评测器"

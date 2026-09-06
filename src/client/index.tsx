@@ -10,21 +10,20 @@ import type { ReaderInjected } from './types.js';
 
 export type { ReaderBlockOwner } from './types.js';
 export { McpAppFrame } from './McpAppFrame.js';
-export const name = 'dsh-better-display-client';
+export const name = 'dsh-deckseek-client';
 export const inject = ['slots', 'sessions'];
 
 export function apply(ctx: Context): void {
   const store = createReaderStore();
   const faces = new Map<SessionId, ReaderInjected>();
   ctx.effect(() => () => { faces.clear(); });
-  ctx.slots.inject('conversation.view', function* () {
-    yield ctx.slots.register({
+  ctx.slots.inject('conversation.view', () => ctx.slots.register({
     name: 'conversation.view',
     id: 'reader',
     order: -5,
     label: () => '阅读',
     locale: 'chat',
-    children: { 'dsh-better-display.block': { kind: 'chain', scope: 'session' } },
+    children: { 'dsh-deckseek.block': { kind: 'chain', scope: 'session' } },
     store,
     inject: (sessionId: SessionId): ReaderInjected => {
       const existing = faces.get(sessionId);
@@ -45,7 +44,6 @@ export function apply(ctx: Context): void {
       faces.set(sessionId, face);
       return face;
     },
-    }, Reader);
-    yield installReaderEntry(ctx);
-  });
+  }, Reader));
+  installReaderEntry(ctx);
 }
