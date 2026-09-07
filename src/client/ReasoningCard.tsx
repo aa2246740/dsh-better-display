@@ -38,6 +38,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
   }, [selected]);
 
   useLayoutEffect(() => {
+    if (!expanded) return;
     const port = viewport.current;
     const host = port?.closest<HTMLElement>('[data-conversation-scroll]');
     if (!port || !host) return;
@@ -52,9 +53,7 @@ export function ReasoningCard({ children, step, active, motion, selected, onRead
     };
     fit();
     const observer = new ResizeObserver(fit); observer.observe(host);
-    const attributes = new MutationObserver(fit);
-    attributes.observe(host, { attributes: true, attributeFilter: ['style'] });
-    return () => { observer.disconnect(); attributes.disconnect(); };
+    return () => { observer.disconnect(); };
   }, [expanded]);
 
   useLayoutEffect(() => {
