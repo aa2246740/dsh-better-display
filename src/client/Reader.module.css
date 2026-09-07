@@ -96,6 +96,7 @@
 .disclosureBody { overflow: hidden; height: 0; }
 .processContents { display: flow-root; border-left: 1px solid var(--dsw-alias-border-l2); padding: 3px 0 2px 17px; margin: 0 0 0 6px; color: var(--dsw-alias-label-secondary); font-size: 14px; line-height: 24px; }
 .processContents > :last-child { margin-bottom: 0; }
+.processCommentary { color: var(--dsw-alias-label-secondary); font-size: 14px; line-height: 24px; margin: 4px 0 8px 6px; padding-left: 12px; border-left: 2px solid var(--dsw-alias-border-l2); }
 .processFrame { min-width: 0; }
 .toolActivity { min-width: 0; color: var(--dsw-alias-label-secondary); }
 .nativeToolRow { min-width: 0; }

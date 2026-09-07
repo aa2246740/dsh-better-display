@@ -45,6 +45,8 @@ const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, 
   const data = node.data;
   const parts = assistantSegments(data.blocks);
   const earlier = isEarlierNarration(data, boundary);
+  const hasToolCalls = data.blocks.some(block => block.kind === 'tool-call');
+  const isProcessStep = earlier || hasToolCalls || (boundary.latestStep > 0 && data.step < boundary.latestStep);
   const body = data.blocks.filter(block => block.kind !== 'reasoning' && block.kind !== 'tool-call');
   return <>{parts.map((part, index) => part.kind === 'reasoning'
     ? <ProcessFragment key={part.start} open={processOpen} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={nodeKey} framed>
@@ -53,8 +55,13 @@ const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, 
           holdFormatting={pinned} startedAt={data.time} interrupted={data.status === 'interrupted'} liveText />
       </ReasoningCard>
     </ProcessFragment>
+    : isProcessStep ? <ProcessFragment key={part.start} open={processOpen} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={nodeKey}>
+      <article className={css.processCommentary}>
+        <Blocks {...render} blocks={part.blocks} streaming={data.status === 'running'} holdFormatting={pinned} startedAt={data.time} interrupted={data.status === 'interrupted'} liveText />
+      </article>
+    </ProcessFragment>
     : hasVisibleBody(part.blocks) && <RetiringContent key={part.start} visible={pinned || processOpen || !earlier}>
-      <article className={css.answer} data-reader-answer data-reader-anchor data-reader-key={nodeKey} data-reader-source-start={part.start} data-answer-status={data.status} data-answer-phase={earlier ? 'process' : 'body'}>
+      <article className={css.answer} data-reader-answer data-reader-anchor data-reader-key={nodeKey} data-reader-source-start={part.start} data-answer-status={data.status} data-answer-phase="body">
         <Blocks {...render} blocks={part.blocks} streaming={data.status === 'running'} holdFormatting={pinned} startedAt={data.time} interrupted={data.status === 'interrupted'} liveText />
         {index === parts.length - 1 && data.status === 'interrupted' && <span className={css.stopped}>已停止</span>}
         {index === parts.length - 1 && !earlier && data.status !== 'running' && boundary.status === 'closed' && <CopyAnswer blocks={body} />}
@@ -133,7 +140,7 @@ function GroupStatus({ group, sessionId, useChat, useSessionPendingInteraction, 
 }
 
 const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[] }) {
-  const chat = props.useChat(snapshot => snapshot);
+  const nodes = props.useChat(snapshot => snapshot.nodes);
   const turn = props.useChat(snapshot => group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn));
   const boundary = useMemo(() => boundaryOf(turn), [turn]);
   const choiceKey = processChoiceKey(group.key, boundary);
@@ -145,8 +152,8 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   const firstKind = props.useChat(snapshot => snapshot.nodes.get(group.keys[0])?.kind);
   const startsWithUser = firstKind === 'user';
   const mainKeys = startsWithUser ? group.keys.slice(1) : group.keys;
-  const flow = useMemo(() => readerFlow({ ...group, keys: mainKeys }, turn, key => chat.nodes.get(key)), [chat, group, mainKeys, turn]);
-  const hasProcess = flow.some(item => item.kind === 'tool' || hasProcessContent(chat.nodes.get(item.nodeKey), boundary));
+  const flow = useMemo(() => readerFlow({ ...group, keys: mainKeys }, turn, key => nodes.get(key)), [nodes, group, mainKeys, turn]);
+  const hasProcess = flow.some(item => item.kind === 'tool' || hasProcessContent(nodes.get(item.nodeKey), boundary));
   // Only a real, still-active text selection delays folding. Merely clicking,
   // focusing or scrolling the live card does not create a permanent override.
   const holdingSelection = flow.some(item => selectedProcessKeys.includes(item.key));
@@ -168,8 +175,8 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
       </Fragment> : <Fragment key={item.key}>
         <BlockBoundary><ProcessFragment open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={item.key} framed>
           <ToolActivity {...shared} entry={item} motion={motion} turnClosed={boundary.status === 'closed'} onRead={pinProcess} />
+          {item.block && <ToolMedia {...shared} block={item.block} />}
         </ProcessFragment></BlockBoundary>
-        {item.block && <BlockBoundary><ToolMedia {...shared} block={item.block} /></BlockBoundary>}
       </Fragment>)}
     </div>
     {terminal && <div className={css.notice} data-reader-terminal>{terminal}</div>}
