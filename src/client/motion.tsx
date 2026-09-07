@@ -198,16 +198,26 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean):
     };
     const capture = () => {
       const top = scroll.getBoundingClientRect().top;
-      const candidate = Array.from(content.querySelectorAll<HTMLElement>('[data-reader-anchor]')).find(element => element.getBoundingClientRect().bottom > top + 8);
+      const candidates = content.querySelectorAll<HTMLElement>('[data-reader-anchor]');
+      let candidate: HTMLElement | null = null;
+      for (let index = 0; index < candidates.length; index++) {
+        const element = candidates[index];
+        if (element.getBoundingClientRect().bottom > top + 8) { candidate = element; break; }
+      }
       anchor.current = candidate ? { element: candidate, top: candidate.getBoundingClientRect().top } : null;
+    };
+    // Anchor capture is only consumed while detached; coalesce DOM scans to one per frame.
+    let captureFrame = 0;
+    const scheduleCapture = () => {
+      if (captureFrame) return;
+      captureFrame = requestAnimationFrame(() => { captureFrame = 0; capture(); });
     };
     const onScroll = () => {
       // Our easing frames must not be mistaken for a user leaving the bottom.
       if (lastWrittenTop !== null && Math.abs(scroll.scrollTop - lastWrittenTop) < 1) return;
-      following.current = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 72;
+      following.current = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 25;
       setDetached(!following.current);
-      if (!following.current) { cancelAnimationFrame(followFrame); followFrame = 0; }
-      capture();
+      if (!following.current) { cancelAnimationFrame(followFrame); followFrame = 0; scheduleCapture(); }
     };
     const onWheel = (event: WheelEvent) => {
       cancelAnimationFrame(followFrame); followFrame = 0; lastWrittenTop = null;
@@ -252,7 +262,7 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean):
     scroll.addEventListener('wheel', onWheel, { passive: true });
     scroll.addEventListener('keydown', onKey);
     return () => {
-      cancelAnimationFrame(firstFrame); cancelAnimationFrame(followFrame); observer.disconnect();
+      cancelAnimationFrame(firstFrame); cancelAnimationFrame(followFrame); cancelAnimationFrame(captureFrame); observer.disconnect();
       scroll.removeEventListener('scroll', onScroll); scroll.removeEventListener('wheel', onWheel);
       scroll.removeEventListener('keydown', onKey);
     };

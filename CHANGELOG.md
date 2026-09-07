@@ -13,7 +13,11 @@ Adds native generative MCP Apps (SEP-1865) support and rich interactive renderin
 - **Redesigned minimal container**: removed protocol/status chrome, 14px-radius subtle card, icon-only reset.
 - **Skill pack**: `skills/generative-mcpapps/` with SKILL.md, protocol reference, HTML boilerplate template, and interactive quiz example.
 - **Docs**: bilingual `README.md` / `README.en.md`; DESIGN.md contract updated.
-- 49 regression tests.
+- **Fix**: the host's synthetic `turn-process` folding-control nodes no longer render as an "unhandled record type" card with raw JSON. They carry no session content (turn id, counters, anchors only) and the reading view has its own process folding, so they are now skipped like `context`/`turn-tail`.
+- **Back-to-bottom control aligned with the native chat view**: the same 34px floating chevron button, lifted above the sticky composer exactly like the native embedded rule (`bottom = composer height + 16px`), and it now appears at the same 25px near-bottom threshold the native view uses (previously 72px, which hid the button on small scrolls).
+- **Scrolling performance**: turn-rail active tracking resolves by binary search over cached section offsets (rebuilt only on content resize), the anchor capture scan runs at most once per frame and only while detached, removing the per-scroll-event O(n) DOM scans that caused stutter on long transcripts.
+- **Turn navigation rail**: a vertical tick rail on the right edge, ported from the native `TurnNavigator` — one tick per loaded turn, the active tick follows the reading line, hovering shows a preview card (turn's opening user text), clicking lands on that turn's section, and the rail scrolls itself with fade masks while keeping the active tick in view. Unloaded history appears as shortened ghost ticks; clicking one loads an older batch. Fewer than two marks hides the rail.
+- 52 regression tests.
 
 ## 0.1.0
 

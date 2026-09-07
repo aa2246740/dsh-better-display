@@ -221,8 +221,64 @@
 .imageDialog::backdrop { background: var(--dsw-alias-bg-mask-photo); }
 .imageDialog img { max-width: 82vw; max-height: 75vh; display: block; object-fit: contain; }
 .dialogClose { position: absolute; right: 8px; top: 4px; border: 0; background: transparent; color: inherit; width: 32px; height: 32px; border-radius: 8px; font-size: 24px; }
-.jumpDock { position: sticky; bottom: 12px; align-self: flex-end; height: 0; z-index: 2; }
-.jump { transform: translateY(-100%); border: 1px solid var(--dsw-alias-border-l2); border-radius: 20px; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; padding: 7px 13px; box-shadow: 0 2px 8px var(--dsw-alias-border-l1); }
+/* Floating jump button, aligned with the native chat "back to bottom" control.
+   Inside the conversation page the sticky composer owns the bottom band, so the
+   native control lifts itself above it: bottom = composer height + 16px. */
+.jumpDock { position: sticky; bottom: calc(var(--dsh-composer-height, 152px) + 16px); height: 0; z-index: 8; display: flex; justify-content: flex-end; pointer-events: none; }
+.jump { margin-top: -34px; flex: none; width: 34px; height: 34px; display: flex; justify-content: center; align-items: center; padding: 0; border: 0; border-radius: 100px; corner-shape: round; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-button-floating-fill); box-shadow: var(--dsw-elevation-panel); --dsw-elevation-stroke-color: var(--dsw-alias-border-l3); pointer-events: auto; }
+.jump:hover { background: var(--dsw-alias-button-floating-hover); }
+
+/* Turn navigation rail, ported from the native TurnNavigator. */
+.railSlot { z-index: 7; pointer-events: none; height: 0; position: sticky; top: 0; }
+.railFrame {
+  --turn-rail-band: calc(var(--dsh-conversation-viewport-height, 100dvh) - var(--dsh-composer-height, 152px));
+  --turn-preview-height: 32px;
+  top: calc(var(--turn-rail-band) / 2);
+  right: calc(12px - (var(--dsh-composer-side-clearance, 16px) + 16px));
+  width: 28px;
+  height: min(var(--turn-natural-height), max(0px, calc(var(--turn-rail-band) - 64px)), 420px);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: height .22s cubic-bezier(.2,.8,.2,1);
+  position: absolute;
+  transform: translateY(-50%);
+}
+.railScroller { overscroll-behavior: contain; scrollbar-width: none; position: absolute; inset: 0; overflow-y: auto; }
+.railScroller::-webkit-scrollbar { display: none; }
+.railScroller.railFadeTop { mask-image: linear-gradient(#0000 0, #000 24px 100%); }
+.railScroller.railFadeBottom { mask-image: linear-gradient(#000 0 calc(100% - 24px), #0000 100%); }
+.railScroller.railFadeTop.railFadeBottom { mask-image: linear-gradient(#0000 0, #000 24px calc(100% - 24px), #0000 100%); }
+.railMarks { height: var(--turn-natural-height); position: relative; }
+.railMarkPosition { top: calc(var(--turn-natural-position) + var(--turn-rail-inset)); height: 10px; transition: top .22s cubic-bezier(.2,.8,.2,1); position: absolute; left: 0; right: 0; transform: translateY(-50%); }
+.railMark { cursor: pointer; pointer-events: none; background: transparent; border: 0; border-radius: 8px; width: 20px; padding: 0; position: absolute; inset: 0 0 0 auto; }
+.railMark::before { background: var(--dsw-alias-border-l4); content: ""; border-radius: 2px; width: 12px; height: 2px; transition: width .14s, background-color .14s; position: absolute; top: 50%; right: 0; transform: translateY(-50%); }
+.railMark[data-ghost=true]::before { opacity: .6; width: 8px; }
+.railMark[data-preview=true]::before { background: var(--dsw-alias-label-tertiary); width: 18px; }
+.railMark[data-busy=true]::before { animation: 1s ease-in-out infinite railMarkBusy; }
+.railMark[data-active=true]::before { background: var(--dsw-alias-label-primary); width: 20px; }
+.railMark:focus-visible::before { background: var(--dsw-alias-state-business-primary); width: 20px; }
+.railMark:focus-visible { outline: 1px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }
+@keyframes railMarkBusy { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.railPreview {
+  top: clamp(0px, calc(var(--turn-natural-position) + var(--turn-rail-inset) - var(--turn-scroll-top, 0px) - var(--turn-preview-height) / 2), calc(100% - var(--turn-preview-height)));
+  box-sizing: border-box;
+  max-width: min(240px, 60cqw);
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: var(--dsw-elevation-panel);
+  pointer-events: none;
+  border: 0;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 20px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: top .14s cubic-bezier(.2, .8, .2, .1);
+  position: absolute;
+  right: calc(100% + 10px);
+}
 [data-motion=off] .chevron, [data-motion=off] .imageOpen img, [data-motion=off] .processMeta { transition: none; }
 @media (prefers-reduced-motion: reduce) { .chevron, .imageOpen img, .processMeta { transition: none; } }
 @media (pointer: coarse) { .disclosureButton { min-height: 44px; } }
