@@ -121,6 +121,8 @@
 .toolDetailNote { margin: 0 0 9px; font-size: 12px; line-height: 20px; color: var(--dsw-alias-label-secondary); }
 .toolRawLabel { margin: 0; color: var(--dsw-alias-label-secondary); font-size: 12px; font-weight: 500; }
 .toolRaw { margin: 0; max-height: 400px; padding: 12px; overflow: auto; border-radius: 8px; background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-label-primary); font: 12px/20px ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* System-prompt disclosure body, mirroring the native opaque scrollport. */
+.systemPrompt { margin: 0; max-height: 320px; padding: 12px; overflow: auto; border-radius: 8px; background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-label-primary); font: 12px/20px ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .toolReceipt .blocks, .toolDocument .blocks { font-size: 13px; line-height: 22px; }
 .toolChildren { margin: 0 14px 12px 24px; padding-left: 12px; border-left: 1px solid var(--dsw-alias-border-l2); display: flex; flex-direction: column; gap: 9px; }
 @container (max-width: 420px) { .toolHeading { gap: 7px; padding: 11px 10px 6px; grid-template-columns: 16px minmax(0, 1fr) auto; } .toolHeadingState { gap: 4px; } .toolLedger { padding-left: 33px; padding-right: 10px; } .toolPanel { padding: 10px; } .toolChildren { margin-left: 12px; padding-left: 8px; } }
