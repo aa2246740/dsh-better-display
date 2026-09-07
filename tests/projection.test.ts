@@ -13,6 +13,19 @@ function assistant(values: Partial<AssistantChatData> = {}): AssistantChatData {
 const active: TurnBoundary = { status: 'open', reason: null, latestStep: 2, closingStep: null };
 const completed: TurnBoundary = { ...active, status: 'closed', reason: 'completed', closingStep: 2 };
 
+test('RC1 system prompts belong to process details', () => {
+  assert.equal(hasProcessContent({ kind: 'system-prompt', visibility: 'visible', data: { text: 'system' } } as ChatConversationViewNode, completed), true);
+});
+
+test('canonical cancellation is interrupted while genuine failures stay failed', () => {
+  const cancelled = { kind: 'tool-result', isError: true, error: { code: 'ABORTED', name: 'AbortError' }, content: [{ type: 'text', text: 'Error: tool call aborted' }], subCalls: [] } as unknown as ToolCallBlock;
+  assert.equal(activityPhase({ block: cancelled }), 'interrupted');
+  assert.equal(toolFailed(cancelled), false);
+  const failure = { ...cancelled, error: { code: 'OTHER' }, content: [{ type: 'text', text: 'failure' }], meta: { exitCode: 7 } } as ToolCallBlock;
+  assert.equal(activityPhase({ block: failure }, true), 'failed');
+  assert.equal(toolFailed(failure), true);
+});
+
 test('reasoning and body retain original order, content and identities across streaming appends', () => {
   const first: AssistantBlock = { kind: 'reasoning', text: '**原始标点**\n  原始空格\n' };
   const later: AssistantBlock = { kind: 'reasoning', text: '正文之后的思考' };

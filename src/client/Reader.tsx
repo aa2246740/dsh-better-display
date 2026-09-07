@@ -1,4 +1,4 @@
-import { Fragment, memo, useCallback, useId, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
 import { JsonBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives';
@@ -30,6 +30,8 @@ const ProcessNode = memo(function ProcessNode({ useChat, t, nodeKey, open, motio
   if (!node || node.visibility === 'hidden') return null;
   let content: ReactNode = null;
   if (isNode(node, 'context')) content = <ContextInjectionRow {...node.data} t={t} />;
+  else if (isNode(node, 'system-prompt')) content = <details className={css.detail}><summary>系统提示词</summary><pre className={css.toolRaw}>{node.data.text}</pre></details>;
+  else if (isNode(node, 'turn-process')) content = <JsonBlock label="轮次过程记录" payload={node.data} truncatedLabel={truncatedJsonLabel} />;
   else if (isNode(node, 'model-retry')) content = <JsonBlock label="模型重试记录" payload={node.data.attempts} truncatedLabel={truncatedJsonLabel} />;
   else if (isNode(node, 'command') || isNode(node, 'manual-compaction')) content = <JsonBlock label="命令记录" payload={node.data} truncatedLabel={truncatedJsonLabel} />;
   return content && <ProcessFragment open={open} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={nodeKey} framed>{content}</ProcessFragment>;
@@ -63,10 +65,20 @@ const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, 
 const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, processOpen = false, ...render }: SeatProps) {
   const node = useChat(snapshot => snapshot.nodes.get(nodeKey));
   if (!node || node.visibility === 'hidden') return null;
-  if (isNode(node, 'user') || isNode(node, 'steering')) return <div className={css.user} data-reader-anchor data-reader-key={nodeKey}>
-    {node.kind === 'steering' && <p className={css.meta}>补充消息</p>}
-    <Blocks {...render} blocks={contentBlocks(node.data.content)} source="user" />
-  </div>;
+  if (isNode(node, 'user') || isNode(node, 'steering')) {
+    const blocks = contentBlocks(node.data.content);
+    const imageBlocks = blocks.filter(b => b.kind === 'image');
+    const otherBlocks = blocks.filter(b => b.kind !== 'image');
+    return <div className={css.userCluster} data-reader-anchor data-reader-key={nodeKey}>
+      {node.kind === 'steering' && <p className={css.meta}>补充消息</p>}
+      {imageBlocks.length > 0 && <div className={css.userImages}>
+        <Blocks {...render} blocks={imageBlocks} source="user" />
+      </div>}
+      {otherBlocks.length > 0 && <div className={css.user}>
+        <Blocks {...render} blocks={otherBlocks} source="user" />
+      </div>}
+    </div>;
+  }
   if (isNode(node, 'assistant-step')) return null;
   if (isNode(node, 'tool-call')) return <ToolMedia {...render} block={node.data.root} />;
   if (isNode(node, 'turn-error')) return <div className={css.error} role="alert" data-reader-anchor>
@@ -84,7 +96,7 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
     return node.data.compaction ? <p className={css.meta}>上下文已整理，原始记录仍保留。</p> : <p className={css.meta}>正在整理上下文…</p>;
   }
   if (node.kind === 'compaction') return <details className={css.detail}><summary>上下文已整理，查看记录</summary><JsonBlock label="压缩记录" payload={node.data} truncatedLabel={truncatedJsonLabel} /></details>;
-  if (node.kind === 'context' || node.kind === 'turn-tail') return null;
+  if (node.kind === 'context' || node.kind === 'turn-tail' || node.kind === 'system-prompt' || node.kind === 'turn-process') return null;
   return <div className={css.unknown} data-reader-anchor>
     <p>此记录类型暂未接入阅读页：{node.kind}</p>
     <JsonBlock label="查看原始记录" payload={node.data} truncatedLabel={truncatedJsonLabel} />
@@ -139,7 +151,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   // focusing or scrolling the live card does not create a permanent override.
   const holdingSelection = flow.some(item => selectedProcessKeys.includes(item.key));
   const expanded = holdingSelection || processExpanded(expansionChoice, boundary);
-  const shared = { useChat: props.useChat, renderSlotChain: props.renderSlotChain, loadImage: props.loadImage };
+  const shared = { useChat: props.useChat, renderSlotChain: props.renderSlotChain, loadImage: props.loadImage, fillComposer: props.fillComposer };
   const terminal = terminalLabel(boundary.reason);
   return <section className={css.turn} data-reader-turn={group.turn ?? 'unresolved'} data-reader-turn-state={boundary.status} data-reader-turn-result={boundary.reason ?? undefined}>
     {startsWithUser && <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={group.keys[0]} /></BlockBoundary>}
@@ -175,6 +187,7 @@ export function Reader(props: ReaderProps) {
   const loading = props.useSession(snapshot => snapshot.openState === 'loading');
   const hasMore = props.useSession(snapshot => snapshot.hasMore);
   const loadingOlder = props.useSession(snapshot => snapshot.loadingOlder);
+  const pendingSubmissions = props.useSession(snapshot => snapshot.pendingSubmissions);
   const motionPreference = props.useStore(state => state.motion);
   const motion = useMotionAllowed(motionPreference);
   const streamMotion = useMemo(() => ({ enabled: motion, activatedAt: activatedAt.current }), [motion]);
@@ -183,6 +196,29 @@ export function Reader(props: ReaderProps) {
   const pinnedKeys = usePinnedSelection(root);
   const selectedProcessKeys = usePinnedSelection(root, '[data-reader-process]');
   const [historyError, setHistoryError] = useState(false);
+
+  const lastKey = order.at(-1);
+  const lastNode = lastKey ? nodes.get(lastKey) : undefined;
+  const lastSubmissionId = pendingSubmissions?.length ? pendingSubmissions[pendingSubmissions.length - 1].requestId : null;
+  const lastOrderKeyRef = useRef<string | undefined>(lastKey);
+  const lastSubmissionRef = useRef<string | null>(lastSubmissionId);
+
+  useLayoutEffect(() => {
+    const appendedUser = lastKey !== lastOrderKeyRef.current && (lastNode?.kind === 'user' || lastNode?.kind === 'steering');
+    const appendedSubmission = lastSubmissionId !== null && lastSubmissionId !== lastSubmissionRef.current;
+    lastOrderKeyRef.current = lastKey;
+    lastSubmissionRef.current = lastSubmissionId;
+
+    if (appendedUser || appendedSubmission) {
+      scroll.jump();
+    }
+  }, [lastKey, lastNode?.kind, lastSubmissionId, scroll]);
+
+  const visibleSubmissions = useMemo(() => {
+    if (!pendingSubmissions || pendingSubmissions.length === 0) return [];
+    return pendingSubmissions.filter(sub => sub.placement !== 'queued');
+  }, [pendingSubmissions]);
+
   return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} data-dsh-better-display="0.1.0" data-motion={motion ? 'on' : 'off'}>
     <div className={css.column}>
       <div className={css.toolbar} data-ud-check="reader-toolbar">
@@ -197,6 +233,26 @@ export function Reader(props: ReaderProps) {
       {openError && <div className={css.error} role="alert">会话暂时无法读取：{openError.message}</div>}
       {loading && groups.length === 0 && <p className={css.empty} role="status">正在读取会话…</p>}
       {groups.map(group => <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} />)}
+      {visibleSubmissions.map(submission => (
+        <div key={submission.requestId} className={css.userCluster} data-reader-pending-submission>
+          {submission.images && submission.images.length > 0 && (
+            <div className={css.userImages}>
+              {submission.images.map((img, idx) => (
+                <figure key={idx} className={css.imageFigure}>
+                  <div className={css.imageFrame} style={{ aspectRatio: `${img.width || 4} / ${img.height || 3}` }}>
+                    <img src={img.previewUrl} alt={img.name ?? '发送的图片'} className={css.pendingImage} />
+                  </div>
+                </figure>
+              ))}
+            </div>
+          )}
+          {submission.text ? (
+            <div className={css.user}>
+              <div className={css.blocks}>{submission.text}</div>
+            </div>
+          ) : null}
+        </div>
+      ))}
       {pending !== undefined && <div className={css.attention} role="alert" data-reader-attention>
         <strong>{pending.kind === 'question' ? '需要你回答一个问题' : '需要你的确认'}</strong>
         <span>请在下方原生操作区处理。此提示不会收进执行过程。</span>

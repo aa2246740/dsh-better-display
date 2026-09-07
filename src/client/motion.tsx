@@ -1,4 +1,4 @@
-import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import css from './Reader.module.css';
 import { StreamMotionContext } from './streaming.js';
@@ -202,16 +202,22 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean):
       anchor.current = candidate ? { element: candidate, top: candidate.getBoundingClientRect().top } : null;
     };
     const onScroll = () => {
+      // While a follow animation is actively driving scroll, do not cancel following midway.
+      if (followFrame !== 0) return;
       // Our easing frames must not be mistaken for a user leaving the bottom.
       if (lastWrittenTop !== null && Math.abs(scroll.scrollTop - lastWrittenTop) < 1) return;
-      following.current = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 72;
-      setDetached(!following.current);
-      if (!following.current) { cancelAnimationFrame(followFrame); followFrame = 0; }
+      const atBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 72;
+      following.current = atBottom;
+      setDetached(!atBottom);
+      if (!atBottom) { cancelAnimationFrame(followFrame); followFrame = 0; }
       capture();
     };
     const onWheel = (event: WheelEvent) => {
       cancelAnimationFrame(followFrame); followFrame = 0; lastWrittenTop = null;
       if (event.deltaY < 0) { following.current = false; setDetached(true); capture(); }
+    };
+    const onTouch = () => {
+      cancelAnimationFrame(followFrame); followFrame = 0; lastWrittenTop = null;
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.target instanceof HTMLElement && event.target.closest('textarea,input,[contenteditable=true]')) return;
@@ -250,15 +256,23 @@ export function useReadingScroll(root: RefObject<HTMLElement>, motion: boolean):
     if (scroll !== content) observer.observe(scroll);
     scroll.addEventListener('scroll', onScroll, { passive: true });
     scroll.addEventListener('wheel', onWheel, { passive: true });
+    scroll.addEventListener('touchstart', onTouch, { passive: true });
+    scroll.addEventListener('touchmove', onTouch, { passive: true });
     scroll.addEventListener('keydown', onKey);
     return () => {
       cancelAnimationFrame(firstFrame); cancelAnimationFrame(followFrame); observer.disconnect();
       scroll.removeEventListener('scroll', onScroll); scroll.removeEventListener('wheel', onWheel);
+      scroll.removeEventListener('touchstart', onTouch); scroll.removeEventListener('touchmove', onTouch);
       scroll.removeEventListener('keydown', onKey);
     };
   }, [root, motion]);
-  return { detached, jump: () => {
-    following.current = true; setDetached(false);
-    port.current?.scrollTo({ top: port.current.scrollHeight, behavior: 'instant' });
-  } };
+  const jump = useCallback(() => {
+    anchor.current = null;
+    following.current = true;
+    setDetached(false);
+    if (port.current) {
+      port.current.scrollTop = port.current.scrollHeight;
+    }
+  }, []);
+  return { detached, jump };
 }

@@ -1,30 +1,52 @@
-import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { createContext, memo, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   getHostTheme,
   getCssTokens,
   extractHtmlTitle,
   ensureHtmlDocument,
   formatReceiptPrompt,
-  setReactInputValue,
+  fillComposerDom,
 } from './mcp-app.js';
 import css from './McpAppFrame.module.css';
+
+/**
+ * Composer fill channel shared by every McpAppFrame in one Reader tree.
+ * Provided by Blocks from the session-scoped Reader face (sanctioned
+ * conversation input API); absent outside a Reader, where the DOM fallback
+ * applies. React context avoids threading the callback through the whole
+ * markdown pipeline (MarkdownText -> render context -> code fence).
+ */
+export type ComposerFill = (text: string) => boolean;
+export const ComposerFillContext = createContext<ComposerFill | undefined>(undefined);
+export function useComposerFill(): ComposerFill | undefined {
+  return useContext(ComposerFillContext);
+}
 
 export interface McpAppFrameProps {
   html: string;
   title?: string;
   initialHeight?: number;
+  /** Session-scoped composer writer; falls back to context, then DOM. */
+  fillComposer?: ComposerFill;
 }
 
 export const McpAppFrame = memo(function McpAppFrame({
   html,
   title: initialTitle,
   initialHeight = 240,
+  fillComposer: fillComposerProp,
 }: McpAppFrameProps) {
+  const fillComposerFromContext = useComposerFill();
+  const writeComposer = useMemo<ComposerFill>(
+    () => fillComposerProp ?? fillComposerFromContext ?? fillComposerDom,
+    [fillComposerProp, fillComposerFromContext],
+  );
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const lastParamsRef = useRef<Record<string, unknown>>({});
   const [height, setHeight] = useState(() => Math.max(60, Math.min(2400, initialHeight)));
   const [ready, setReady] = useState(false);
   const [receipt, setReceipt] = useState<string | null>(null);
+  const [lastPrompt, setLastPrompt] = useState<string | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
   const frameId = useId();
 
@@ -32,18 +54,30 @@ export const McpAppFrame = memo(function McpAppFrame({
     return initialTitle || extractHtmlTitle(html) || '交互式 MCP App';
   }, [initialTitle, html]);
 
-  const [currentTheme, setCurrentTheme] = useState(getHostTheme);
-  useEffect(() => {
-    const update = () => setCurrentTheme(getHostTheme());
-    const obs = typeof MutationObserver !== 'undefined' && typeof document !== 'undefined'
-      ? new MutationObserver(update)
-      : null;
-    if (obs && document.body) obs.observe(document.body, { attributes: true });
-    if (obs && document.documentElement) obs.observe(document.documentElement, { attributes: true });
-    return () => obs?.disconnect();
-  }, []);
+  // Capture the host theme ONCE for the initial srcDoc. Live theme switches
+  // are delivered via postMessage (broadcastTheme), so the srcDoc identity
+  // stays stable and the iframe never reloads (which would wipe user state
+  // such as checked boxes or selected tabs).
+  const [initialTheme] = useState(getHostTheme);
+  const preparedHtml = useMemo(() => ensureHtmlDocument(html, initialTheme), [html, initialTheme]);
 
-  const preparedHtml = useMemo(() => ensureHtmlDocument(html, currentTheme), [html, currentTheme]);
+  const fillComposer = useCallback((params: Record<string, unknown>) => {
+    const prompt = formatReceiptPrompt(params, title);
+    setLastPrompt(prompt);
+    try {
+      if (writeComposer(prompt)) return true;
+      // Composer refused: leave the prompt visible in the receipt bar and
+      // stash a clipboard copy as a fallback.
+      try {
+        void navigator.clipboard?.writeText(prompt);
+      } catch {
+        // Clipboard unavailable; the visible receipt text remains copyable.
+      }
+    } catch {
+      // Ignore DOM query errors in non-browser environments
+    }
+    return false;
+  }, [title, writeComposer]);
 
   const handleUserSubmit = useCallback((params: Record<string, unknown>) => {
     lastParamsRef.current = params;
@@ -61,16 +95,8 @@ export const McpAppFrame = memo(function McpAppFrame({
     setReceipt(summary);
 
     // Populate DSH composer with natural prompt and trigger React input state
-    try {
-      const textarea = document.querySelector<HTMLTextAreaElement>('textarea');
-      if (textarea) {
-        const prompt = formatReceiptPrompt(params, title);
-        setReactInputValue(textarea, prompt);
-      }
-    } catch {
-      // Ignore DOM query errors in non-browser environments
-    }
-  }, [title]);
+    fillComposer(params);
+  }, [fillComposer]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -245,20 +271,21 @@ export const McpAppFrame = memo(function McpAppFrame({
             </svg>
             <span>已就绪：{receipt}</span>
           </span>
+          {lastPrompt && (
+            <div className={css.receiptPrompt} title={lastPrompt}>
+              {lastPrompt}
+            </div>
+          )}
           <div className={css.receiptHint}>
             <button
               type="button"
               className={css.sendKbd}
-              title="聚焦输入框并回车发送"
+              title="把这条结果重新填入输入框，然后回车发送"
               onClick={() => {
-                const textarea = document.querySelector<HTMLTextAreaElement>('textarea');
-                if (textarea) {
-                  const prompt = formatReceiptPrompt(lastParamsRef.current, title);
-                  setReactInputValue(textarea, prompt);
-                }
+                fillComposer(lastParamsRef.current);
               }}
             >
-              <span>回车直接发送</span>
+              <span>填入输入框</span>
               <kbd>↵</kbd>
             </button>
           </div>
@@ -267,6 +294,18 @@ export const McpAppFrame = memo(function McpAppFrame({
     </div>
   );
 });
+
+/**
+ * Markdown code-fence mount point: picks the session composer writer from
+ * React context (provided by Blocks) without changing the markdown
+ * pipeline's signatures.
+ */
+export function McpAppCodeBlock({ html, title, initialHeight }: {
+  html: string; title?: string; initialHeight?: number;
+}) {
+  const fillComposer = useComposerFill();
+  return <McpAppFrame html={html} title={title} initialHeight={initialHeight} fillComposer={fillComposer} />;
+}
 
 export function StreamingMcpAppPlaceholder({ title }: { title?: string }) {
   return (

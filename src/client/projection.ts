@@ -1,6 +1,6 @@
 import type { AssistantBlock, ToolCallBlock, TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type { AssistantChatData, ChatConversationViewNode } from '@deepseek-ai/dsh-client-ui-chat/client';
-import { executionFacts } from './tool-activity.js';
+import { activityPhase } from './tool-activity.js';
 
 export interface ReaderGroup { key: string; turn: number | null; keys: readonly string[] }
 export interface TurnBoundary { status: 'open' | 'closed' | 'unknown'; reason: string | null; latestStep: number; closingStep: number | null }
@@ -57,7 +57,7 @@ export function hasProcessContent(node: ChatConversationViewNode | undefined, bo
     return data.blocks.some(block => block.kind === 'reasoning' && block.text.trim() !== '')
       || (isEarlierNarration(data, boundary) && hasVisibleBody(data.blocks));
   }
-  return node.kind === 'context' || node.kind === 'model-retry'
+  return node.kind === 'context' || node.kind === 'model-retry' || node.kind === 'system-prompt' || node.kind === 'turn-process'
     || node.kind === 'command' || node.kind === 'manual-compaction';
 }
 
@@ -82,8 +82,7 @@ export function assistantSegments(blocks: readonly AssistantBlock[]): { kind: 'r
 }
 
 export function toolFailed(block: ToolCallBlock): boolean {
-  const { exitCode, signal } = executionFacts(block);
-  return ('kind' in block && block.isError) || !!signal || (exitCode !== undefined && exitCode !== 0) || block.subCalls.some(toolFailed);
+  return activityPhase({ block }) === 'failed';
 }
 
 export function toolName(block: ToolCallBlock): string {

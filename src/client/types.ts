@@ -22,10 +22,16 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 export interface ReaderInjected {
   loadOlder: () => Promise<void>;
   loadImage: (attachment: ImageAttachmentRef) => Promise<{ data: Uint8Array; mediaType: string }>;
+  /**
+   * Writes text into this session's composer draft via the sanctioned
+   * conversation input face, with a DOM fallback. Returns true when the
+   * composer accepted the text.
+   */
+  fillComposer: (text: string) => boolean;
 }
 export type ReaderProps = PropsRuntime<'conversation.view'>
   & PropsLocale<'chat'>
   & PropsRenderSlots<'dsh-better-display.block'>
   & PropsStore<ReturnType<typeof createReaderStore>>
   & ReaderInjected;
-export type BlockRenderProps = Pick<ReaderProps, 'renderSlotChain' | 'loadImage'>;
+export type BlockRenderProps = Pick<ReaderProps, 'renderSlotChain' | 'loadImage' | 'fillComposer'>;

@@ -6,12 +6,21 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client';
 import { Reader } from './Reader.js';
 import { createReaderStore } from './store.js';
 import { installReaderEntry } from './entry.js';
+import { fillComposerDom } from './mcp-app.js';
 import type { ReaderInjected } from './types.js';
+
+/** Structural face of the sanctioned per-session composer writer. */
+interface ComposerShell {
+  setDraft: (text: string) => void;
+}
+interface ConversationFace {
+  input?: { shell?: (id: SessionId) => ComposerShell };
+}
 
 export type { ReaderBlockOwner } from './types.js';
 export { McpAppFrame } from './McpAppFrame.js';
 export const name = 'dsh-better-display-client';
-export const inject = ['slots', 'sessions'];
+export const inject = ['slots', 'sessions', 'conversation'];
 
 export function apply(ctx: Context): void {
   const store = createReaderStore();
@@ -40,6 +49,25 @@ export function apply(ctx: Context): void {
           const receipt = await session().readAttachment(attachment.attachmentId);
           if (!receipt.ok) throw new Error(receipt.error.message);
           return { data: Uint8Array.from(receipt.value.data), mediaType: receipt.value.attachment.mediaType };
+        },
+        fillComposer: (text: string) => {
+          // Sanctioned path: the conversation input shell owns the Lexical
+          // editor, so setDraft lands in the draft store deterministically.
+          try {
+            const conversation = (ctx as unknown as { conversation?: ConversationFace }).conversation;
+            const shell = conversation?.input?.shell?.(sessionId);
+            if (shell && typeof shell.setDraft === 'function') {
+              shell.setDraft(text);
+              return true;
+            }
+          } catch {
+            // Fall through to the DOM path below.
+          }
+          try {
+            return fillComposerDom(text);
+          } catch {
+            return false;
+          }
         },
       };
       faces.set(sessionId, face);
