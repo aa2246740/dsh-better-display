@@ -1,10 +1,11 @@
 import { Fragment, memo, useCallback, useId, useMemo, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
-import { JsonBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives';
+import { JsonBlock, MarkdownText, IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives';
 import { BlockBoundary, Blocks, contentBlocks, CopyAnswer } from './Blocks.js';
 import { ReasoningCard } from './ReasoningCard.js';
 import { ToolActivity, ToolMedia } from './ToolActivity.js';
+import { TurnRail } from './TurnRail.js';
 import { preparingLabel, readerFlow } from './tool-activity.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelection, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
@@ -84,7 +85,20 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
     return node.data.compaction ? <p className={css.meta}>上下文已整理，原始记录仍保留。</p> : <p className={css.meta}>正在整理上下文…</p>;
   }
   if (node.kind === 'compaction') return <details className={css.detail}><summary>上下文已整理，查看记录</summary><JsonBlock label="压缩记录" payload={node.data} truncatedLabel={truncatedJsonLabel} /></details>;
-  if (node.kind === 'context' || node.kind === 'turn-tail') return null;
+  if (isNode(node, 'system-prompt')) return <details className={css.detail}>
+    <summary>系统提示词</summary>
+    <pre className={css.systemPrompt}>{node.data.text}</pre>
+  </details>;
+  // Registered by dsh-client-ui-goal (not a linked peer): a /goal slash-command
+  // run the native chat renders as a right-aligned input bubble.
+  if ((node.kind as string) === 'command-input') {
+    const data = node.data as { readonly text: string };
+    return <div className={css.user} data-reader-anchor data-reader-key={nodeKey}>
+      <p className={css.meta}>命令输入</p>
+      <p className={css.commandInput}>{data.text}</p>
+    </div>;
+  }
+  if (node.kind === 'context' || node.kind === 'turn-tail' || node.kind === 'turn-process') return null;
   return <div className={css.unknown} data-reader-anchor>
     <p>此记录类型暂未接入阅读页：{node.kind}</p>
     <JsonBlock label="查看原始记录" payload={node.data} truncatedLabel={truncatedJsonLabel} />
@@ -183,16 +197,33 @@ export function Reader(props: ReaderProps) {
   const pinnedKeys = usePinnedSelection(root);
   const selectedProcessKeys = usePinnedSelection(root, '[data-reader-process]');
   const [historyError, setHistoryError] = useState(false);
+  const loadOlderOnce = useCallback(async () => {
+    setHistoryError(false);
+    try { await props.loadOlder(); } catch { setHistoryError(true); }
+  }, [props.loadOlder]);
+  const previewLabel = useCallback((turn: number | null): string => {
+    if (turn === null) return '更早的轮次 · 点击加载';
+    const group = groups.find(candidate => candidate.turn === turn);
+    const node = group ? nodes.get(group.keys[0]) : undefined;
+    if (node && (isNode(node, 'user') || isNode(node, 'steering'))) {
+      const text = contentBlocks(node.data.content)
+        .filter(block => block.kind === 'text')
+        .map(block => block.text)
+        .join('')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (text) return text.length > 60 ? `${text.slice(0, 60)}…` : text;
+    }
+    return `第 ${turn} 轮`;
+  }, [groups, nodes]);
   return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} data-dsh-better-display="0.1.0" data-motion={motion ? 'on' : 'off'}>
+    <TurnRail root={root} groups={groups} hasMore={hasMore} loadOlder={loadOlderOnce} previewLabel={previewLabel} />
     <div className={css.column}>
       <div className={css.toolbar} data-ud-check="reader-toolbar">
         <span title="基于真实消息类型和轮次边界整理。当前协议没有独立的正文阶段标记，无法确认的内容会继续保留。">阅读 · 原始记录完整保留</span>
         <button type="button" className={css.textButton} aria-pressed={motionPreference} onClick={() => props.actions.setMotion(!motionPreference)} title="新到文字柔和显现，过程平滑展开；关闭后立即完整显示，自动遵循系统减少动态效果设置。">{motionPreference && !motion ? '动效 · 跟随系统关闭' : `动效${motionPreference ? '开' : '关'}`}</button>
       </div>
-      {hasMore && <button type="button" className={css.historyButton} disabled={loadingOlder} onClick={async () => {
-        setHistoryError(false);
-        try { await props.loadOlder(); } catch { setHistoryError(true); }
-      }}>{loadingOlder ? '正在加载更早记录' : '加载更早记录'}</button>}
+      {hasMore && <button type="button" className={css.historyButton} disabled={loadingOlder} onClick={() => { void loadOlderOnce(); }}>{loadingOlder ? '正在加载更早记录' : '加载更早记录'}</button>}
       {historyError && <div className={css.notice}>历史记录加载失败，可再次尝试；现有内容未改变。</div>}
       {openError && <div className={css.error} role="alert">会话暂时无法读取：{openError.message}</div>}
       {loading && groups.length === 0 && <p className={css.empty} role="status">正在读取会话…</p>}
@@ -201,7 +232,7 @@ export function Reader(props: ReaderProps) {
         <strong>{pending.kind === 'question' ? '需要你回答一个问题' : '需要你的确认'}</strong>
         <span>请在下方原生操作区处理。此提示不会收进执行过程。</span>
       </div>}
-      {scroll.detached && <div className={css.jumpDock}><button type="button" className={css.jump} onClick={scroll.jump}>↓ 回到最新</button></div>}
+      {scroll.detached && <div className={css.jumpDock}><button type="button" className={css.jump} aria-label="回到底部" title="回到底部" onClick={scroll.jump}><IconChevronDownOutline14 /></button></div>}
     </div>
   </div></StreamMotionContext.Provider>;
 }
