@@ -89,6 +89,15 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
     <summary>系统提示词</summary>
     <pre className={css.systemPrompt}>{node.data.text}</pre>
   </details>;
+  // Registered by dsh-client-ui-goal (not a linked peer): a /goal slash-command
+  // run the native chat renders as a right-aligned input bubble.
+  if ((node.kind as string) === 'command-input') {
+    const data = node.data as { readonly text: string };
+    return <div className={css.user} data-reader-anchor data-reader-key={nodeKey}>
+      <p className={css.meta}>命令输入</p>
+      <p className={css.commandInput}>{data.text}</p>
+    </div>;
+  }
   if (node.kind === 'context' || node.kind === 'turn-tail' || node.kind === 'turn-process') return null;
   return <div className={css.unknown} data-reader-anchor>
     <p>此记录类型暂未接入阅读页：{node.kind}</p>
