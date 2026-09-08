@@ -9,6 +9,7 @@ import { preparingLabel, readerFlow } from './tool-activity.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelection, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
 import { assistantSegments, boundaryOf, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
+import { basename, createProducedFileMentions, getTurnDeliverables } from './deliverables.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import type { ReaderGroup, TurnBoundary } from './projection.js';
 import type { BlockRenderProps, ReaderProps } from './types.js';
@@ -158,7 +159,19 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   // focusing or scrolling the live card does not create a permanent override.
   const holdingSelection = flow.some(item => selectedProcessKeys.includes(item.key));
   const expanded = holdingSelection || processExpanded(expansionChoice, boundary);
-  const shared = { useChat: props.useChat, renderSlotChain: props.renderSlotChain, loadImage: props.loadImage, fillComposer: props.fillComposer };
+  const deliverables = useMemo(() => getTurnDeliverables(turn, flow), [turn, flow]);
+  const fileMentions = useMemo(
+    () => deliverables.length > 0 && props.openFile ? createProducedFileMentions(deliverables, props.openFile) : undefined,
+    [deliverables, props.openFile],
+  );
+  const shared = {
+    useChat: props.useChat,
+    renderSlotChain: props.renderSlotChain,
+    loadImage: props.loadImage,
+    fillComposer: props.fillComposer,
+    openFile: props.openFile,
+    fileMentions,
+  };
   const terminal = terminalLabel(boundary.reason);
   return <section className={css.turn} data-reader-turn={group.turn ?? 'unresolved'} data-reader-turn-state={boundary.status} data-reader-turn-result={boundary.reason ?? undefined}>
     {startsWithUser && <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={group.keys[0]} /></BlockBoundary>}
@@ -179,6 +192,45 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
         </ProcessFragment></BlockBoundary>
       </Fragment>)}
     </div>
+    {deliverables.length > 0 && (
+      <div className={css.deliverablesRoot} data-reader-deliverables>
+        <span className={css.deliverablesLabel}>产物</span>
+        <div className={css.deliverablesLane}>
+          <div className={css.deliverablesRow}>
+            {deliverables.slice(0, 8).map(path => (
+              <button
+                key={path}
+                type="button"
+                className={css.deliverableFile}
+                title={path}
+                aria-label={`打开 ${path}`}
+                onClick={() => { props.openFile?.(path); }}
+              >
+                <svg className={css.deliverableIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+                  <path d="M4 2.5h5l3 3V13.5H4V2.5z" strokeWidth="1.2" strokeLinejoin="round" />
+                  <path d="M9 2.5v3h3" strokeWidth="1.2" strokeLinejoin="round" />
+                </svg>
+                <span className={css.deliverableName}>{basename(path)}</span>
+              </button>
+            ))}
+            {deliverables.length > 8 && (
+              <span className={css.deliverablesMore}>
+                + {deliverables.length - 8} 个文件
+              </span>
+            )}
+            {deliverables.length > 1 && (
+              <button
+                type="button"
+                className={css.deliverablesShowFolder}
+                onClick={() => { props.openFile?.('.'); }}
+              >
+                在文件夹中显示
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
     {terminal && <div className={css.notice} data-reader-terminal>{terminal}</div>}
   </section>;
 });
