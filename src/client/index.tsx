@@ -2,6 +2,7 @@ import type { Context } from '@deepseek-ai/cordis';
 import type {} from '@deepseek-ai/dsh-api-session-controller/client';
 import type { SessionId } from '@deepseek-ai/dsh-session/types';
 import { resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path';
+import { dirname } from './deliverables.js';
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client';
 import { Reader } from './Reader.js';
@@ -67,6 +68,37 @@ export function apply(ctx: Context): void {
             }
           } catch (error) {
             console.warn('[dsh-better-display] openFile error:', error);
+          }
+        },
+        revealFile: async (path: string) => {
+          try {
+            const cwd = ctx.sessions?.list?.getSnapshot?.()?.byId[sessionId]?.cwd;
+            const targetPath = resolveWorkspacePath(cwd, path);
+            // 1. Try dedicated host endpoint for native file highlighting (open -R / explorer /select)
+            try {
+              const res = await fetch('/better-display/reveal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: targetPath }),
+              });
+              if (res.ok) {
+                const data = await res.json();
+                if (data.ok) return;
+              }
+            } catch {
+              // Server endpoint not yet available, fallback to directory open
+            }
+
+            // 2. Fallback to official opener with parent directory
+            const parentDir = dirname(targetPath);
+            const remote = ctx.remote as unknown as { session?: { openWorkspacePath: (arg: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }> } } | undefined;
+            const remoteSession = remote?.session
+              ?? (ctx.get?.('remote.session') as unknown as { openWorkspacePath: (arg: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }> } | undefined);
+            if (remoteSession?.openWorkspacePath) {
+              await remoteSession.openWorkspacePath({ path: parentDir });
+            }
+          } catch (error) {
+            console.warn('[dsh-better-display] revealFile error:', error);
           }
         },
         fillComposer: (text: string) => {

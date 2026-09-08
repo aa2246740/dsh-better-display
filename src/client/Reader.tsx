@@ -140,7 +140,11 @@ function GroupStatus({ group, sessionId, useChat, useSessionPendingInteraction, 
   return <StatusText text={text} motion={motion} shimmer={busy} />;
 }
 
-const DeliverableChip = memo(function DeliverableChip({ path, openFile }: { path: string; openFile?: (path: string) => Promise<void> | void }) {
+const DeliverableChip = memo(function DeliverableChip({ path, openFile, revealFile }: {
+  path: string;
+  openFile?: (path: string) => Promise<void> | void;
+  revealFile?: (path: string) => Promise<void> | void;
+}) {
   const [status, setStatus] = useState<'idle' | 'opened' | 'copied' | 'revealed'>('idle');
   const timer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -163,7 +167,11 @@ const DeliverableChip = memo(function DeliverableChip({ path, openFile }: { path
   const onReveal = (event: React.MouseEvent) => {
     event.stopPropagation();
     try {
-      openFile?.(dirname(path));
+      if (revealFile) {
+        revealFile(path);
+      } else {
+        openFile?.(dirname(path));
+      }
       flash('revealed');
     } catch {
       // fallback
@@ -248,7 +256,11 @@ const DeliverableChip = memo(function DeliverableChip({ path, openFile }: { path
   );
 });
 
-function DeliverablesRow({ deliverables, openFile }: { deliverables: readonly string[]; openFile?: (path: string) => Promise<void> | void }) {
+function DeliverablesRow({ deliverables, openFile, revealFile }: {
+  deliverables: readonly string[];
+  openFile?: (path: string) => Promise<void> | void;
+  revealFile?: (path: string) => Promise<void> | void;
+}) {
   const [folderStatus, setFolderStatus] = useState<'idle' | 'opened'>('idle');
   const onOpenWorkspace = () => {
     try {
@@ -266,7 +278,7 @@ function DeliverablesRow({ deliverables, openFile }: { deliverables: readonly st
       <div className={css.deliverablesLane}>
         <div className={css.deliverablesRow}>
           {deliverables.slice(0, 8).map(path => (
-            <DeliverableChip key={path} path={path} openFile={openFile} />
+            <DeliverableChip key={path} path={path} openFile={openFile} revealFile={revealFile} />
           ))}
           {deliverables.length > 8 && (
             <span className={css.deliverablesMore}>
@@ -342,7 +354,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
         </ProcessFragment></BlockBoundary>
       </Fragment>)}
     </div>
-    {deliverables.length > 0 && <DeliverablesRow deliverables={deliverables} openFile={props.openFile} />}
+    {deliverables.length > 0 && <DeliverablesRow deliverables={deliverables} openFile={props.openFile} revealFile={props.revealFile} />}
     {terminal && <div className={css.notice} data-reader-terminal>{terminal}</div>}
   </section>;
 });

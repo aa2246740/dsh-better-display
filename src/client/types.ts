@@ -31,6 +31,8 @@ export interface ReaderInjected {
   fillComposer: (text: string) => boolean;
   /** Open a workspace file or directory in the native host editor / file viewer. */
   openFile: (path: string) => Promise<void> | void;
+  /** Reveal and highlight a workspace file in macOS Finder or Windows Explorer. */
+  revealFile?: (path: string) => Promise<void> | void;
 }
 export type ReaderProps = PropsRuntime<'conversation.view'>
   & PropsLocale<'chat'>
@@ -39,5 +41,6 @@ export type ReaderProps = PropsRuntime<'conversation.view'>
   & ReaderInjected;
 export type BlockRenderProps = Pick<ReaderProps, 'renderSlotChain' | 'loadImage' | 'fillComposer'> & {
   openFile?: (path: string) => Promise<void> | void;
+  revealFile?: (path: string) => Promise<void> | void;
   fileMentions?: MarkdownFileMentions;
 };
