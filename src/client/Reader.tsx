@@ -80,15 +80,15 @@ const CompactionDivider = memo(function CompactionDivider({ data }: {
   const items = data.shadowedItemCount;
   const tokens = data.shadowedTokenCount;
 
-  let label = '历史上下文已精简优化';
+  let label = '已压缩历史上下文';
   if (items && tokens) {
     const kTokens = tokens >= 1000 ? `${(tokens / 1000).toFixed(1)}k` : String(tokens);
-    label = `已精简 ${items} 条历史消息 · 释放约 ${kTokens} tokens`;
+    label = `已压缩 ${items} 条上下文 · 释放约 ${kTokens} tokens`;
   } else if (items) {
-    label = `已精简 ${items} 条历史消息`;
+    label = `已压缩 ${items} 条上下文`;
   } else if (tokens) {
     const kTokens = tokens >= 1000 ? `${(tokens / 1000).toFixed(1)}k` : String(tokens);
-    label = `历史记忆已整理 · 释放约 ${kTokens} tokens`;
+    label = `已压缩上下文 · 释放约 ${kTokens} tokens`;
   }
 
   return (
