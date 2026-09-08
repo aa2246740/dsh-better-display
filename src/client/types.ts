@@ -1,5 +1,6 @@
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment';
 import type { AssistantBlock } from '@deepseek-ai/dsh-client-ui-conversation/client';
+import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots';
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client';
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client';
@@ -22,10 +23,24 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 export interface ReaderInjected {
   loadOlder: () => Promise<void>;
   loadImage: (attachment: ImageAttachmentRef) => Promise<{ data: Uint8Array; mediaType: string }>;
+  /**
+   * Writes text into this session's composer draft via the sanctioned
+   * conversation input face, with a DOM fallback. Returns true when the
+   * composer accepted the text.
+   */
+  fillComposer: (text: string) => boolean;
+  /** Open a workspace file or directory in the native host editor / file viewer. */
+  openFile: (path: string) => Promise<void> | void;
+  /** Reveal and highlight a workspace file in macOS Finder or Windows Explorer. */
+  revealFile?: (path: string) => Promise<void> | void;
 }
 export type ReaderProps = PropsRuntime<'conversation.view'>
   & PropsLocale<'chat'>
   & PropsRenderSlots<'dsh-better-display.block'>
   & PropsStore<ReturnType<typeof createReaderStore>>
   & ReaderInjected;
-export type BlockRenderProps = Pick<ReaderProps, 'renderSlotChain' | 'loadImage'>;
+export type BlockRenderProps = Pick<ReaderProps, 'renderSlotChain' | 'loadImage' | 'fillComposer'> & {
+  openFile?: (path: string) => Promise<void> | void;
+  revealFile?: (path: string) => Promise<void> | void;
+  fileMentions?: MarkdownFileMentions;
+};

@@ -116,6 +116,8 @@ export function executionFacts(block: ToolCallBlock | undefined): { exitCode?: n
 export function activityPhase(entry: Pick<ToolActivityEntry, 'block' | 'draft'>, turnClosed = false): ToolPhase {
   if (!entry.block) return turnClosed ? 'interrupted' : 'preparing';
   if (!('kind' in entry.block)) return turnClosed ? 'interrupted' : 'running';
+  // RC1 publishes canonical cancellation as an error result with a typed code.
+  if (entry.block.error?.code === 'ABORTED' || entry.block.error?.code === 'interrupted') return 'interrupted';
   const facts = executionFacts(entry.block);
   if (entry.block.isError || facts.signal || (facts.exitCode !== undefined && facts.exitCode !== 0)
     || entry.block.subCalls.some(block => activityPhase({ block }, turnClosed) === 'failed')) return 'failed';

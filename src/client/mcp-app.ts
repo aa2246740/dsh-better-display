@@ -239,6 +239,68 @@ export function formatReceiptPrompt(params: Record<string, unknown>, title?: str
 }
 
 /**
+ * Finds the DSH composer textarea. The page can contain multiple (hidden)
+ * textareas, so prefer a visible, enabled one carrying the input-bar
+ * `data-phase` marker; fall back to the tallest visible, then any enabled.
+ */
+export function findComposerTextarea(doc?: Document): HTMLTextAreaElement | null {
+  const d = doc ?? (typeof document !== 'undefined' ? document : undefined);
+  if (!d) return null;
+  const areas = Array.from(d.querySelectorAll('textarea'));
+  if (areas.length === 0) return null;
+  const visible = areas.filter((el) => !el.disabled && (el as HTMLElement).offsetParent !== null);
+  const pool = visible.length > 0 ? visible : areas.filter((el) => !el.disabled);
+  const candidates = pool.length > 0 ? pool : areas;
+  const phased = candidates.find((el) => el.hasAttribute('data-phase'));
+  if (phased) return phased;
+  let best = candidates[0];
+  for (const el of candidates) {
+    if (((el as HTMLElement).offsetHeight || 0) > ((best as HTMLElement).offsetHeight || 0)) best = el;
+  }
+  return best;
+}
+
+/**
+ * DOM fallback for composer fill: types into the Lexical contenteditable
+ * surface (`[data-composer-input]`) via execCommand insertText so the editor
+ * adopts the change as a genuine user edit. Returns true when accepted.
+ */
+export function fillComposerDom(text: string, doc?: Document): boolean {
+  const d = doc ?? (typeof document !== 'undefined' ? document : undefined);
+  if (!d) return false;
+  try {
+    const surfaces = Array.from(d.querySelectorAll('[data-composer-input]'));
+    const editable = surfaces.find(
+      (el) => el.getAttribute('contenteditable') === 'true'
+    ) as HTMLElement | undefined;
+    const target = editable ?? (surfaces[0] as HTMLElement | undefined);
+    if (!target) return false;
+    target.focus();
+    if (typeof d.execCommand === 'function') {
+      try {
+        if (d.execCommand('insertText', false, text)) return true;
+      } catch {
+        // Fall through to the selection-based path below.
+      }
+    }
+    const selection = d.getSelection?.();
+    if (selection) {
+      selection.selectAllChildren(target);
+      if (typeof d.execCommand === 'function') {
+        try {
+          if (d.execCommand('insertText', false, text)) return true;
+        } catch {
+          // No further DOM path; the caller falls back to clipboard.
+        }
+      }
+    }
+  } catch {
+    // Non-browser environment or DOM denial.
+  }
+  return false;
+}
+
+/**
  * Updates a React-controlled textarea and properly notifies React's valueTracker
  * so the backdrop and input state immediately reflect the text.
  */

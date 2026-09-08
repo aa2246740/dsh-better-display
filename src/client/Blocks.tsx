@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment';
 import type { AssistantBlock, UserMessageNode } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import { JsonBlock, MessageText, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives';
-import { McpAppFrame } from './McpAppFrame.js';
+import { ComposerFillContext, McpAppFrame } from './McpAppFrame.js';
 import { truncatedJsonLabel } from './primitive-labels.js';
 import type { BlockRenderProps, ReaderBlockOwner } from './types.js';
 import { useStreamingText } from './streaming.js';
@@ -74,7 +74,7 @@ export function contentBlocks(content: UserMessageNode['content']): AssistantBlo
 
 type TextPresentation = { startedAt?: number; interrupted?: boolean; liveText?: boolean };
 
-function ReadingMarkdown({ text, streaming, holdFormatting, startedAt, interrupted = false, liveText = false, kind = 'body' }: { text: string; streaming: boolean; holdFormatting: boolean; kind?: 'body' | 'reasoning' } & TextPresentation) {
+function ReadingMarkdown({ text, streaming, holdFormatting, startedAt, interrupted = false, liveText = false, kind = 'body', fileMentions }: { text: string; streaming: boolean; holdFormatting: boolean; kind?: 'body' | 'reasoning'; fileMentions?: BlockRenderProps['fileMentions'] } & TextPresentation) {
   const root = useRef<HTMLDivElement>(null);
   const presentation = useStreamingText(text, streaming, { startedAt, interrupted: interrupted || !liveText, selected: holdFormatting });
   // Native Markdown changes block keys for its full final parse. Keep the last
@@ -85,7 +85,7 @@ function ReadingMarkdown({ text, streaming, holdFormatting, startedAt, interrupt
   useLayoutEffect(() => { committedMode.current = effectiveMode; }, [effectiveMode]);
   return <div ref={root} className={css.readingText} data-reader-text data-reader-text-kind={kind} data-received-length={text.length} data-shown-length={presentation.text.length}
     data-presentation-pending={presentation.pending || undefined} data-motion-style="opacity-blur" data-ud-motion="reader-text-arrival" data-ud-motion-type="reveal" data-ud-motion-no-flash="true">
-    <MotionMarkdown text={presentation.text} streaming={effectiveMode} enabled={liveText && presentation.reveal && effectiveMode} revision={presentation.revision} />
+    <MotionMarkdown text={presentation.text} streaming={effectiveMode} enabled={liveText && presentation.reveal && effectiveMode} revision={presentation.revision} fileMentions={fileMentions} />
   </div>;
 }
 
@@ -97,9 +97,9 @@ function ReadingReasoning({ text, streaming, holdFormatting, startedAt, interrup
   </div>;
 }
 
-function fallback(block: AssistantBlock, streaming: boolean, source: ReaderBlockOwner['source'], loadImage: BlockRenderProps['loadImage'], holdFormatting: boolean, presentation: TextPresentation): ReactNode {
+function fallback(block: AssistantBlock, streaming: boolean, source: ReaderBlockOwner['source'], loadImage: BlockRenderProps['loadImage'], fillComposer: BlockRenderProps['fillComposer'], holdFormatting: boolean, presentation: TextPresentation, fileMentions?: BlockRenderProps['fileMentions']): ReactNode {
   switch (block.kind) {
-    case 'text': return source === 'user' ? <MessageText text={block.text} /> : <ReadingMarkdown text={block.text} streaming={streaming} holdFormatting={holdFormatting} {...presentation} />;
+    case 'text': return source === 'user' ? <MessageText text={block.text} /> : <ReadingMarkdown text={block.text} streaming={streaming} holdFormatting={holdFormatting} {...presentation} fileMentions={fileMentions} />;
     case 'image': return <ImageBlock attachment={block.attachment} loadImage={loadImage} />;
     case 'reasoning': return <ReadingReasoning text={block.text} streaming={streaming} holdFormatting={holdFormatting} {...presentation} />;
     case 'tool-call': return <JsonBlock label={`工具参数 · ${block.name}`} payload={block.argsRaw} truncatedLabel={truncatedJsonLabel} />;
@@ -108,7 +108,7 @@ function fallback(block: AssistantBlock, streaming: boolean, source: ReaderBlock
       if (raw && typeof raw === 'object') {
         const item = raw as Record<string, unknown>;
         if ((item.type === 'mcp-app' || item.type === 'mcpapp' || item.type === 'ui') && typeof item.html === 'string') {
-          return <McpAppFrame html={item.html} title={typeof item.title === 'string' ? item.title : undefined} />;
+          return <McpAppFrame html={item.html} title={typeof item.title === 'string' ? item.title : undefined} fillComposer={fillComposer} />;
         }
       }
       return <div className={css.unknown}>
@@ -119,14 +119,16 @@ function fallback(block: AssistantBlock, streaming: boolean, source: ReaderBlock
   }
 }
 
-export const Blocks = memo(function Blocks({ blocks, streaming = false, source = 'assistant', holdFormatting = false, startedAt, interrupted, liveText, renderSlotChain, loadImage }: BlockRenderProps & TextPresentation & {
+export const Blocks = memo(function Blocks({ blocks, streaming = false, source = 'assistant', holdFormatting = false, startedAt, interrupted, liveText, renderSlotChain, loadImage, fillComposer, fileMentions }: BlockRenderProps & TextPresentation & {
   blocks: readonly AssistantBlock[]; streaming?: boolean; source?: ReaderBlockOwner['source']; holdFormatting?: boolean;
 }) {
-  return <div className={css.blocks} data-streaming={streaming || undefined}>
-    {blocks.map((block, index) => <BlockBoundary key={block.kind === 'image' ? `image:${block.attachment.attachmentId}:${index}` : `${index}:${block.kind}`}>
-      <Fragment>{renderSlotChain('dsh-better-display.block', { block, streaming, source }, { fallback: fallback(block, streaming, source, loadImage, holdFormatting, { startedAt, interrupted, liveText }) })}</Fragment>
-    </BlockBoundary>)}
-  </div>;
+  return <ComposerFillContext.Provider value={fillComposer}>
+    <div className={css.blocks} data-streaming={streaming || undefined}>
+      {blocks.map((block, index) => <BlockBoundary key={block.kind === 'image' ? `image:${block.attachment.attachmentId}:${index}` : `${index}:${block.kind}`}>
+        <Fragment>{renderSlotChain('dsh-better-display.block', { block, streaming, source }, { fallback: fallback(block, streaming, source, loadImage, fillComposer, holdFormatting, { startedAt, interrupted, liveText }, fileMentions) })}</Fragment>
+      </BlockBoundary>)}
+    </div>
+  </ComposerFillContext.Provider>;
 });
 
 export function CopyAnswer({ blocks }: { blocks: readonly AssistantBlock[] }) {

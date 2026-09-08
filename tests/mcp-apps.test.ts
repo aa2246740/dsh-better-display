@@ -8,6 +8,8 @@ import {
   ensureHtmlDocument,
   extractHtmlTitle,
   formatReceiptPrompt,
+  findComposerTextarea,
+  fillComposerDom,
 } from '../src/client/mcp-app.js';
 import { parseGfmWithMath } from '../src/client/markdown/parse.js';
 
@@ -130,4 +132,26 @@ test('formatReceiptPrompt formats clean, natural conversational text without ext
     payload: { count: 0 },
   };
   assert.equal(formatReceiptPrompt(actionParams, '计数器'), '[计数器] 已完成 reset_counter: {"count":0}');
+});
+
+test('ensureHtmlDocument injects theme bridge and auto-height reporter into complete documents', () => {
+  const completeHtml = '<!DOCTYPE html>\n<html><head><title>Demo</title></head><body><div class="box">hi</div></body></html>';
+  const processed = ensureHtmlDocument(completeHtml, 'dark');
+  assert.ok(processed.includes('<title>Demo</title>'));
+  assert.ok(processed.includes('<body><div class="box">hi</div></body>'));
+  // Theme bridge must apply the initial theme and listen for live host updates
+  // (host pushes ui/initialize result / host-context-changed carrying hostContext.theme).
+  assert.ok(processed.includes('applyTheme("dark")'));
+  assert.ok(processed.includes('hostContext'));
+  // Auto-height reporter must observe the body and emit SEP-1865 resize events.
+  assert.ok(processed.includes('ResizeObserver'));
+  assert.ok(processed.includes('ui/resize'));
+});
+
+test('findComposerTextarea is importable and null-safe without a DOM', () => {
+  assert.equal(findComposerTextarea(undefined as unknown as Document), null);
+});
+
+test('fillComposerDom refuses without a DOM instead of throwing', () => {
+  assert.equal(fillComposerDom('hello'), false);
 });

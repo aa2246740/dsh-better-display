@@ -1,4 +1,4 @@
-import { Fragment, memo, useCallback, useId, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
 import { JsonBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives';
@@ -9,6 +9,7 @@ import { preparingLabel, readerFlow } from './tool-activity.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelection, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
 import { assistantSegments, boundaryOf, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
+import { basename, createProducedFileMentions, dirname, getTurnDeliverables } from './deliverables.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import type { ReaderGroup, TurnBoundary } from './projection.js';
 import type { BlockRenderProps, ReaderProps } from './types.js';
@@ -30,6 +31,8 @@ const ProcessNode = memo(function ProcessNode({ useChat, t, nodeKey, open, motio
   if (!node || node.visibility === 'hidden') return null;
   let content: ReactNode = null;
   if (isNode(node, 'context')) content = <ContextInjectionRow {...node.data} t={t} />;
+  else if (isNode(node, 'system-prompt')) content = <details className={css.detail}><summary>系统提示词</summary><pre className={css.toolRaw}>{node.data.text}</pre></details>;
+  else if (isNode(node, 'turn-process')) content = <JsonBlock label="轮次过程记录" payload={node.data} truncatedLabel={truncatedJsonLabel} />;
   else if (isNode(node, 'model-retry')) content = <JsonBlock label="模型重试记录" payload={node.data.attempts} truncatedLabel={truncatedJsonLabel} />;
   else if (isNode(node, 'command') || isNode(node, 'manual-compaction')) content = <JsonBlock label="命令记录" payload={node.data} truncatedLabel={truncatedJsonLabel} />;
   return content && <ProcessFragment open={open} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={nodeKey} framed>{content}</ProcessFragment>;
@@ -43,6 +46,8 @@ const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, 
   const data = node.data;
   const parts = assistantSegments(data.blocks);
   const earlier = isEarlierNarration(data, boundary);
+  const hasToolCalls = data.blocks.some(block => block.kind === 'tool-call');
+  const isProcessStep = earlier || hasToolCalls || (boundary.latestStep > 0 && data.step < boundary.latestStep);
   const body = data.blocks.filter(block => block.kind !== 'reasoning' && block.kind !== 'tool-call');
   return <>{parts.map((part, index) => part.kind === 'reasoning'
     ? <ProcessFragment key={part.start} open={processOpen} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={nodeKey} framed>
@@ -51,8 +56,13 @@ const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, 
           holdFormatting={pinned} startedAt={data.time} interrupted={data.status === 'interrupted'} liveText />
       </ReasoningCard>
     </ProcessFragment>
+    : isProcessStep ? <ProcessFragment key={part.start} open={processOpen} motion={motion} onRead={onRead} returnFocusTo={returnFocusTo} nodeKey={nodeKey}>
+      <article className={css.processCommentary}>
+        <Blocks {...render} blocks={part.blocks} streaming={data.status === 'running'} holdFormatting={pinned} startedAt={data.time} interrupted={data.status === 'interrupted'} liveText />
+      </article>
+    </ProcessFragment>
     : hasVisibleBody(part.blocks) && <RetiringContent key={part.start} visible={pinned || processOpen || !earlier}>
-      <article className={css.answer} data-reader-answer data-reader-anchor data-reader-key={nodeKey} data-reader-source-start={part.start} data-answer-status={data.status} data-answer-phase={earlier ? 'process' : 'body'}>
+      <article className={css.answer} data-reader-answer data-reader-anchor data-reader-key={nodeKey} data-reader-source-start={part.start} data-answer-status={data.status} data-answer-phase="body">
         <Blocks {...render} blocks={part.blocks} streaming={data.status === 'running'} holdFormatting={pinned} startedAt={data.time} interrupted={data.status === 'interrupted'} liveText />
         {index === parts.length - 1 && data.status === 'interrupted' && <span className={css.stopped}>已停止</span>}
         {index === parts.length - 1 && !earlier && data.status !== 'running' && boundary.status === 'closed' && <CopyAnswer blocks={body} />}
@@ -63,10 +73,20 @@ const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, 
 const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, processOpen = false, ...render }: SeatProps) {
   const node = useChat(snapshot => snapshot.nodes.get(nodeKey));
   if (!node || node.visibility === 'hidden') return null;
-  if (isNode(node, 'user') || isNode(node, 'steering')) return <div className={css.user} data-reader-anchor data-reader-key={nodeKey}>
-    {node.kind === 'steering' && <p className={css.meta}>补充消息</p>}
-    <Blocks {...render} blocks={contentBlocks(node.data.content)} source="user" />
-  </div>;
+  if (isNode(node, 'user') || isNode(node, 'steering')) {
+    const blocks = contentBlocks(node.data.content);
+    const imageBlocks = blocks.filter(b => b.kind === 'image');
+    const otherBlocks = blocks.filter(b => b.kind !== 'image');
+    return <div className={css.userCluster} data-reader-anchor data-reader-key={nodeKey}>
+      {node.kind === 'steering' && <p className={css.meta}>补充消息</p>}
+      {imageBlocks.length > 0 && <div className={css.userImages}>
+        <Blocks {...render} blocks={imageBlocks} source="user" />
+      </div>}
+      {otherBlocks.length > 0 && <div className={css.user}>
+        <Blocks {...render} blocks={otherBlocks} source="user" />
+      </div>}
+    </div>;
+  }
   if (isNode(node, 'assistant-step')) return null;
   if (isNode(node, 'tool-call')) return <ToolMedia {...render} block={node.data.root} />;
   if (isNode(node, 'turn-error')) return <div className={css.error} role="alert" data-reader-anchor>
@@ -84,7 +104,7 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
     return node.data.compaction ? <p className={css.meta}>上下文已整理，原始记录仍保留。</p> : <p className={css.meta}>正在整理上下文…</p>;
   }
   if (node.kind === 'compaction') return <details className={css.detail}><summary>上下文已整理，查看记录</summary><JsonBlock label="压缩记录" payload={node.data} truncatedLabel={truncatedJsonLabel} /></details>;
-  if (node.kind === 'context' || node.kind === 'turn-tail') return null;
+  if (node.kind === 'context' || node.kind === 'turn-tail' || node.kind === 'system-prompt' || node.kind === 'turn-process') return null;
   return <div className={css.unknown} data-reader-anchor>
     <p>此记录类型暂未接入阅读页：{node.kind}</p>
     <JsonBlock label="查看原始记录" payload={node.data} truncatedLabel={truncatedJsonLabel} />
@@ -120,8 +140,170 @@ function GroupStatus({ group, sessionId, useChat, useSessionPendingInteraction, 
   return <StatusText text={text} motion={motion} shimmer={busy} />;
 }
 
+const DeliverableChip = memo(function DeliverableChip({ path, openFile, revealFile }: {
+  path: string;
+  openFile?: (path: string) => Promise<void> | void;
+  revealFile?: (path: string) => Promise<void> | void;
+}) {
+  const [status, setStatus] = useState<'idle' | 'opened' | 'copied' | 'revealed'>('idle');
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+
+  const flash = (next: 'opened' | 'copied' | 'revealed') => {
+    setStatus(next);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setStatus('idle'), 1600);
+  };
+
+  const onOpen = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    try {
+      openFile?.(path);
+      flash('opened');
+    } catch {
+      // fallback
+    }
+  };
+
+  const onReveal = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    try {
+      if (revealFile) {
+        revealFile(path);
+      } else {
+        openFile?.(dirname(path));
+      }
+      flash('revealed');
+    } catch {
+      // fallback
+    }
+  };
+
+  const onCopy = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    try {
+      void navigator.clipboard?.writeText(path);
+      flash('copied');
+    } catch {
+      // fallback
+    }
+  };
+
+  const name = basename(path);
+  const folder = dirname(path);
+
+  return (
+    <div className={css.deliverableChip} data-status={status} title={path}>
+      <button
+        type="button"
+        className={css.chipMain}
+        onClick={onOpen}
+        onDoubleClick={onOpen}
+        aria-label={`直接在编辑器中打开 ${path}`}
+      >
+        {status === 'opened' ? (
+          <svg className={css.statusIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+            <path d="M3.5 8.5l3 3 6-7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        ) : (
+          <svg className={css.deliverableIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+            <path d="M4 2.5h5l3 3V13.5H4V2.5z" strokeWidth="1.2" strokeLinejoin="round" />
+            <path d="M9 2.5v3h3" strokeWidth="1.2" strokeLinejoin="round" />
+          </svg>
+        )}
+        <span className={css.deliverableName}>
+          {status === 'opened' ? '已在外部打开' : name}
+        </span>
+      </button>
+
+      <div className={css.chipActions} aria-label="文件操作">
+        <button
+          type="button"
+          className={css.chipActionBtn}
+          title={`在访达中定位所在目录 (${folder})`}
+          aria-label="在访达中显示所在目录"
+          onClick={onReveal}
+        >
+          {status === 'revealed' ? (
+            <svg className={css.actionIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+              <path d="M3.5 8.5l3 3 6-7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <svg className={css.actionIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+              <path d="M2 4.5h4l1.5 2H14v6.5H2V4.5z" strokeWidth="1.2" strokeLinejoin="round" />
+            </svg>
+          )}
+        </button>
+        <button
+          type="button"
+          className={css.chipActionBtn}
+          title="复制相对路径"
+          aria-label="复制相对路径"
+          onClick={onCopy}
+        >
+          {status === 'copied' ? (
+            <svg className={css.actionIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+              <path d="M3.5 8.5l3 3 6-7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <svg className={css.actionIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+              <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" strokeWidth="1.2" />
+              <path d="M4 10.5H3a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+});
+
+function DeliverablesRow({ deliverables, openFile, revealFile }: {
+  deliverables: readonly string[];
+  openFile?: (path: string) => Promise<void> | void;
+  revealFile?: (path: string) => Promise<void> | void;
+}) {
+  const [folderStatus, setFolderStatus] = useState<'idle' | 'opened'>('idle');
+  const onOpenWorkspace = () => {
+    try {
+      openFile?.('.');
+      setFolderStatus('opened');
+      setTimeout(() => setFolderStatus('idle'), 1600);
+    } catch {
+      // ignore
+    }
+  };
+
+  return (
+    <div className={css.deliverablesRoot} data-reader-deliverables>
+      <span className={css.deliverablesLabel}>产物</span>
+      <div className={css.deliverablesLane}>
+        <div className={css.deliverablesRow}>
+          {deliverables.slice(0, 8).map(path => (
+            <DeliverableChip key={path} path={path} openFile={openFile} revealFile={revealFile} />
+          ))}
+          {deliverables.length > 8 && (
+            <span className={css.deliverablesMore}>
+              + {deliverables.length - 8} 个文件
+            </span>
+          )}
+          {deliverables.length > 1 && (
+            <button
+              type="button"
+              className={css.deliverablesShowFolder}
+              data-status={folderStatus}
+              onClick={onOpenWorkspace}
+              title="在访达中打开整个工作区目录"
+            >
+              {folderStatus === 'opened' ? '✓ 已打开访达' : '在文件夹中显示'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[] }) {
-  const chat = props.useChat(snapshot => snapshot);
+  const nodes = props.useChat(snapshot => snapshot.nodes);
   const turn = props.useChat(snapshot => group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn));
   const boundary = useMemo(() => boundaryOf(turn), [turn]);
   const choiceKey = processChoiceKey(group.key, boundary);
@@ -133,13 +315,25 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   const firstKind = props.useChat(snapshot => snapshot.nodes.get(group.keys[0])?.kind);
   const startsWithUser = firstKind === 'user';
   const mainKeys = startsWithUser ? group.keys.slice(1) : group.keys;
-  const flow = useMemo(() => readerFlow({ ...group, keys: mainKeys }, turn, key => chat.nodes.get(key)), [chat, group, mainKeys, turn]);
-  const hasProcess = flow.some(item => item.kind === 'tool' || hasProcessContent(chat.nodes.get(item.nodeKey), boundary));
+  const flow = useMemo(() => readerFlow({ ...group, keys: mainKeys }, turn, key => nodes.get(key)), [nodes, group, mainKeys, turn]);
+  const hasProcess = flow.some(item => item.kind === 'tool' || hasProcessContent(nodes.get(item.nodeKey), boundary));
   // Only a real, still-active text selection delays folding. Merely clicking,
   // focusing or scrolling the live card does not create a permanent override.
   const holdingSelection = flow.some(item => selectedProcessKeys.includes(item.key));
   const expanded = holdingSelection || processExpanded(expansionChoice, boundary);
-  const shared = { useChat: props.useChat, renderSlotChain: props.renderSlotChain, loadImage: props.loadImage };
+  const deliverables = useMemo(() => getTurnDeliverables(turn, flow), [turn, flow]);
+  const fileMentions = useMemo(
+    () => deliverables.length > 0 && props.openFile ? createProducedFileMentions(deliverables, props.openFile) : undefined,
+    [deliverables, props.openFile],
+  );
+  const shared = {
+    useChat: props.useChat,
+    renderSlotChain: props.renderSlotChain,
+    loadImage: props.loadImage,
+    fillComposer: props.fillComposer,
+    openFile: props.openFile,
+    fileMentions,
+  };
   const terminal = terminalLabel(boundary.reason);
   return <section className={css.turn} data-reader-turn={group.turn ?? 'unresolved'} data-reader-turn-state={boundary.status} data-reader-turn-result={boundary.reason ?? undefined}>
     {startsWithUser && <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={group.keys[0]} /></BlockBoundary>}
@@ -156,10 +350,11 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
       </Fragment> : <Fragment key={item.key}>
         <BlockBoundary><ProcessFragment open={expanded} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={item.key} framed>
           <ToolActivity {...shared} entry={item} motion={motion} turnClosed={boundary.status === 'closed'} onRead={pinProcess} />
+          {item.block && <ToolMedia {...shared} block={item.block} />}
         </ProcessFragment></BlockBoundary>
-        {item.block && <BlockBoundary><ToolMedia {...shared} block={item.block} /></BlockBoundary>}
       </Fragment>)}
     </div>
+    {deliverables.length > 0 && <DeliverablesRow deliverables={deliverables} openFile={props.openFile} revealFile={props.revealFile} />}
     {terminal && <div className={css.notice} data-reader-terminal>{terminal}</div>}
   </section>;
 });
@@ -175,6 +370,7 @@ export function Reader(props: ReaderProps) {
   const loading = props.useSession(snapshot => snapshot.openState === 'loading');
   const hasMore = props.useSession(snapshot => snapshot.hasMore);
   const loadingOlder = props.useSession(snapshot => snapshot.loadingOlder);
+  const pendingSubmissions = props.useSession(snapshot => snapshot.pendingSubmissions);
   const motionPreference = props.useStore(state => state.motion);
   const motion = useMotionAllowed(motionPreference);
   const streamMotion = useMemo(() => ({ enabled: motion, activatedAt: activatedAt.current }), [motion]);
@@ -183,6 +379,29 @@ export function Reader(props: ReaderProps) {
   const pinnedKeys = usePinnedSelection(root);
   const selectedProcessKeys = usePinnedSelection(root, '[data-reader-process]');
   const [historyError, setHistoryError] = useState(false);
+
+  const lastKey = order.at(-1);
+  const lastNode = lastKey ? nodes.get(lastKey) : undefined;
+  const lastSubmissionId = pendingSubmissions?.length ? pendingSubmissions[pendingSubmissions.length - 1].requestId : null;
+  const lastOrderKeyRef = useRef<string | undefined>(lastKey);
+  const lastSubmissionRef = useRef<string | null>(lastSubmissionId);
+
+  useLayoutEffect(() => {
+    const appendedUser = lastKey !== lastOrderKeyRef.current && (lastNode?.kind === 'user' || lastNode?.kind === 'steering');
+    const appendedSubmission = lastSubmissionId !== null && lastSubmissionId !== lastSubmissionRef.current;
+    lastOrderKeyRef.current = lastKey;
+    lastSubmissionRef.current = lastSubmissionId;
+
+    if (appendedUser || appendedSubmission) {
+      scroll.jump();
+    }
+  }, [lastKey, lastNode?.kind, lastSubmissionId, scroll]);
+
+  const visibleSubmissions = useMemo(() => {
+    if (!pendingSubmissions || pendingSubmissions.length === 0) return [];
+    return pendingSubmissions.filter(sub => sub.placement !== 'queued');
+  }, [pendingSubmissions]);
+
   return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} data-dsh-better-display="0.1.0" data-motion={motion ? 'on' : 'off'}>
     <div className={css.column}>
       <div className={css.toolbar} data-ud-check="reader-toolbar">
@@ -197,6 +416,26 @@ export function Reader(props: ReaderProps) {
       {openError && <div className={css.error} role="alert">会话暂时无法读取：{openError.message}</div>}
       {loading && groups.length === 0 && <p className={css.empty} role="status">正在读取会话…</p>}
       {groups.map(group => <TurnGroup key={group.key} {...props} group={group} motion={motion} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} />)}
+      {visibleSubmissions.map(submission => (
+        <div key={submission.requestId} className={css.userCluster} data-reader-pending-submission>
+          {submission.images && submission.images.length > 0 && (
+            <div className={css.userImages}>
+              {submission.images.map((img, idx) => (
+                <figure key={idx} className={css.imageFigure}>
+                  <div className={css.imageFrame} style={{ aspectRatio: `${img.width || 4} / ${img.height || 3}` }}>
+                    <img src={img.previewUrl} alt={img.name ?? '发送的图片'} className={css.pendingImage} />
+                  </div>
+                </figure>
+              ))}
+            </div>
+          )}
+          {submission.text ? (
+            <div className={css.user}>
+              <div className={css.blocks}>{submission.text}</div>
+            </div>
+          ) : null}
+        </div>
+      ))}
       {pending !== undefined && <div className={css.attention} role="alert" data-reader-attention>
         <strong>{pending.kind === 'question' ? '需要你回答一个问题' : '需要你的确认'}</strong>
         <span>请在下方原生操作区处理。此提示不会收进执行过程。</span>

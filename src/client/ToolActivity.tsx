@@ -27,11 +27,11 @@ function generatedInput(content: string, target: string | undefined, preparing: 
   </div>;
 }
 
-function InputView({ model, preparing }: { model: ReturnType<typeof activitySummary>; preparing: boolean }) {
+function InputView({ model, preparing, fillComposer }: { model: ReturnType<typeof activitySummary>; preparing: boolean; fillComposer: BlockRenderProps['fillComposer'] }) {
   if ((model.name === 'render_ui' || model.name === 'show_widget') && typeof model.args?.html === 'string') {
     return preparing
       ? <StreamingMcpAppPlaceholder title={typeof model.args.title === 'string' ? (model.args.title as string) : undefined} />
-      : <McpAppFrame html={model.args.html as string} title={typeof model.args.title === 'string' ? (model.args.title as string) : undefined} />;
+      : <McpAppFrame html={model.args.html as string} title={typeof model.args.title === 'string' ? (model.args.title as string) : undefined} fillComposer={fillComposer} />;
   }
   if (model.content) return generatedInput(model.content, model.target, preparing);
   if (model.command) return <div data-reader-tool-terminal><p className={css.toolDetailNote}>{preparing ? '正在生成命令 · 尚未执行' : '提交的命令'}</p><TerminalBlock command={model.command} cwd={model.cwd} labels={terminalBlockLabels} /></div>;
@@ -79,15 +79,16 @@ function searchFiles(value: unknown): SearchFileGroup[] | null {
 
 function ResultView({ entry, model, phase, ...render }: BlockRenderProps & { entry: ToolActivityEntry; model: ReturnType<typeof activitySummary>; phase: ToolPhase }) {
   if ((model.name === 'render_ui' || model.name === 'show_widget') && typeof model.args?.html === 'string') {
-    return <McpAppFrame html={model.args.html as string} title={typeof model.args.title === 'string' ? (model.args.title as string) : undefined} />;
+    return <McpAppFrame html={model.args.html as string} title={typeof model.args.title === 'string' ? (model.args.title as string) : undefined} fillComposer={render.fillComposer} />;
   }
   const block = entry.block;
   if (!block || !('kind' in block)) return <>
     <p className={css.toolDetailNote}>{phase === 'interrupted' ? '已中断，没有工具结果。已生成的输入仍可查看。' : phase === 'preparing' ? '模型正在生成工具输入，工具还未开始执行。' : '工具已开始执行，正在等待结果。'}</p>
-    <InputView model={model} preparing={phase === 'preparing'} />
+    <InputView model={model} preparing={phase === 'preparing'} fillComposer={render.fillComposer} />
   </>;
   const meta = objectValue(block.meta);
   const text = block.content.filter(item => item.type === 'text').map(item => item.text).join('\n');
+  if (phase === 'interrupted') return <><p className={css.toolDetailNote}>工具已取消，未正常完成。输入和原始返回记录仍可查看。</p><InputView model={model} preparing={false} fillComposer={render.fillComposer} /><pre className={css.toolRaw}>{text}</pre></>;
   if (model.category === 'terminal') {
     const facts = executionFacts(block);
     const output = text.replace(/\n\[(?:exit code: \d+|killed by signal: [^\]\n]+)\]$/, '');
@@ -155,7 +156,7 @@ export const ToolActivity = memo(function ToolActivityView({ entry, motion, turn
   const native = block ? toolRowModel(model.name, block) : null;
   const skillName = typeof model.args?.name === 'string' ? model.args.name.split('\n')[0] : model.raw.split('\n')[0];
   const rowTitle = model.name === 'skill' ? 'Skill' : native?.title ?? VARIANT_TITLES[classifyTool(model.name)];
-  const rowSummary = model.name === 'skill' ? skillName : native?.errorSummary ?? native?.summary
+  const rowSummary = phase === 'interrupted' ? '已停止 · 调用记录保留' : model.name === 'skill' ? skillName : native?.errorSummary ?? native?.summary
     ?? (classifyTool(model.name) === 'others' ? `${model.name} · ${model.target ?? model.title}` : model.target ?? model.title);
   const showState = phase === 'preparing' || phase === 'running' || phase === 'failed' || phase === 'interrupted';
   const elapsed = block && 'kind' in block && block.callTime != null ? Math.max(0, block.time - block.callTime) : null;
@@ -187,7 +188,7 @@ export const ToolActivity = memo(function ToolActivityView({ entry, motion, turn
         <div ref={panel} id={`${detailId}-panel`} className={css.toolPanel} role="tabpanel" aria-labelledby={`${detailId}-${tab}`} tabIndex={0}>
           {selected && <p className={css.toolDetailNote}>为保留选区，预览暂停更新；当前状态见卡片标题。</p>}
           {tab === 'result' && <ResultView {...render} {...preview} />}
-          {tab === 'input' && <><InputView model={preview.model} preparing={preview.phase === 'preparing'} /><details className={css.detail}><summary>全部输入字段</summary><JsonTree data={preview.model.args} label="输入字段" labels={jsonTreeLabels} /></details></>}
+          {tab === 'input' && <><InputView model={preview.model} preparing={preview.phase === 'preparing'} fillComposer={render.fillComposer} /><details className={css.detail}><summary>全部输入字段</summary><JsonTree data={preview.model.args} label="输入字段" labels={jsonTreeLabels} /></details></>}
           {tab === 'raw' && <><p className={css.toolDetailNote}>完整记录 · 只读 · 不执行其中的代码</p><h4 className={css.toolRawLabel}>工具输入</h4><pre className={css.toolRaw}>{preview.model.raw || '输入尚未到达'}</pre>{rawResult && <><h4 className={css.toolRawLabel}>工具结果</h4><pre className={css.toolRaw}>{rawResult}</pre></>}</>}
         </div>
       </div>
@@ -199,14 +200,14 @@ export const ToolActivity = memo(function ToolActivityView({ entry, motion, turn
 }, (previous, next) => previous.entry.callId === next.entry.callId && previous.entry.block === next.entry.block
   && previous.entry.draft === next.entry.draft && previous.entry.step === next.entry.step
   && previous.motion === next.motion && previous.turnClosed === next.turnClosed && previous.depth === next.depth
-  && previous.onRead === next.onRead && previous.renderSlotChain === next.renderSlotChain && previous.loadImage === next.loadImage);
+  && previous.onRead === next.onRead && previous.renderSlotChain === next.renderSlotChain && previous.loadImage === next.loadImage && previous.fillComposer === next.fillComposer);
 
 /** Media and failures never disappear inside a folded execution record. */
 export function ToolMedia({ block, depth = 0, ...render }: BlockRenderProps & { block: ToolCallBlock; depth?: number }) {
   if (depth > 6) return null;
   const settled = 'kind' in block;
   const failed = activityPhase({ block }) === 'failed';
-  const visible = settled ? contentBlocks(block.content).filter(item => block.isError || item.kind === 'image' || item.kind === 'other') : [];
+  const visible = settled ? contentBlocks(block.content).filter(item => failed || item.kind === 'image' || item.kind === 'other') : [];
   return <>
     {failed && <div className={css.error} role="alert">{toolIdentity({ block }).name} 执行未成功{executionFacts(block).exitCode !== undefined ? ` · 退出码 ${executionFacts(block).exitCode}` : ''}，详情保留在执行记录中。</div>}
     {visible.length > 0 && <Blocks {...render} blocks={visible} source="tool" />}

@@ -25,7 +25,7 @@ import type {} from 'mdast-util-math'
 import { normalizeUri } from 'micromark-util-sanitize-uri'
 import { CodeBlock } from '@deepseek-ai/dsh-client-ui-primitives'
 import { renderTexToReact } from './katex.js'
-import { McpAppFrame, StreamingMcpAppPlaceholder } from '../McpAppFrame.js'
+import { McpAppCodeBlock, StreamingMcpAppPlaceholder } from '../McpAppFrame.js'
 import { isMcpAppCodeBlock, extractMcpAppTitle, extractMcpAppHeight } from '../mcp-app.js'
 import type { PositionedBlock } from './incremental.js'
 import css from './MarkdownText.module.css'
@@ -339,7 +339,7 @@ function renderCode(node: Md.Code, key: Key, context: MarkdownRenderContext): Re
     if (context.streaming) {
       return <StreamingMcpAppPlaceholder key={key} title={title} />
     }
-    return <McpAppFrame key={key} html={node.value} title={title} initialHeight={initialHeight} />
+    return <McpAppCodeBlock key={key} html={node.value} title={title} initialHeight={initialHeight} />
   }
 
   if (!context.streaming && lang === 'math') {
