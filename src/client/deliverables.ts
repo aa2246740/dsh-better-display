@@ -19,6 +19,13 @@ export function basename(path: string): string {
   return at === -1 ? normalized : normalized.slice(at + 1);
 }
 
+/** Extract parent directory of a path (or '.' if top-level). */
+export function dirname(path: string): string {
+  const normalized = path.replace(/[/\\]+$/, '');
+  const at = Math.max(normalized.lastIndexOf('/'), normalized.lastIndexOf('\\'));
+  return at === -1 ? '.' : normalized.slice(0, at) || '.';
+}
+
 /**
  * Extract all unique file paths produced/modified in one turn.
  * Respects official deliverables data when available, and falls back to

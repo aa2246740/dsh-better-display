@@ -1,14 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
-import { basename, createProducedFileMentions, getTurnDeliverables } from '../src/client/deliverables.ts';
+import { basename, createProducedFileMentions, dirname, getTurnDeliverables } from '../src/client/deliverables.ts';
 import type { ReaderFlowEntry } from '../src/client/tool-activity.ts';
 
-test('basename handles POSIX and Windows style paths', () => {
+test('basename and dirname handle POSIX and Windows style paths', () => {
   assert.equal(basename('src/client/Reader.tsx'), 'Reader.tsx');
+  assert.equal(dirname('src/client/Reader.tsx'), 'src/client');
   assert.equal(basename('C:\\project\\src\\index.ts'), 'index.ts');
+  assert.equal(dirname('C:\\project\\src\\index.ts'), 'C:\\project\\src');
   assert.equal(basename('simple.txt'), 'simple.txt');
+  assert.equal(dirname('simple.txt'), '.');
   assert.equal(basename('/root/file.md/'), 'file.md');
+  assert.equal(dirname('/root/file.md/'), '/root');
 });
 
 test('getTurnDeliverables extracts produced paths from turn deliverables data', () => {

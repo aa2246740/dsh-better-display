@@ -9,7 +9,7 @@ import { preparingLabel, readerFlow } from './tool-activity.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelection, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
 import { assistantSegments, boundaryOf, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
-import { basename, createProducedFileMentions, getTurnDeliverables } from './deliverables.js';
+import { basename, createProducedFileMentions, dirname, getTurnDeliverables } from './deliverables.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import type { ReaderGroup, TurnBoundary } from './projection.js';
 import type { BlockRenderProps, ReaderProps } from './types.js';
@@ -140,6 +140,156 @@ function GroupStatus({ group, sessionId, useChat, useSessionPendingInteraction, 
   return <StatusText text={text} motion={motion} shimmer={busy} />;
 }
 
+const DeliverableChip = memo(function DeliverableChip({ path, openFile }: { path: string; openFile?: (path: string) => Promise<void> | void }) {
+  const [status, setStatus] = useState<'idle' | 'opened' | 'copied' | 'revealed'>('idle');
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+
+  const flash = (next: 'opened' | 'copied' | 'revealed') => {
+    setStatus(next);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setStatus('idle'), 1600);
+  };
+
+  const onOpen = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    try {
+      openFile?.(path);
+      flash('opened');
+    } catch {
+      // fallback
+    }
+  };
+
+  const onReveal = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    try {
+      openFile?.(dirname(path));
+      flash('revealed');
+    } catch {
+      // fallback
+    }
+  };
+
+  const onCopy = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    try {
+      void navigator.clipboard?.writeText(path);
+      flash('copied');
+    } catch {
+      // fallback
+    }
+  };
+
+  const name = basename(path);
+  const folder = dirname(path);
+
+  return (
+    <div className={css.deliverableChip} data-status={status} title={path}>
+      <button
+        type="button"
+        className={css.chipMain}
+        onClick={onOpen}
+        onDoubleClick={onOpen}
+        aria-label={`直接在编辑器中打开 ${path}`}
+      >
+        {status === 'opened' ? (
+          <svg className={css.statusIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+            <path d="M3.5 8.5l3 3 6-7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        ) : (
+          <svg className={css.deliverableIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+            <path d="M4 2.5h5l3 3V13.5H4V2.5z" strokeWidth="1.2" strokeLinejoin="round" />
+            <path d="M9 2.5v3h3" strokeWidth="1.2" strokeLinejoin="round" />
+          </svg>
+        )}
+        <span className={css.deliverableName}>
+          {status === 'opened' ? '已在外部打开' : name}
+        </span>
+      </button>
+
+      <div className={css.chipActions} aria-label="文件操作">
+        <button
+          type="button"
+          className={css.chipActionBtn}
+          title={`在访达中定位所在目录 (${folder})`}
+          aria-label="在访达中显示所在目录"
+          onClick={onReveal}
+        >
+          {status === 'revealed' ? (
+            <svg className={css.actionIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+              <path d="M3.5 8.5l3 3 6-7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <svg className={css.actionIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+              <path d="M2 4.5h4l1.5 2H14v6.5H2V4.5z" strokeWidth="1.2" strokeLinejoin="round" />
+            </svg>
+          )}
+        </button>
+        <button
+          type="button"
+          className={css.chipActionBtn}
+          title="复制相对路径"
+          aria-label="复制相对路径"
+          onClick={onCopy}
+        >
+          {status === 'copied' ? (
+            <svg className={css.actionIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+              <path d="M3.5 8.5l3 3 6-7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <svg className={css.actionIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+              <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" strokeWidth="1.2" />
+              <path d="M4 10.5H3a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+});
+
+function DeliverablesRow({ deliverables, openFile }: { deliverables: readonly string[]; openFile?: (path: string) => Promise<void> | void }) {
+  const [folderStatus, setFolderStatus] = useState<'idle' | 'opened'>('idle');
+  const onOpenWorkspace = () => {
+    try {
+      openFile?.('.');
+      setFolderStatus('opened');
+      setTimeout(() => setFolderStatus('idle'), 1600);
+    } catch {
+      // ignore
+    }
+  };
+
+  return (
+    <div className={css.deliverablesRoot} data-reader-deliverables>
+      <span className={css.deliverablesLabel}>产物</span>
+      <div className={css.deliverablesLane}>
+        <div className={css.deliverablesRow}>
+          {deliverables.slice(0, 8).map(path => (
+            <DeliverableChip key={path} path={path} openFile={openFile} />
+          ))}
+          {deliverables.length > 8 && (
+            <span className={css.deliverablesMore}>
+              + {deliverables.length - 8} 个文件
+            </span>
+          )}
+          {deliverables.length > 1 && (
+            <button
+              type="button"
+              className={css.deliverablesShowFolder}
+              data-status={folderStatus}
+              onClick={onOpenWorkspace}
+              title="在访达中打开整个工作区目录"
+            >
+              {folderStatus === 'opened' ? '✓ 已打开访达' : '在文件夹中显示'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedProcessKeys, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[] }) {
   const nodes = props.useChat(snapshot => snapshot.nodes);
   const turn = props.useChat(snapshot => group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn));
@@ -192,45 +342,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
         </ProcessFragment></BlockBoundary>
       </Fragment>)}
     </div>
-    {deliverables.length > 0 && (
-      <div className={css.deliverablesRoot} data-reader-deliverables>
-        <span className={css.deliverablesLabel}>产物</span>
-        <div className={css.deliverablesLane}>
-          <div className={css.deliverablesRow}>
-            {deliverables.slice(0, 8).map(path => (
-              <button
-                key={path}
-                type="button"
-                className={css.deliverableFile}
-                title={path}
-                aria-label={`打开 ${path}`}
-                onClick={() => { props.openFile?.(path); }}
-              >
-                <svg className={css.deliverableIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
-                  <path d="M4 2.5h5l3 3V13.5H4V2.5z" strokeWidth="1.2" strokeLinejoin="round" />
-                  <path d="M9 2.5v3h3" strokeWidth="1.2" strokeLinejoin="round" />
-                </svg>
-                <span className={css.deliverableName}>{basename(path)}</span>
-              </button>
-            ))}
-            {deliverables.length > 8 && (
-              <span className={css.deliverablesMore}>
-                + {deliverables.length - 8} 个文件
-              </span>
-            )}
-            {deliverables.length > 1 && (
-              <button
-                type="button"
-                className={css.deliverablesShowFolder}
-                onClick={() => { props.openFile?.('.'); }}
-              >
-                在文件夹中显示
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    )}
+    {deliverables.length > 0 && <DeliverablesRow deliverables={deliverables} openFile={props.openFile} />}
     {terminal && <div className={css.notice} data-reader-terminal>{terminal}</div>}
   </section>;
 });
