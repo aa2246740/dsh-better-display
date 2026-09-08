@@ -21,12 +21,10 @@ interface ConversationFace {
 export type { ReaderBlockOwner } from './types.js';
 export { McpAppFrame } from './McpAppFrame.js';
 export const name = 'dsh-better-display-client';
-export const inject = ['slots', 'sessions', 'conversation', 'remote'];
+export const inject = ['slots', 'sessions', 'conversation', 'remote', 'remote.session'];
 
 export function apply(ctx: Context): void {
   const store = createReaderStore();
-  const faces = new Map<SessionId, ReaderInjected>();
-  ctx.effect(() => () => { faces.clear(); });
   ctx.slots.inject('conversation.view', function* () {
     yield ctx.slots.register({
     name: 'conversation.view',
@@ -37,14 +35,12 @@ export function apply(ctx: Context): void {
     children: { 'dsh-better-display.block': { kind: 'chain', scope: 'session' } },
     store,
     inject: (sessionId: SessionId): ReaderInjected => {
-      const existing = faces.get(sessionId);
-      if (existing) return existing;
       const session = () => {
         const current = ctx.sessions.binding(sessionId)?.session;
         if (!current) throw new Error('阅读页对应的会话已关闭。');
         return current;
       };
-      const face: ReaderInjected = {
+      return {
         loadOlder: async () => { await session().loadOlder(); },
         loadImage: async attachment => {
           const receipt = await session().readAttachment(attachment.attachmentId);
@@ -53,15 +49,24 @@ export function apply(ctx: Context): void {
         },
         openFile: async (path: string) => {
           try {
-            const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd;
-            const targetPath = resolveWorkspacePath(cwd, path);
+            const cwd = ctx.sessions?.list?.getSnapshot?.()?.byId[sessionId]?.cwd;
+            const targetPath = path === '.' || path === ''
+              ? (cwd ?? '.')
+              : resolveWorkspacePath(cwd, path);
             const remote = ctx.remote as unknown as { session?: { openWorkspacePath: (arg: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }> } } | undefined;
-            if (remote?.session) {
-              const result = await remote.session.openWorkspacePath({ path: targetPath });
-              if (!result.ok) console.warn('openWorkspacePath failed:', result.error?.message);
+            const remoteSession = remote?.session
+              ?? (ctx.get?.('remote.session') as unknown as { openWorkspacePath: (arg: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }> } | undefined)
+              ?? ((ctx.get?.('remote') as unknown as { session?: { openWorkspacePath: (arg: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }> } })?.session);
+            if (remoteSession?.openWorkspacePath) {
+              const result = await remoteSession.openWorkspacePath({ path: targetPath });
+              if (!result?.ok) {
+                console.warn('[dsh-better-display] openWorkspacePath failed:', result?.error?.message);
+              }
+            } else {
+              console.warn('[dsh-better-display] remote.session is not available');
             }
           } catch (error) {
-            console.warn('openFile failed:', error);
+            console.warn('[dsh-better-display] openFile error:', error);
           }
         },
         fillComposer: (text: string) => {
@@ -84,8 +89,6 @@ export function apply(ctx: Context): void {
           }
         },
       };
-      faces.set(sessionId, face);
-      return face;
     },
     }, Reader);
     yield installReaderEntry(ctx);
