@@ -101,6 +101,33 @@ export function apply(ctx: Context): void {
             console.warn('[dsh-better-display] revealFile error:', error);
           }
         },
+        forkAt: (seq: number) => {
+          try {
+            const sessionsApi = ctx.sessions as unknown as {
+              fork: (arg: { sessionId: string; atSeq: number; increaseTitle: boolean }) => Promise<string>;
+              open: (sessionId: string) => void;
+            } | undefined;
+            if (sessionsApi?.fork) {
+              sessionsApi.fork({ sessionId, atSeq: seq, increaseTitle: true })
+                .then(childId => { sessionsApi.open?.(childId); })
+                .catch(err => { console.warn('[dsh-better-display] fork failed:', err); });
+            }
+          } catch (error) {
+            console.warn('[dsh-better-display] forkAt error:', error);
+          }
+        },
+        loadThrough: async (seq: unknown) => {
+          try {
+            const current = session() as unknown as { loadThrough?: (seq: unknown) => Promise<void> };
+            if (typeof current?.loadThrough === 'function') {
+              await current.loadThrough(seq);
+            } else {
+              await session().loadOlder();
+            }
+          } catch (error) {
+            console.warn('[dsh-better-display] loadThrough error:', error);
+          }
+        },
         fillComposer: (text: string) => {
           // Sanctioned path: the conversation input shell owns the Lexical
           // editor, so setDraft lands in the draft store deterministically.

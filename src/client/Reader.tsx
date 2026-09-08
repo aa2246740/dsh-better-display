@@ -1,4 +1,4 @@
-import { Fragment, memo, useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
 import { JsonBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives';
@@ -11,6 +11,8 @@ import { StreamMotionContext } from './streaming.js';
 import { assistantSegments, boundaryOf, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
 import { basename, createProducedFileMentions, dirname, getTurnDeliverables } from './deliverables.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
+import { TimelineRail } from './TimelineRail.js';
+import { mergeTimelineItems, type TimelineItem } from './timeline.js';
 import type { ReaderGroup, TurnBoundary } from './projection.js';
 import type { BlockRenderProps, ReaderProps } from './types.js';
 import css from './Reader.module.css';
@@ -18,6 +20,22 @@ import { markdownLabels, truncatedJsonLabel } from './primitive-labels.js';
 
 function isNode<K extends ChatNodeKind>(node: ChatConversationViewNode, kind: K): node is ChatNode<K> {
   return node.kind === kind;
+}
+
+function cleanErrorMessage(raw: string | undefined): string {
+  if (!raw) return '模型服务暂时无响应或连接中断，请稍后重试。';
+  let str = raw.trim();
+  if (str.includes('"error"') || str.startsWith('{')) {
+    try {
+      const idx = str.indexOf('{');
+      const parsed = JSON.parse(str.slice(idx));
+      const msg = parsed?.error?.message || parsed?.message || parsed?.error;
+      if (typeof msg === 'string') str = msg;
+    } catch {
+      // keep
+    }
+  }
+  return str;
 }
 
 type SeatProps = BlockRenderProps & Pick<ReaderProps, 'useChat'> & {
@@ -65,7 +83,9 @@ const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, 
       <article className={css.answer} data-reader-answer data-reader-anchor data-reader-key={nodeKey} data-reader-source-start={part.start} data-answer-status={data.status} data-answer-phase="body">
         <Blocks {...render} blocks={part.blocks} streaming={data.status === 'running'} holdFormatting={pinned} startedAt={data.time} interrupted={data.status === 'interrupted'} liveText />
         {index === parts.length - 1 && data.status === 'interrupted' && <span className={css.stopped}>已停止</span>}
-        {index === parts.length - 1 && !earlier && data.status !== 'running' && boundary.status === 'closed' && <CopyAnswer blocks={body} />}
+        {index === parts.length - 1 && !earlier && data.status !== 'running' && boundary.status === 'closed' && (
+          <CopyAnswer blocks={body} onFork={render.forkAt ? () => render.forkAt!(data.seq) : undefined} metrics={render.metrics} />
+        )}
       </article>
     </RetiringContent>)}</>;
 });
@@ -155,10 +175,10 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
     </svg>
     <div className={css.errorCopy}>
       <div className={css.errorTitle}>
-        <strong>本轮执行中断或出现错误</strong>
+        <strong>本轮运行失败</strong>
         {node.data.code && <code className={css.errorCode}>{node.data.code}</code>}
       </div>
-      <p className={css.errorMessage}>{node.data.message || '模型未返回有效回复。'}</p>
+      <p className={css.errorMessage}>{cleanErrorMessage(node.data.message)}</p>
     </div>
   </div>;
   if (isNode(node, 'turn-max-tokens')) return <div className={css.notice}>已到达输出长度限制，回答尚未完整。</div>;
@@ -418,15 +438,34 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     () => deliverables.length > 0 && props.openFile ? createProducedFileMentions(deliverables, props.openFile) : undefined,
     [deliverables, props.openFile],
   );
+  const tailData = useMemo(() => {
+    for (const key of group.keys) {
+      const n = nodes.get(key);
+      if (n?.kind === 'turn-tail') return n.data;
+    }
+    return undefined;
+  }, [group.keys, nodes]);
+  const runMs = turn?.start && turn?.end ? Math.max(0, turn.end.time - turn.start.time) : undefined;
+  const metrics = useMemo(() => ({
+    usage: tailData?.tokenUsage,
+    runMs,
+    tokensPerSecond: tailData?.tokensPerSecond,
+    ttftMs: tailData?.ttftMs,
+  }), [tailData, runMs]);
   const shared = {
     useChat: props.useChat,
     renderSlotChain: props.renderSlotChain,
     loadImage: props.loadImage,
     fillComposer: props.fillComposer,
     openFile: props.openFile,
+    revealFile: props.revealFile,
+    forkAt: props.forkAt,
     fileMentions,
+    metrics,
   };
   const terminal = terminalLabel(boundary.reason);
+  const hasTurnError = flow.some(item => item.kind === 'node' && nodes.get(item.nodeKey)?.kind === 'turn-error');
+  const showTerminalNotice = terminal && !hasTurnError && boundary.reason !== 'interrupted' && boundary.reason !== 'aborted';
   return <section className={css.turn} data-reader-turn={group.turn ?? 'unresolved'} data-reader-turn-state={boundary.status} data-reader-turn-result={boundary.reason ?? undefined}>
     {startsWithUser && <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={group.keys[0]} /></BlockBoundary>}
     {hasProcess && <Disclosure open={expanded} onChange={setExpanded} controls={flowId} buttonRef={processButton}
@@ -447,7 +486,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
       </Fragment>)}
     </div>
     {deliverables.length > 0 && <DeliverablesRow deliverables={deliverables} openFile={props.openFile} revealFile={props.revealFile} />}
-    {terminal && <div className={css.notice} data-reader-terminal>{terminal}</div>}
+    {showTerminalNotice && <div className={css.notice} data-reader-terminal>{terminal}</div>}
   </section>;
 });
 
@@ -472,6 +511,103 @@ export function Reader(props: ReaderProps) {
   const selectedProcessKeys = usePinnedSelection(root, '[data-reader-process]');
   const [historyError, setHistoryError] = useState(false);
 
+  // 1. Navigation items from Chat snapshot
+  const turnNavigationItems = props.useChat(snapshot => snapshot.navigation?.items ? snapshot.navigation.items() : undefined);
+  // 2. Whole-log turn outline projection
+  const turnOutline = props.useProjection?.('turnOutline');
+  // 3. Track turns with deliverables
+  const turnsWithDeliverables = useMemo(() => {
+    const set = new Set<number>();
+    for (const [turnNum, loc] of timeline.turns) {
+      const deliv = loc.data?.get('deliverables') as { produced?: unknown[] } | undefined;
+      if (Array.isArray(deliv?.produced) && deliv.produced.length > 0) {
+        set.add(turnNum);
+      }
+    }
+    return set;
+  }, [timeline]);
+
+  // 4. Merged timeline items for the rail
+  const timelineItems = useMemo(
+    () => mergeTimelineItems(turnNavigationItems, turnOutline, turnsWithDeliverables),
+    [turnNavigationItems, turnOutline, turnsWithDeliverables],
+  );
+
+  // 5. Active & busy turn tracking
+  const [activeTurn, setActiveTurn] = useState<number | null>(null);
+  const [busyTurn, setBusyTurn] = useState<number | null>(null);
+
+  // Scroll spy to update activeTurn
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const scroller = el.closest('[data-conversation-scroll]') ?? el;
+
+    let ticking = false;
+    const updateActive = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        ticking = false;
+        const line = (scroller instanceof HTMLElement ? scroller.clientHeight : window.innerHeight) * 0.35;
+        const turnRows = el.querySelectorAll<HTMLElement>('[data-reader-turn]:not([data-reader-turn="unresolved"])');
+        let current: number | null = null;
+        for (const row of turnRows) {
+          const rect = row.getBoundingClientRect();
+          if (rect.top <= line) {
+            const num = Number(row.dataset.readerTurn);
+            if (Number.isSafeInteger(num)) current = num;
+          } else {
+            break;
+          }
+        }
+        if (current !== null) {
+          setActiveTurn(current);
+        } else if (turnRows.length > 0) {
+          const first = Number(turnRows[0].dataset.readerTurn);
+          if (Number.isSafeInteger(first)) setActiveTurn(first);
+        }
+      });
+    };
+
+    scroller.addEventListener('scroll', updateActive, { passive: true });
+    updateActive();
+    return () => scroller.removeEventListener('scroll', updateActive);
+  }, [groups]);
+
+  // Navigation handler (supports loaded jump & unloaded loadThrough)
+  const onNavigateTurn = useCallback(async (item: TimelineItem) => {
+    const el = root.current;
+    if (!el) return;
+
+    if (item.anchor.kind === 'loaded') {
+      const targetRow = el.querySelector<HTMLElement>(`[data-reader-turn="${item.turn}"]`);
+      if (targetRow) {
+        targetRow.scrollIntoView({ behavior: motion ? 'smooth' : 'auto', block: 'start' });
+        setActiveTurn(item.turn);
+      }
+      return;
+    }
+
+    setBusyTurn(item.turn);
+    try {
+      if (props.loadThrough) {
+        await props.loadThrough(item.anchor.seq);
+      } else {
+        await props.loadOlder();
+      }
+      setTimeout(() => {
+        const targetRow = el.querySelector<HTMLElement>(`[data-reader-turn="${item.turn}"]`);
+        if (targetRow) {
+          targetRow.scrollIntoView({ behavior: motion ? 'smooth' : 'auto', block: 'start' });
+          setActiveTurn(item.turn);
+        }
+      }, 50);
+    } finally {
+      setBusyTurn(null);
+    }
+  }, [props.loadThrough, props.loadOlder, motion]);
+
   const lastKey = order.at(-1);
   const lastNode = lastKey ? nodes.get(lastKey) : undefined;
   const lastSubmissionId = pendingSubmissions?.length ? pendingSubmissions[pendingSubmissions.length - 1].requestId : null;
@@ -495,6 +631,7 @@ export function Reader(props: ReaderProps) {
   }, [pendingSubmissions]);
 
   return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} data-dsh-better-display="0.1.0" data-motion={motion ? 'on' : 'off'}>
+    <TimelineRail items={timelineItems} activeTurn={activeTurn} busyTurn={busyTurn} onNavigate={onNavigateTurn} />
     <div className={css.column}>
       <div className={css.toolbar} data-ud-check="reader-toolbar">
         <span title="基于真实消息类型和轮次边界整理。当前协议没有独立的正文阶段标记，无法确认的内容会继续保留。">阅读 · 原始记录完整保留</span>

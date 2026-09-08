@@ -1,0 +1,115 @@
+.container {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.pillButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-bg-module-platform);
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  cursor: pointer;
+  outline: none;
+  transition: all 140ms ease;
+  font-family: inherit;
+}
+
+.pillButton:hover, .pillButton[data-active=true] {
+  color: var(--dsw-alias-label-primary);
+  border-color: var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.pillIcon {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  opacity: .8;
+}
+
+.metricsPop {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: 260px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-base);
+  border: 1px solid var(--dsw-alias-border-l2);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+  backdrop-filter: blur(10px);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  animation: popIn 140ms ease-out;
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.popHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+}
+
+.popSection {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.popSectionTitle {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--dsw-alias-label-tertiary);
+  margin-top: 2px;
+}
+
+.popGrid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 12px;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.popLabel {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.popValue {
+  color: var(--dsw-alias-label-primary);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  text-align: right;
+}
+
+.popBadge {
+  font-size: 10px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--dsw-alias-border-l1);
+  color: var(--dsw-alias-label-secondary);
+  margin-left: 4px;
+}

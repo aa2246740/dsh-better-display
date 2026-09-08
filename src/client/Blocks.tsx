@@ -131,7 +131,9 @@ export const Blocks = memo(function Blocks({ blocks, streaming = false, source =
   </ComposerFillContext.Provider>;
 });
 
-export function CopyAnswer({ blocks }: { blocks: readonly AssistantBlock[] }) {
+import { TurnMetrics } from './TurnMetrics.js';
+
+export function CopyAnswer({ blocks, onFork, metrics }: { blocks: readonly AssistantBlock[]; onFork?: () => void; metrics?: BlockRenderProps['metrics'] }) {
   const [receipt, setReceipt] = useState('');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
@@ -146,6 +148,23 @@ export function CopyAnswer({ blocks }: { blocks: readonly AssistantBlock[] }) {
     }}>
       <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect x="5" y="5" width="8" height="8" rx="1.5" /><path d="M3 10H2.8A.8.8 0 0 1 2 9.2V2.8a.8.8 0 0 1 .8-.8h6.4a.8.8 0 0 1 .8.8V3" /></svg>
     </button>
+    {onFork && (
+      <button
+        type="button"
+        className={css.iconButton}
+        aria-label="以此处为基础创建分叉会话"
+        title="以此处为基础创建分叉会话 (Fork)"
+        onClick={onFork}
+      >
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.2">
+          <circle cx="4.5" cy="3.5" r="1.8" />
+          <circle cx="4.5" cy="12.5" r="1.8" />
+          <circle cx="11.5" cy="5.5" r="1.8" />
+          <path d="M4.5 5.5v5M4.5 8c2.5 0 4.5-1 7-2.5" strokeLinecap="round" />
+        </svg>
+      </button>
+    )}
+    {metrics && <TurnMetrics {...metrics} />}
     <span role="status" className={css.meta}>{receipt}</span>
   </div>;
 }

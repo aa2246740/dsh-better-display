@@ -1,0 +1,170 @@
+/* Zero-height sticky slot: floats over the transcript right gutter */
+.slot {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  height: 0;
+  pointer-events: none;
+}
+
+.frame {
+  --turn-rail-band: calc(
+    var(--dsh-conversation-viewport-height, 100dvh) - var(--dsh-composer-height, 152px)
+  );
+  --turn-preview-height: 100px;
+
+  position: absolute;
+  top: calc(var(--turn-rail-band) / 2);
+  /* .root is the containing block (container-type creates layout containment)
+     and already reserves the right gutter via its own padding, so a small
+     positive inset keeps the rail inside the gutter, clear of the text. */
+  right: 6px;
+  width: 26px;
+  height: min(
+    var(--turn-natural-height),
+    max(0px, calc(var(--turn-rail-band) - 64px)),
+    420px
+  );
+  cursor: pointer;
+  pointer-events: auto;
+  transform: translateY(-50%);
+  transition: height 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.scroller {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.fadeTop {
+  mask-image: linear-gradient(to bottom, transparent 0, #000 24px, #000 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 24px, #000 100%);
+}
+
+.fadeBottom {
+  mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 24px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 24px), transparent 100%);
+}
+
+.fadeTop.fadeBottom {
+  mask-image: linear-gradient(to bottom, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+}
+
+.marks {
+  position: relative;
+  height: var(--turn-natural-height);
+}
+
+.markPosition {
+  position: absolute;
+  top: calc(var(--turn-natural-position) + var(--turn-rail-inset));
+  right: 0;
+  left: 0;
+  height: 12px;
+  transform: translateY(-50%);
+  transition: top 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.mark {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.tick {
+  border-radius: 2px;
+  flex: none;
+  transition: width 100ms cubic-bezier(0.16, 1, 0.3, 1),
+              height 100ms cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 100ms ease,
+              background-color 140ms ease;
+}
+
+.markBusy .tick {
+  animation: markBusyPulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes markBusyPulse {
+  from { width: 8px; opacity: 0.4; }
+  to { width: 18px; opacity: 1; }
+}
+
+.preview {
+  position: absolute;
+  top: clamp(
+    0px,
+    calc(
+      var(--turn-natural-position) + var(--turn-rail-inset)
+      - var(--turn-scroll-top, 0px) - var(--turn-preview-height) / 2
+    ),
+    calc(100% - var(--turn-preview-height))
+  );
+  right: calc(100% + 10px);
+  box-sizing: border-box;
+  width: min(280px, calc(100cqw - 120px));
+  max-height: var(--turn-preview-height);
+  overflow: hidden;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+  animation: previewFadeIn 120ms ease-out;
+  transition: top 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  z-index: 40;
+}
+
+@keyframes previewFadeIn {
+  from { opacity: 0; transform: translateX(4px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.previewPrompt {
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+}
+
+.previewResponse {
+  margin-top: 4px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 16px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+}
+
+@media (max-width: 960px) {
+  .slot {
+    display: none !important;
+  }
+}

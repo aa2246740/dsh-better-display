@@ -33,6 +33,10 @@ export interface ReaderInjected {
   openFile: (path: string) => Promise<void> | void;
   /** Reveal and highlight a workspace file in macOS Finder or Windows Explorer. */
   revealFile?: (path: string) => Promise<void> | void;
+  /** Fork the conversation at a specific message sequence into a new branch session. */
+  forkAt?: (seq: number) => void;
+  /** Load session history through a target sequence number. */
+  loadThrough?: (seq: unknown) => Promise<void>;
 }
 export type ReaderProps = PropsRuntime<'conversation.view'>
   & PropsLocale<'chat'>
@@ -42,5 +46,12 @@ export type ReaderProps = PropsRuntime<'conversation.view'>
 export type BlockRenderProps = Pick<ReaderProps, 'renderSlotChain' | 'loadImage' | 'fillComposer'> & {
   openFile?: (path: string) => Promise<void> | void;
   revealFile?: (path: string) => Promise<void> | void;
+  forkAt?: (seq: number) => void;
   fileMentions?: MarkdownFileMentions;
+  metrics?: {
+    usage?: import('@deepseek-ai/dsh-client-ui-chat/client').TurnTokenUsage;
+    runMs?: number;
+    tokensPerSecond?: number;
+    ttftMs?: number;
+  };
 };
