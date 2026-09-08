@@ -107,7 +107,7 @@ const CompactionDivider = memo(function CompactionDivider({ data }: {
               <path d="M8 5v3.2l2 1.8" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <span>{label}</span>
-            <span className={css.compactionToggle}>{open ? '收起备忘 ▴' : '查看备忘 ▾'}</span>
+            <span className={css.compactionToggle}>{open ? '收起备忘' : '查看备忘'}</span>
           </button>
         ) : (
           <span className={css.compactionPill}>
@@ -380,7 +380,12 @@ function DeliverablesRow({ deliverables, openFile, revealFile }: {
               onClick={onOpenWorkspace}
               title="在访达中打开整个工作区目录"
             >
-              {folderStatus === 'opened' ? '✓ 已打开访达' : '在文件夹中显示'}
+              {folderStatus === 'opened' && (
+                <svg className={css.statusIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+                  <path d="M3.5 8.5l3 3 6-7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+              <span>{folderStatus === 'opened' ? '已打开访达' : '在文件夹中显示'}</span>
             </button>
           )}
         </div>
