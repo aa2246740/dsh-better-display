@@ -200,6 +200,16 @@
 .tool > .tool { margin: 10px 0 0 12px; }
 .meta { font-size: 12px; line-height: 20px; color: var(--dsw-alias-label-tertiary); }
 .stopped { align-self: flex-start; border-radius: 6px; padding: 0 6px; background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 18px; margin-top: 12px; }
+.compactionRow { display: flex; flex-direction: column; align-items: center; margin: 16px 0; width: 100%; box-sizing: border-box; }
+.compactionLine { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 18px; user-select: none; }
+.compactionLine::before, .compactionLine::after { content: ''; flex: 1; height: 1px; background: var(--dsw-alias-border-l1); opacity: .7; }
+.compactionPill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 12px; background: var(--dsw-alias-bg-module-platform); border: 1px solid var(--dsw-alias-border-l1); color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 18px; font-family: inherit; }
+.compactionButton { cursor: pointer; transition: color 140ms ease, border-color 140ms ease, background-color 140ms ease; }
+.compactionButton:hover { color: var(--dsw-alias-label-primary); border-color: var(--dsw-alias-border-l2); background: var(--dsw-alias-interactive-bg-hover); }
+.compactionIcon { width: 12px; height: 12px; flex: none; opacity: .7; }
+.compactionToggle { font-size: 10px; opacity: .8; margin-left: 2px; }
+.compactionSummaryBox { margin-top: 10px; width: 100%; max-width: 680px; padding: 12px 16px; border-radius: 8px; background: var(--dsw-alias-bg-module-platform); border: 1px solid var(--dsw-alias-border-l2); font-size: 12px; line-height: 20px; color: var(--dsw-alias-label-secondary); box-sizing: border-box; }
+.compactionSummaryHeader { font-size: 11px; font-weight: 500; color: var(--dsw-alias-label-tertiary); margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px dashed var(--dsw-alias-border-l1); }
 .notice, .error, .attention { border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 20px; overflow-wrap: anywhere; }
 .notice { background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-label-secondary); border: 1px solid var(--dsw-alias-border-l2); }
 .error { display: flex; align-items: flex-start; gap: 10px; background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.22); color: var(--dsw-alias-label-primary); }

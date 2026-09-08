@@ -70,6 +70,65 @@ const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, 
     </RetiringContent>)}</>;
 });
 
+const CompactionDivider = memo(function CompactionDivider({ data }: {
+  data: { summary?: string | null; shadowedItemCount?: number | null; shadowedTokenCount?: number | null } | null;
+}) {
+  const [open, setOpen] = useState(false);
+  if (!data) return null;
+
+  const hasSummary = typeof data.summary === 'string' && data.summary.trim().length > 0;
+  const items = data.shadowedItemCount;
+  const tokens = data.shadowedTokenCount;
+
+  let label = '历史上下文已精简优化';
+  if (items && tokens) {
+    const kTokens = tokens >= 1000 ? `${(tokens / 1000).toFixed(1)}k` : String(tokens);
+    label = `已精简 ${items} 条历史消息 · 释放约 ${kTokens} tokens`;
+  } else if (items) {
+    label = `已精简 ${items} 条历史消息`;
+  } else if (tokens) {
+    const kTokens = tokens >= 1000 ? `${(tokens / 1000).toFixed(1)}k` : String(tokens);
+    label = `历史记忆已整理 · 释放约 ${kTokens} tokens`;
+  }
+
+  return (
+    <div className={css.compactionRow} data-reader-compaction>
+      <div className={css.compactionLine}>
+        {hasSummary ? (
+          <button
+            type="button"
+            className={`${css.compactionPill} ${css.compactionButton}`}
+            onClick={() => setOpen(v => !v)}
+            aria-expanded={open}
+            title={open ? '收起历史记忆摘要' : '展开查看此节点提炼的记忆摘要'}
+          >
+            <svg className={css.compactionIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+              <path d="M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2z" strokeWidth="1.2" />
+              <path d="M8 5v3.2l2 1.8" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span>{label}</span>
+            <span className={css.compactionToggle}>{open ? '收起备忘 ▴' : '查看备忘 ▾'}</span>
+          </button>
+        ) : (
+          <span className={css.compactionPill}>
+            <svg className={css.compactionIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+              <path d="M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2z" strokeWidth="1.2" />
+              <path d="M8 5v3.2l2 1.8" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span>{label}</span>
+          </span>
+        )}
+      </div>
+      {open && hasSummary && (
+        <div className={css.compactionSummaryBox} data-reader-anchor>
+          <div className={css.compactionSummaryHeader}>前期对话要点备忘</div>
+          <MarkdownText text={data.summary!} labels={markdownLabels} />
+        </div>
+      )}
+    </div>
+  );
+});
+
 const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, processOpen = false, ...render }: SeatProps) {
   const node = useChat(snapshot => snapshot.nodes.get(nodeKey));
   if (!node || node.visibility === 'hidden') return null;
@@ -129,9 +188,9 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
         <p className={css.errorMessage}>{node.data.command.outcome.text}</p>
       </div>
     </div>;
-    return node.data.compaction ? <p className={css.meta}>上下文已整理，原始记录仍保留。</p> : <p className={css.meta}>正在整理上下文…</p>;
+    return node.data.compaction ? <CompactionDivider data={node.data.compaction} /> : null;
   }
-  if (node.kind === 'compaction') return <details className={css.detail}><summary>上下文已整理，查看记录</summary><JsonBlock label="压缩记录" payload={node.data} truncatedLabel={truncatedJsonLabel} /></details>;
+  if (node.kind === 'compaction') return <CompactionDivider data={node.data} />;
   if (node.kind === 'context' || node.kind === 'turn-tail' || node.kind === 'system-prompt' || node.kind === 'turn-process') return null;
   return <div className={css.unknown} data-reader-anchor>
     <p>此记录类型暂未接入阅读页：{node.kind}</p>
