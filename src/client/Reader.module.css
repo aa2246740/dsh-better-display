@@ -200,10 +200,14 @@
 .tool > .tool { margin: 10px 0 0 12px; }
 .meta { font-size: 12px; line-height: 20px; color: var(--dsw-alias-label-tertiary); }
 .stopped { align-self: flex-start; border-radius: 6px; padding: 0 6px; background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 18px; margin-top: 12px; }
-.notice, .error, .attention { border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 22px; overflow-wrap: anywhere; }
-.notice { background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-label-secondary); }
-.error { background: var(--dsw-alias-interactive-bg-hover-danger); color: var(--dsw-alias-state-error-primary); }
-.error p { margin: 6px 0; }
+.notice, .error, .attention { border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 20px; overflow-wrap: anywhere; }
+.notice { background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-label-secondary); border: 1px solid var(--dsw-alias-border-l2); }
+.error { display: flex; align-items: flex-start; gap: 10px; background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.22); color: var(--dsw-alias-label-primary); }
+.errorIcon { width: 16px; height: 16px; flex: none; margin-top: 2px; color: #ef4444; }
+.errorCopy { flex: 1; min-width: 0; }
+.errorTitle { display: flex; align-items: center; gap: 8px; color: #dc2626; font-weight: 500; margin-bottom: 2px; }
+.errorMessage { margin: 0; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 18px; word-break: break-word; }
+.errorCode { font-size: 11px; padding: 1px 5px; border-radius: 4px; background: rgba(239, 68, 68, 0.12); color: #dc2626; font-family: inherit; }
 .attention { display: flex; flex-direction: column; gap: 3px; border: 1px solid var(--dsw-alias-state-business-primary); color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-base); }
 .attention span { color: var(--dsw-alias-label-secondary); }
 .unknown { background: var(--dsw-alias-bg-module-platform); border: 1px solid var(--dsw-alias-border-l2); border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 22px; }

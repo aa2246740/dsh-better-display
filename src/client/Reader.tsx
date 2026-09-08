@@ -90,17 +90,45 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
   if (isNode(node, 'assistant-step')) return null;
   if (isNode(node, 'tool-call')) return <ToolMedia {...render} block={node.data.root} />;
   if (isNode(node, 'turn-error')) return <div className={css.error} role="alert" data-reader-anchor>
-    <strong>本轮出现错误</strong><p>{node.data.message}</p>{node.data.code && <code>{node.data.code}</code>}
+    <svg className={css.errorIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+      <circle cx="8" cy="8" r="6.5" strokeWidth="1.2" />
+      <path d="M8 5v3.5M8 11.2h.01" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+    <div className={css.errorCopy}>
+      <div className={css.errorTitle}>
+        <strong>本轮执行中断或出现错误</strong>
+        {node.data.code && <code className={css.errorCode}>{node.data.code}</code>}
+      </div>
+      <p className={css.errorMessage}>{node.data.message || '模型未返回有效回复。'}</p>
+    </div>
   </div>;
   if (isNode(node, 'turn-max-tokens')) return <div className={css.notice}>已到达输出长度限制，回答尚未完整。</div>;
   if (isNode(node, 'model-retry')) return node.data.current.retryState === 'scheduled'
     ? <div className={css.notice} role="status">模型请求未成功，正在等待重试。详情保留在执行过程中。</div> : null;
   if (isNode(node, 'command')) {
-    if (node.data.outcome?.kind === 'error') return <div className={css.error} role="alert">命令执行失败：{node.data.outcome.text ?? node.data.name ?? '查看原对话中的命令记录'}</div>;
+    if (node.data.outcome?.kind === 'error') return <div className={css.error} role="alert">
+      <svg className={css.errorIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+        <circle cx="8" cy="8" r="6.5" strokeWidth="1.2" />
+        <path d="M8 5v3.5M8 11.2h.01" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+      <div className={css.errorCopy}>
+        <div className={css.errorTitle}><strong>命令执行未成功</strong></div>
+        <p className={css.errorMessage}>{node.data.outcome.text ?? node.data.name ?? '查看原对话中的命令记录'}</p>
+      </div>
+    </div>;
     return node.data.outcome?.text ? <MarkdownText text={node.data.outcome.text} labels={markdownLabels} /> : null;
   }
   if (isNode(node, 'manual-compaction')) {
-    if (node.data.command.outcome?.kind === 'error') return <div className={css.error} role="alert">上下文压缩失败：{node.data.command.outcome.text}</div>;
+    if (node.data.command.outcome?.kind === 'error') return <div className={css.error} role="alert">
+      <svg className={css.errorIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
+        <circle cx="8" cy="8" r="6.5" strokeWidth="1.2" />
+        <path d="M8 5v3.5M8 11.2h.01" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+      <div className={css.errorCopy}>
+        <div className={css.errorTitle}><strong>上下文压缩未成功</strong></div>
+        <p className={css.errorMessage}>{node.data.command.outcome.text}</p>
+      </div>
+    </div>;
     return node.data.compaction ? <p className={css.meta}>上下文已整理，原始记录仍保留。</p> : <p className={css.meta}>正在整理上下文…</p>;
   }
   if (node.kind === 'compaction') return <details className={css.detail}><summary>上下文已整理，查看记录</summary><JsonBlock label="压缩记录" payload={node.data} truncatedLabel={truncatedJsonLabel} /></details>;
