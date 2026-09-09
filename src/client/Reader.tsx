@@ -1,3 +1,4 @@
+import type {} from '@deepseek-ai/dsh-session-turn-outline/types';
 import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
@@ -216,7 +217,7 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
     </div>;
     return node.data.compaction ? <CompactionDivider data={node.data.compaction} /> : null;
   }
-  if (node.kind === 'compaction') return <CompactionDivider data={node.data} />;
+  if (isNode(node, 'compaction')) return <CompactionDivider data={node.data} />;
   if (node.kind === 'context' || node.kind === 'turn-tail' || node.kind === 'system-prompt' || node.kind === 'turn-process') return null;
   return <div className={css.unknown} data-reader-anchor>
     <p>此记录类型暂未接入阅读页：{node.kind}</p>
@@ -447,7 +448,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   const tailData = useMemo(() => {
     for (const key of group.keys) {
       const n = nodes.get(key);
-      if (n?.kind === 'turn-tail') return n.data;
+      if (n && isNode(n, 'turn-tail')) return n.data;
     }
     return undefined;
   }, [group.keys, nodes]);
@@ -527,7 +528,7 @@ export function Reader(props: ReaderProps) {
   const turnsWithDeliverables = useMemo(() => {
     const set = new Set<number>();
     for (const [turnNum, loc] of timeline.turns) {
-      const deliv = loc.data?.get('deliverables') as { produced?: unknown[] } | undefined;
+      const deliv = (loc.data as { get(key: string): unknown } | undefined)?.get('deliverables') as { produced?: unknown[] } | undefined;
       if (Array.isArray(deliv?.produced) && deliv.produced.length > 0) {
         set.add(turnNum);
       }

@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import type { TurnTokenUsage } from '@deepseek-ai/dsh-client-ui-chat/client';
+import type { TurnTailChatData } from '@deepseek-ai/dsh-client-ui-chat/client';
+type TurnTokenUsage = NonNullable<TurnTailChatData['tokenUsage']>;
 import css from './TurnMetrics.module.css';
 
 interface TurnMetricsProps {
@@ -128,7 +129,7 @@ export const TurnMetrics = memo(function TurnMetrics({
                     <span className={css.popBadge}>命中 {cacheHitPercent}%</span>
                   )}
                 </span>
-                <span className={css.popValue}>{usage!.inputTokens?.toLocaleString() ?? 0} tok</span>
+                <span className={css.popValue}>{(usage!.totalTokens - usage!.outputTokens).toLocaleString()} tok</span>
 
                 {typeof usage!.cacheReadTokens === 'number' && usage!.cacheReadTokens > 0 && (
                   <>

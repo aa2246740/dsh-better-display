@@ -51,7 +51,7 @@ export type BlockRenderProps = Pick<ReaderProps, 'renderSlotChain' | 'loadImage'
   forkSeq?: number;
   fileMentions?: MarkdownFileMentions;
   metrics?: {
-    usage?: import('@deepseek-ai/dsh-client-ui-chat/client').TurnTokenUsage;
+    usage?: NonNullable<import('@deepseek-ai/dsh-client-ui-chat/client').TurnTailChatData['tokenUsage']>;
     runMs?: number;
     tokensPerSecond?: number;
     ttftMs?: number;
