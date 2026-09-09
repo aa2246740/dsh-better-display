@@ -47,6 +47,8 @@ export type BlockRenderProps = Pick<ReaderProps, 'renderSlotChain' | 'loadImage'
   openFile?: (path: string) => Promise<void> | void;
   revealFile?: (path: string) => Promise<void> | void;
   forkAt?: (seq: number) => void;
+  /** Durable closing-message seq of this turn (turn-tail closing), used as the fork anchor. */
+  forkSeq?: number;
   fileMentions?: MarkdownFileMentions;
   metrics?: {
     usage?: import('@deepseek-ai/dsh-client-ui-chat/client').TurnTokenUsage;

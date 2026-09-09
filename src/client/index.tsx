@@ -102,6 +102,12 @@ export function apply(ctx: Context): void {
           }
         },
         forkAt: (seq: number) => {
+          // A missing anchor would silently fork the whole session instead of
+          // the intended turn prefix, so refuse it loudly rather than guessing.
+          if (typeof seq !== 'number' || !Number.isFinite(seq)) {
+            console.warn('[dsh-better-display] fork refused: missing anchor seq');
+            return;
+          }
           try {
             const sessionsApi = ctx.sessions as unknown as {
               fork: (arg: { sessionId: string; atSeq: number; increaseTitle: boolean }) => Promise<string>;

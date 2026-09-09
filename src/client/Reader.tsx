@@ -8,7 +8,7 @@ import { ToolActivity, ToolMedia } from './ToolActivity.js';
 import { preparingLabel, readerFlow } from './tool-activity.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelection, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
-import { assistantSegments, boundaryOf, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
+import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
 import { basename, createProducedFileMentions, dirname, getTurnDeliverables } from './deliverables.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
@@ -84,7 +84,13 @@ const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, 
         <Blocks {...render} blocks={part.blocks} streaming={data.status === 'running'} holdFormatting={pinned} startedAt={data.time} interrupted={data.status === 'interrupted'} liveText />
         {index === parts.length - 1 && data.status === 'interrupted' && <span className={css.stopped}>已停止</span>}
         {index === parts.length - 1 && !earlier && data.status !== 'running' && boundary.status === 'closed' && (
-          <CopyAnswer blocks={body} onFork={render.forkAt ? () => render.forkAt!(data.seq) : undefined} metrics={render.metrics} />
+          <CopyAnswer blocks={body} onFork={(() => {
+            // The fork anchor must be the durable closing message seq (same as
+            // the official turn-tail branch). AssistantChatData carries no seq
+            // of its own; passing it would fork the whole session instead.
+            const anchor = forkAnchorSeq([data.finalNode, { seq: render.forkSeq }]);
+            return render.forkAt && anchor !== undefined ? () => render.forkAt!(anchor) : undefined;
+          })()} metrics={render.metrics} />
         )}
       </article>
     </RetiringContent>)}</>;
@@ -452,6 +458,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     tokensPerSecond: tailData?.tokensPerSecond,
     ttftMs: tailData?.ttftMs,
   }), [tailData, runMs]);
+  const forkSeq = forkAnchorSeq([tailData?.closing?.finalNode]);
   const shared = {
     useChat: props.useChat,
     renderSlotChain: props.renderSlotChain,
@@ -460,6 +467,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     openFile: props.openFile,
     revealFile: props.revealFile,
     forkAt: props.forkAt,
+    forkSeq,
     fileMentions,
     metrics,
   };
