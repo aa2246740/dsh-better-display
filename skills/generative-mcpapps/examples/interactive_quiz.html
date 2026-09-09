@@ -133,10 +133,10 @@
     function submitChoice() {
       if (!currentSelection) return;
 
-      document.getElementById('status-text').innerText = "已提交给 Agent！";
+      document.getElementById('status-text').innerText = "已发送到聊天输入框，请确认并发送。";
       document.getElementById('submit-btn').disabled = true;
 
-      // 通过 SEP-1865 标准向 Host 提交结果
+      // 通过 Better Display 适配器将选择填入聊天输入框
       window.parent.postMessage({
         jsonrpc: "2.0",
         id: "eval-" + Date.now(),
