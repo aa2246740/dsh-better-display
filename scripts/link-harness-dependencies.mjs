@@ -8,6 +8,8 @@ const local = resolve('node_modules');
 mkdirSync(local, { recursive: true });
 const shared = {
   '@deepseek-ai/cordis': 'vendor/cordis',
+  '@deepseek-ai/dsh-api-session-controller': 'packages/api/session-controller',
+  '@deepseek-ai/dsh-session-turn-outline': 'packages/session/session-turn-outline',
   '@deepseek-ai/dsh-client-store': 'packages/client/store',
   '@deepseek-ai/dsh-client-ui-chat': 'packages/client/ui-chat',
   '@deepseek-ai/dsh-client-ui-conversation': 'packages/client/ui-conversation',
@@ -20,6 +22,7 @@ const shared = {
   '@deepseek-ai/dsh-util-workspace-path': 'packages/util/workspace-path',
 };
 function link(name, target) {
+  if (!existsSync(target)) throw new Error(`Missing Harness dependency target: ${name} (${target})`);
   const destination = join(local, name);
   mkdirSync(dirname(destination), { recursive: true });
   if (existsSync(destination)) {
