@@ -36,7 +36,7 @@ export function getTurnDeliverables(turn: TurnLocation | undefined, flow?: reado
   const seen = new Set<string>();
 
   // 1. Check official deliverables turn data from @deepseek-ai/dsh-client-ui-deliverables
-  const deliverables = turn?.data.get('deliverables') as DeliverablesData | undefined;
+  const deliverables = (turn?.data as { get(key: string): unknown } | undefined)?.get('deliverables') as DeliverablesData | undefined;
   if (deliverables?.produced && Array.isArray(deliverables.produced)) {
     for (const item of deliverables.produced) {
       if (typeof item?.path === 'string' && item.path.trim().length > 0) {

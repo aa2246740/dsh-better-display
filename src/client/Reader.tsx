@@ -1,3 +1,4 @@
+import type {} from '@deepseek-ai/dsh-session-turn-outline/types';
 import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
@@ -8,7 +9,7 @@ import { ToolActivity, ToolMedia } from './ToolActivity.js';
 import { preparingLabel, readerFlow } from './tool-activity.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelection, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
-import { assistantSegments, boundaryOf, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
+import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
 import { basename, createProducedFileMentions, dirname, getTurnDeliverables } from './deliverables.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
@@ -84,7 +85,13 @@ const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, 
         <Blocks {...render} blocks={part.blocks} streaming={data.status === 'running'} holdFormatting={pinned} startedAt={data.time} interrupted={data.status === 'interrupted'} liveText />
         {index === parts.length - 1 && data.status === 'interrupted' && <span className={css.stopped}>已停止</span>}
         {index === parts.length - 1 && !earlier && data.status !== 'running' && boundary.status === 'closed' && (
-          <CopyAnswer blocks={body} onFork={render.forkAt ? () => render.forkAt!(data.seq) : undefined} metrics={render.metrics} />
+          <CopyAnswer blocks={body} onFork={(() => {
+            // The fork anchor must be the durable closing message seq (same as
+            // the official turn-tail branch). AssistantChatData carries no seq
+            // of its own; passing it would fork the whole session instead.
+            const anchor = forkAnchorSeq([data.finalNode, { seq: render.forkSeq }]);
+            return render.forkAt && anchor !== undefined ? () => render.forkAt!(anchor) : undefined;
+          })()} metrics={render.metrics} />
         )}
       </article>
     </RetiringContent>)}</>;
@@ -210,7 +217,7 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
     </div>;
     return node.data.compaction ? <CompactionDivider data={node.data.compaction} /> : null;
   }
-  if (node.kind === 'compaction') return <CompactionDivider data={node.data} />;
+  if (isNode(node, 'compaction')) return <CompactionDivider data={node.data} />;
   if (node.kind === 'context' || node.kind === 'turn-tail' || node.kind === 'system-prompt' || node.kind === 'turn-process') return null;
   return <div className={css.unknown} data-reader-anchor>
     <p>此记录类型暂未接入阅读页：{node.kind}</p>
@@ -441,7 +448,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
   const tailData = useMemo(() => {
     for (const key of group.keys) {
       const n = nodes.get(key);
-      if (n?.kind === 'turn-tail') return n.data;
+      if (n && isNode(n, 'turn-tail')) return n.data;
     }
     return undefined;
   }, [group.keys, nodes]);
@@ -452,6 +459,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     tokensPerSecond: tailData?.tokensPerSecond,
     ttftMs: tailData?.ttftMs,
   }), [tailData, runMs]);
+  const forkSeq = forkAnchorSeq([tailData?.closing?.finalNode]);
   const shared = {
     useChat: props.useChat,
     renderSlotChain: props.renderSlotChain,
@@ -460,6 +468,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     openFile: props.openFile,
     revealFile: props.revealFile,
     forkAt: props.forkAt,
+    forkSeq,
     fileMentions,
     metrics,
   };
@@ -519,7 +528,7 @@ export function Reader(props: ReaderProps) {
   const turnsWithDeliverables = useMemo(() => {
     const set = new Set<number>();
     for (const [turnNum, loc] of timeline.turns) {
-      const deliv = loc.data?.get('deliverables') as { produced?: unknown[] } | undefined;
+      const deliv = (loc.data as { get(key: string): unknown } | undefined)?.get('deliverables') as { produced?: unknown[] } | undefined;
       if (Array.isArray(deliv?.produced) && deliv.produced.length > 0) {
         set.add(turnNum);
       }

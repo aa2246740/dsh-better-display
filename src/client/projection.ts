@@ -100,3 +100,19 @@ export function terminalLabel(reason: string | null): string | null {
     default: return `本轮结束状态：${reason}。请在原对话中核对完整记录。`;
   }
 }
+
+/**
+ * Extract the first usable fork anchor seq from candidate message nodes.
+ * Only the durable closing message seq cuts the intended turn prefix: an
+ * absent anchor must surface as undefined (never as 0 or NaN), because the
+ * host treats a missing atSeq as a whole-session fork.
+ */
+export function forkAnchorSeq(
+  candidates: ReadonlyArray<{ seq?: unknown } | null | undefined>,
+): number | undefined {
+  for (const candidate of candidates) {
+    const seq = candidate?.seq;
+    if (typeof seq === 'number' && Number.isFinite(seq)) return seq;
+  }
+  return undefined;
+}

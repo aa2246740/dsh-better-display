@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AssistantBlock, ToolCallBlock, TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type { AssistantChatData, ChatConversationViewNode } from '@deepseek-ai/dsh-client-ui-chat/client';
-import { assistantSegments, boundaryOf, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel, toolFailed } from '../src/client/projection.ts';
+import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel, toolFailed } from '../src/client/projection.ts';
 import type { TurnBoundary } from '../src/client/projection.ts';
 import { activityPhase, activitySummary, inputFields, readerFlow } from '../src/client/tool-activity.ts';
 
@@ -173,4 +173,12 @@ test('a nonzero terminal exit is a failure even when the tool transport is non-e
   assert.equal(activityPhase({ block }), 'failed');
   assert.equal(activityPhase({ block: { ...block, meta: null } as ToolCallBlock }), 'returned');
   assert.equal(activityPhase({}, true), 'interrupted');
+});
+
+test('fork anchor prefers the durable closing seq and never yields a missing anchor', () => {
+  assert.equal(forkAnchorSeq([{ seq: 42 }]), 42);
+  assert.equal(forkAnchorSeq([null, undefined, {}, { seq: '42' as unknown as number }, { seq: 7 }]), 7);
+  assert.equal(forkAnchorSeq([{ seq: NaN }, { seq: Infinity }, { seq: 100.5 }]), 100.5);
+  assert.equal(forkAnchorSeq([]), undefined);
+  assert.equal(forkAnchorSeq([null, {}, { seq: undefined }]), undefined);
 });

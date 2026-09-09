@@ -55,7 +55,7 @@ export class WordTimeline {
     this.source = source;
     this.enabled = enabled;
     this.revision = revision;
-    this.hasLiveText ||= enabled;
+    this.hasLiveText = enabled && this.births.length > 0;
   }
 
   bornAt(offset: number): number | null {
@@ -74,16 +74,23 @@ export class WordTimeline {
     // Atomic inline animation boxes must not turn commas into legal line starts
     // or strand opening quotes at a line end. Keep source-offset identities when
     // punctuation arrives in a later chunk, so the preceding word never replays.
+    // Already received text is one inert leaf, not thousands of React Words.
+    // Only the newly appended suffix needs word identities and birth times.
+    const prefixLength = Math.min(value.length, Math.max(0, this.floor - offset));
+    const prefix: RevealingWord[] = prefixLength > 0
+      ? [{ key: offset, text: value.slice(0, prefixLength), born: null }]
+      : [];
     const parts: { index: number; segment: string }[] = [];
-    for (const part of segmenter.segment(value)) {
+    for (const segment of segmenter.segment(value.slice(prefixLength))) {
+      const part = { index: prefixLength + segment.index, segment: segment.segment };
       const previous = parts.at(-1);
       if (previous?.segment.trim() && (closingPunctuation.test(part.segment) || openingPunctuation.test(previous.segment))) {
         previous.segment += part.segment;
       } else parts.push({ index: part.index, segment: part.segment });
     }
-    return parts.map(part => {
+    return prefix.concat(parts.map(part => {
       const key = offset + part.index;
       return { key, text: part.segment, born: this.bornAt(key) };
-    });
+    }));
   }
 }
