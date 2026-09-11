@@ -226,6 +226,8 @@
 .historyButton:disabled { opacity: .55; cursor: default; }
 .empty { padding: 40px 0; color: var(--dsw-alias-label-tertiary); text-align: center; }
 .answerActions { display: flex; align-items: center; gap: 8px; margin: 13px 0 0 -6px; min-height: 28px; }
+.userActions { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.messageClock { font-size: 13px; line-height: 24px; color: var(--dsw-alias-label-tertiary); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .iconButton { display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 6px; padding: 6px; background: transparent; color: var(--dsw-alias-label-tertiary); }
 .iconButton svg { fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
 .imageFigure { margin: 0; max-width: 100%; width: min(100%, 360px); box-sizing: border-box; align-self: flex-start; }

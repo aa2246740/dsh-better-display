@@ -55,5 +55,7 @@ export type BlockRenderProps = Pick<ReaderProps, 'renderSlotChain' | 'loadImage'
     runMs?: number;
     tokensPerSecond?: number;
     ttftMs?: number;
+    /** Closing assistant-message time (turn-tail `closing.time`). */
+    endedAt?: number;
   };
 };

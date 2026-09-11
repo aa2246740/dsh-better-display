@@ -3,7 +3,7 @@ import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useMemo
 import type { ReactNode, RefObject } from 'react';
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
 import { JsonBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives';
-import { BlockBoundary, Blocks, contentBlocks, CopyAnswer } from './Blocks.js';
+import { BlockBoundary, Blocks, contentBlocks, CopyAnswer, UserMessageActions } from './Blocks.js';
 import { ReasoningCard } from './ReasoningCard.js';
 import { ToolActivity, ToolMedia } from './ToolActivity.js';
 import { preparingLabel, readerFlow } from './tool-activity.js';
@@ -163,6 +163,8 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
     const blocks = contentBlocks(node.data.content);
     const imageBlocks = blocks.filter(b => b.kind === 'image');
     const otherBlocks = blocks.filter(b => b.kind !== 'image');
+    const text = otherBlocks.filter((block): block is Extract<typeof block, { kind: 'text' }> => block.kind === 'text').map(block => block.text).join('\n\n');
+    const time = node.data.time;
     return <div className={css.userCluster} data-reader-anchor data-reader-key={nodeKey}>
       {node.kind === 'steering' && <p className={css.meta}>补充消息</p>}
       {imageBlocks.length > 0 && <div className={css.userImages}>
@@ -171,6 +173,7 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
       {otherBlocks.length > 0 && <div className={css.user}>
         <Blocks {...render} blocks={otherBlocks} source="user" />
       </div>}
+      <UserMessageActions text={text} time={time} />
     </div>;
   }
   if (isNode(node, 'assistant-step')) return null;
@@ -458,7 +461,8 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
     runMs,
     tokensPerSecond: tailData?.tokensPerSecond,
     ttftMs: tailData?.ttftMs,
-  }), [tailData, runMs]);
+    endedAt: tailData?.closing?.time ?? turn?.end?.time,
+  }), [tailData, runMs, turn?.end?.time]);
   const forkSeq = forkAnchorSeq([tailData?.closing?.finalNode]);
   const shared = {
     useChat: props.useChat,
@@ -672,6 +676,7 @@ export function Reader(props: ReaderProps) {
               <div className={css.blocks}>{submission.text}</div>
             </div>
           ) : null}
+          <UserMessageActions text={submission.text} time={submission.time} />
         </div>
       ))}
       {pending !== undefined && <div className={css.attention} role="alert" data-reader-attention>

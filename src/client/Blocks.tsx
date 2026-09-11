@@ -4,6 +4,7 @@ import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment';
 import type { AssistantBlock, UserMessageNode } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import { JsonBlock, MarkdownText, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives';
 import { ComposerFillContext, McpAppFrame } from './McpAppFrame.js';
+import { formatMessageClock } from './message-chrome.js';
 import { markdownLabels, truncatedJsonLabel } from './primitive-labels.js';
 import type { BlockRenderProps, ReaderBlockOwner } from './types.js';
 import { useStreamingText } from './streaming.js';
@@ -133,21 +134,39 @@ export const Blocks = memo(function Blocks({ blocks, streaming = false, source =
 
 import { TurnMetrics } from './TurnMetrics.js';
 
-export function CopyAnswer({ blocks, onFork, metrics }: { blocks: readonly AssistantBlock[]; onFork?: () => void; metrics?: BlockRenderProps['metrics'] }) {
+function CopyGlyph() {
+  return <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect x="5" y="5" width="8" height="8" rx="1.5" /><path d="M3 10H2.8A.8.8 0 0 1 2 9.2V2.8a.8.8 0 0 1 .8-.8h6.4a.8.8 0 0 1 .8.8V3" /></svg>;
+}
+
+function useCopyReceipt() {
   const [receipt, setReceipt] = useState('');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  const copy = async (text: string) => {
+    const accepted = await writeClipboard(text);
+    setReceipt(accepted ? '已复制' : '未能复制，请手动选择文字');
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setReceipt(''), 2000);
+  };
+  return { receipt, copy };
+}
+
+function MessageClock({ time }: { time: number }) {
+  return <time className={css.messageClock} dateTime={new Date(time).toISOString()}>{formatMessageClock(time)}</time>;
+}
+
+export function CopyAnswer({ blocks, onFork, metrics }: { blocks: readonly AssistantBlock[]; onFork?: () => void; metrics?: BlockRenderProps['metrics'] }) {
+  const { receipt, copy } = useCopyReceipt();
   const text = blocks.filter((block): block is Extract<AssistantBlock, { kind: 'text' }> => block.kind === 'text').map(block => block.text).join('\n\n');
-  if (!text.trim()) return null;
+  const endedAt = metrics?.endedAt;
+  const hasMetrics = metrics !== undefined && (metrics.usage !== undefined || metrics.runMs !== undefined || endedAt !== undefined);
+  if (!text.trim() && !onFork && !hasMetrics) return null;
   return <div className={css.answerActions}>
-    <button type="button" className={css.iconButton} aria-label="复制回答" title="复制回答" onClick={async () => {
-      const accepted = await writeClipboard(text);
-      setReceipt(accepted ? '已复制' : '未能复制，请手动选择文字');
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => setReceipt(''), 2000);
-    }}>
-      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect x="5" y="5" width="8" height="8" rx="1.5" /><path d="M3 10H2.8A.8.8 0 0 1 2 9.2V2.8a.8.8 0 0 1 .8-.8h6.4a.8.8 0 0 1 .8.8V3" /></svg>
-    </button>
+    {text.trim() !== '' && (
+      <button type="button" className={css.iconButton} aria-label="复制回答" title="复制回答" onClick={() => { void copy(text); }}>
+        <CopyGlyph />
+      </button>
+    )}
     {onFork && (
       <button
         type="button"
@@ -164,7 +183,23 @@ export function CopyAnswer({ blocks, onFork, metrics }: { blocks: readonly Assis
         </svg>
       </button>
     )}
-    {metrics && <TurnMetrics {...metrics} />}
+    {metrics && <TurnMetrics usage={metrics.usage} runMs={metrics.runMs} tokensPerSecond={metrics.tokensPerSecond} ttftMs={metrics.ttftMs} />}
+    {endedAt !== undefined && <MessageClock time={endedAt} />}
+    <span role="status" className={css.meta}>{receipt}</span>
+  </div>;
+}
+
+export function UserMessageActions({ text, time }: { text: string; time?: number }) {
+  const { receipt, copy } = useCopyReceipt();
+  const hasText = text.trim() !== '';
+  if (!hasText && time === undefined) return null;
+  return <div className={css.userActions}>
+    {time !== undefined && <MessageClock time={time} />}
+    {hasText && (
+      <button type="button" className={css.iconButton} aria-label="复制消息" title="复制消息" onClick={() => { void copy(text); }}>
+        <CopyGlyph />
+      </button>
+    )}
     <span role="status" className={css.meta}>{receipt}</span>
   </div>;
 }
