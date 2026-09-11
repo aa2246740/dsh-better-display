@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
-import { basename, createProducedFileMentions, dirname, getTurnDeliverables } from '../src/client/deliverables.ts';
+import { basename, createProducedFileMentions, dirname, getTurnDeliverables, showDeliverablesRow } from '../src/client/deliverables.ts';
 import type { ReaderFlowEntry } from '../src/client/tool-activity.ts';
 
 test('basename and dirname handle POSIX and Windows style paths', () => {
@@ -118,4 +118,11 @@ test('createProducedFileMentions resolves exact paths and unique basenames, leav
   // Unrelated file leaves undefined
   const unrelated = mentions.resolve('unknown.js');
   assert.equal(unrelated, undefined);
+});
+
+test('produced-files row waits for turn close even when paths already exist', () => {
+  const paths = ['src/client/Watcher.tsx'];
+  assert.equal(showDeliverablesRow('open', paths), false);
+  assert.equal(showDeliverablesRow('closed', paths), true);
+  assert.equal(showDeliverablesRow('closed', []), false);
 });

@@ -10,7 +10,7 @@ import { preparingLabel, readerFlow } from './tool-activity.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelection, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
 import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
-import { basename, createProducedFileMentions, dirname, getTurnDeliverables } from './deliverables.js';
+import { basename, createProducedFileMentions, dirname, getTurnDeliverables, showDeliverablesRow } from './deliverables.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
 import { mergeTimelineItems, type TimelineItem } from './timeline.js';
@@ -498,7 +498,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, pinnedKeys, selectedP
         </ProcessFragment></BlockBoundary>
       </Fragment>)}
     </div>
-    {deliverables.length > 0 && <DeliverablesRow deliverables={deliverables} openFile={props.openFile} revealFile={props.revealFile} />}
+    {showDeliverablesRow(boundary.status, deliverables) && <DeliverablesRow deliverables={deliverables} openFile={props.openFile} revealFile={props.revealFile} />}
     {showTerminalNotice && <div className={css.notice} data-reader-terminal>{terminal}</div>}
   </section>;
 });

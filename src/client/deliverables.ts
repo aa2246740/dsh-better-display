@@ -27,6 +27,14 @@ export function dirname(path: string): string {
 }
 
 /**
+ * The produced-files chip row waits for turn close. Live writes still
+ * accumulate, but the row must not interrupt an in-progress process.
+ */
+export function showDeliverablesRow(status: 'open' | 'closed', paths: readonly string[]): boolean {
+  return status === 'closed' && paths.length > 0
+}
+
+/**
  * Extract all unique file paths produced/modified in one turn.
  * Respects official deliverables data when available, and falls back to
  * inspecting successful write/edit tool invocations in the turn flow.
