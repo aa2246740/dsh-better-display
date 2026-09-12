@@ -1,4 +1,4 @@
-# Portable source overlay. Use dshx activate-new-client for a built Web plugin.
+# Source overlay for local --patch work. Stock install uses cordis.patch.yml.
 - insert:
     - id: dsh-better-display
       name: './src/dsh-better-display.ts'

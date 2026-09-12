@@ -18,6 +18,9 @@
     "./package.json": "./package.json"
   },
   "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "inject": [
@@ -52,13 +55,13 @@
   },
   "devDependencies": {
     "@deepseek-ai/dsh-api-session-controller": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-session-turn-outline": "0.1.2-rc.1",
     "@types/mdast": "^4.0.4",
     "@types/node": "^22.20.0",
     "@types/react": "~18.3.1",
     "tsdown": "^0.22.2",
     "tsx": "^4.22.4",
-    "typescript": "^6.0.3",
-    "@deepseek-ai/dsh-session-turn-outline": "0.1.2-rc.1"
+    "typescript": "^6.0.3"
   },
   "dependencies": {
     "clsx": "^2.0.0",
@@ -83,10 +86,12 @@
     "tests",
     "scripts",
     "cordis.yml",
+    "cordis.patch.yml",
     "dshx.yml",
     "tsconfig.json",
     "tsdown.config.ts",
     "README.md",
+    "README.en.md",
     "DESIGN.md",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md",
@@ -105,6 +110,8 @@
   },
   "keywords": [
     "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
     "dshx",
     "conversation",
     "reasoning",
