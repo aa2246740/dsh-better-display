@@ -6,12 +6,27 @@ import { ReferenceIcon } from './ReferenceIcon.js'
 import { contextBody } from './ContextBody.js'
 import css from './ContextInjectionRow.module.css'
 
+/**
+ * Role and producer name projected from the durable source. Host generations
+ * disagree on the field name: alpha generations project `producer`
+ * (ContextProducerView), newer ones `provenance`; the reader spreads the host
+ * node, so either — or neither — may arrive. Structural on purpose: an
+ * indexed access on ContextMessageNode would not compile against every
+ * generation.
+ */
+interface ContextProvenanceView {
+  role?: string
+  label?: string | null
+}
+
 /** Props for the logged non-user message presentation. */
 export interface ContextInjectionRowProps {
   content: ContextMessageNode['content']
   source: ContextMessageNode['source']
-  /** Role and producer name projected from the durable source. */
-  provenance: ContextMessageNode['provenance']
+  /** Role and producer name projected from the durable source (newer hosts). */
+  provenance?: ContextProvenanceView
+  /** Role and producer name projected from the durable source (alpha hosts). */
+  producer?: ContextProvenanceView
   /** Producer-declared information form; null renders the opaque body. */
   form: ContextMessageNode['form']
   /** The owning view's locale seat, passed down as a plain prop. */
@@ -29,8 +44,12 @@ export interface ContextInjectionRowProps {
  * @param props - Durable content, its projected producer role/name and form, and the locale seat.
  * @returns A collapsed context row with a bounded, form-specific body.
  */
-export function ContextInjectionRow({ content, source, provenance, form, t }: ContextInjectionRowProps) {
+export function ContextInjectionRow({ content, source, provenance, producer, form, t }: ContextInjectionRowProps) {
   const [open, setOpen] = useState(false)
+  // Resolved rather than declared, like the form below: an absent projection
+  // (a host generation carrying neither field name) renders a plain injection
+  // row instead of throwing on read.
+  const view = provenance ?? producer ?? { role: 'inject', label: null }
   // Resolved rather than declared: a form whose fields are unreadable renders
   // the opaque body, and the marker must say what the row actually shows.
   const { rendered, summary, body } = contextBody(form, { content, source, t })
@@ -38,18 +57,18 @@ export function ContextInjectionRow({ content, source, provenance, form, t }: Co
   return (
     <DisclosureRow
       className={css.root}
-      icon={provenance.role === 'recall'
+      icon={view.role === 'recall'
         ? <span data-context-recall-icon><ReferenceIcon kind="session" /></span>
         : <IconBrowseOutline16 size={14} />}
       chevronClassName={css.chevron}
-      title={t(provenance.role === 'recall' ? 'message.contextRecall' : 'message.contextInjection')}
-      collapsedContent={provenance.label === null ? undefined : (
+      title={t(view.role === 'recall' ? 'message.contextRecall' : 'message.contextInjection')}
+      collapsedContent={view.label === null ? undefined : (
         /* ToolRow's separator shape: an aria-hidden dot, so the accessible name
            stays the two readable parts and the two disclosure rows expose one
            name shape. A source that names no producer drops the dot with it. */
         <>
           <span className={css.sep} aria-hidden />
-          <span className={css.source} data-context-source>{provenance.label}</span>
+          <span className={css.source} data-context-source>{view.label}</span>
           {summary !== null && (
             <>
               <span className={css.sep} aria-hidden />
