@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Context rows no longer crash the reading view on host generations that project the
+  durable source as `producer` (the 0.1.6-alpha generations) instead of `provenance`:
+  the row resolves either field and falls back to a plain injection row when both are
+  absent. Reading view only — session logs were never affected (the failed block showed
+  "此内容暂时无法在阅读页显示" with `Cannot read properties of undefined (reading 'role')`).
+
 ## 0.2.0 — 2026-09-18
 
 ### Diff review and tool presentation
