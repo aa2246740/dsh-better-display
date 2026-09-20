@@ -46,12 +46,18 @@ export interface ReaderInjected {
       foldIntensity?: import('./fold-intensity.js').FoldIntensity;
       autoFold?: boolean;
       processOnly?: boolean;
+      /** Keep user-facing answer text out of the fold; orthogonal to foldIntensity. */
+      keepProse?: boolean;
+      /** Name the tools a fold contains instead of only counting them. */
+      keepToolSemantics?: boolean;
     };
     subscribe: (fn: () => void) => () => void;
     actions?: {
       setFoldIntensity?: (value: import('./fold-intensity.js').FoldIntensity) => void;
       setAutoFold?: (value: boolean) => void;
       setFrostedGlass?: (value: boolean) => void;
+      setKeepProse?: (value: boolean) => void;
+      setKeepToolSemantics?: (value: boolean) => void;
       setDeliverableOpenMode?: (value: import('./open-file.js').DeliverableOpenMode) => void;
     };
   };

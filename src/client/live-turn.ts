@@ -14,11 +14,41 @@ export type LiveStep =
 
 export type LiveTurnItem =
   | { kind: 'user'; key: string; step: Extract<LiveStep, { kind: 'user' }> }
-  | { kind: 'fold'; key: string; steps: readonly LiveStep[]; summary: string }
+  | { kind: 'fold'; key: string; steps: readonly LiveStep[]; summary: string; named?: boolean }
   | { kind: 'open'; key: string; step: LiveStep };
 
 export function liveFoldEnabled(boundary: TurnBoundary): boolean {
   return boundary.status === 'open';
+}
+
+/**
+ * A finished turn still has to honour the fold switches.
+ *
+ * `liveFoldEnabled` gates the animated live path, which only exists while the
+ * turn is open. Once it closes the reader falls back to `ClosedProcessSummary`
+ * — a single whole-turn disclosure — so a reader who turned on "keep the
+ * model's replies" at level 1 saw every finished turn collapse into one row
+ * again, and turning auto-fold off expanded all of it. The two switches looked
+ * broken on exactly the turns people actually read.
+ *
+ * The segmentation itself is the same either way, so reuse the live items.
+ */
+export function settledFoldItems(
+  steps: readonly LiveStep[],
+  boundary: TurnBoundary,
+  keepProse: boolean,
+  keepToolSemantics = false,
+): LiveTurnItem[] | null {
+  // Either opt-in switch means the finished turn should reuse the same
+  // per-run segmentation: naming the tools requires the digest to match the run
+  // it describes, exactly as much as keeping the prose does.
+  if ((!keepProse && !keepToolSemantics) || boundary.status === 'open') return null;
+  // Must never bail out to null for a finished turn: the caller then falls back
+  // to the live items, and `liveFoldEnabled` is false once a turn closes — so
+  // every step is emitted open and the whole transcript unfolds. Segmenting is
+  // what folds the process while leaving the prose; small turns get exactly one
+  // digest out of it, which is the same shape the author's own summary had.
+  return presentLiveTurn(steps, { ...boundary, status: 'open' }, true, true, keepToolSemantics, true);
 }
 
 export function foldSummary(steps: readonly LiveStep[]): string {
@@ -38,6 +68,98 @@ export function foldSummary(steps: readonly LiveStep[]): string {
   if (tool) parts.push(`工具×${tool}`);
   if (extra) parts.push(`记录×${extra}`);
   return parts.join(' · ') || '此前步骤';
+}
+
+/**
+ * The tools a folded run actually ran, named as the tool cards name them.
+ *
+ * `foldSummary` only counts (`工具×22`), which tells a reader how much was
+ * hidden but not what it was. This is the opt-in alternative: the same
+ * identity the tool card uses, so a digest cannot claim something the card
+ * does not show. Bounded to a few entries so the row stays one line.
+ */
+/** First line only, then clipped — a command's arguments are not a summary. */
+function clipTarget(value: string, max = 32): string {
+  const firstLine = value.split(/\r?\n/u)[0]!.trim();
+  return firstLine.length <= max ? firstLine : `${firstLine.slice(0, max)}…`;
+}
+
+export function foldToolSemantics(steps: readonly LiveStep[], limit = 3): string {
+  const named: string[] = [];
+  for (const step of steps) {
+    if (step.kind !== 'tool') continue;
+    const model = activitySummary(step.entry);
+    // `target` falls back to the whole command for terminal tools, so it has to
+    // be bounded here. Unbounded, a digest quoted entire shell pipelines and
+    // the row grew to hundreds of characters — which is what made the layout
+    // look broken long before any width rule ran.
+    const bounded = model.target ? clipTarget(model.target) : '';
+    const label = bounded ? `${model.title} · ${bounded}` : model.title;
+    if (label && named.at(-1) !== label) named.push(label);
+  }
+  if (!named.length) return '';
+  const shown = named.slice(0, limit);
+  const rest = named.length - shown.length;
+  return rest > 0 ? `${shown.join(' · ')} 等 ${named.length} 项` : shown.join(' · ');
+}
+
+export type ChainSegment = { fold: readonly LiveStep[] | null; open: readonly LiveStep[] };
+
+/**
+ * Keep-prose split: fold each *finished* run of process steps while every body
+ * step — the model's user-facing answer text — stays open.
+ *
+ * A run is folded only once a body step follows it, so the run that is still
+ * streaming stays expanded exactly as the reader is watching it.
+ *
+ * Runs of a single step are left open on purpose. One tool row already reads as
+ * one line, and that line carries the tool name and its target; replacing it
+ * with a count would drop the only part of it a reader can act on.
+ */
+export function splitChainKeepingBody(chain: readonly LiveStep[], sealed = false): ChainSegment[] {
+  // `sealed` is for a finished turn: nothing is streaming any more, so the
+  // trailing run is no longer "what the reader is watching arrive" and may be
+  // folded like any other. Without it a settled turn kept its last thinking run
+  // wide open — the process folded everywhere except the tail.
+  const segments: ChainSegment[] = [];
+  let run: LiveStep[] = [];
+  const flushRun = (finished: boolean) => {
+    if (!run.length) return;
+    // A finished run is worth folding when it hides more than it tells. A lone
+    // reasoning step is a whole block of thinking and has to fold; a lone tool
+    // row already reads as one line that carries its own name and target, so
+    // folding it would only trade that line for a count. Judge by content —
+    // the old length-only rule left every isolated thought box wide open.
+    const worthFolding = run.length > 1 || run.some(step => step.kind !== 'tool');
+    if (finished && worthFolding) segments.push({ fold: run, open: [] });
+    else segments.push({ fold: null, open: run });
+    run = [];
+  };
+  for (const step of chain) {
+    if (step.kind === 'body') {
+      flushRun(true);
+      segments.push({ fold: null, open: [step] });
+    } else if (step.kind === 'user') {
+      flushRun(false);
+      segments.push({ fold: null, open: [step] });
+    } else if (step.kind === 'reasoning') {
+      // A new reasoning step is the author's own auto-fold trigger: everything
+      // before it has finished. Without this the splitter only ever flushed on
+      // a body step, and a streaming turn that alternates thinking and tools
+      // with no answer text yet never folded past its first run.
+      flushRun(true);
+      run.push(step);
+    } else {
+      run.push(step);
+    }
+  }
+  // A unit runs from one thought up to — not including — the next one. The
+  // trailing run is therefore still open by definition: more tools, and more
+  // thoughts, may still arrive inside it. Folding it the moment a tool showed
+  // up collapsed the block the reader was still watching. Only the next
+  // reasoning step (or the end of the turn) closes a unit.
+  flushRun(sealed);
+  return segments;
 }
 
 /** One chain: fold only when a new reasoning step has prior body/tool/reasoning. */
@@ -167,14 +289,48 @@ function toolSummary(entry: ToolActivityEntry): string {
   }
 }
 
-export function presentLiveTurn(steps: readonly LiveStep[], boundary: TurnBoundary, autoFold = true): LiveTurnItem[] {
+export function presentLiveTurn(
+  steps: readonly LiveStep[],
+  boundary: TurnBoundary,
+  autoFold = true,
+  keepProse = false,
+  keepToolSemantics = false,
+  sealed = false,
+): LiveTurnItem[] {
   const live = autoFold && liveFoldEnabled(boundary);
   const items: LiveTurnItem[] = [];
   let chain: LiveStep[] = [];
+  const pushSegment = (segment: ChainSegment, fallbackKey: string) => {
+    if (segment.fold?.length) {
+      const named = keepToolSemantics ? foldToolSemantics(segment.fold) : '';
+      items.push({
+        kind: 'fold',
+        key: `live-fold:${segment.fold[0]!.key ?? fallbackKey}`,
+        steps: segment.fold,
+        summary: named || foldSummary(segment.fold),
+        // Marks the digest as tool-named so the stylesheet can widen it. The
+        // author's count-only digest keeps its own geometry untouched.
+        named: named !== '',
+      });
+    }
+    for (const step of segment.open) items.push({ kind: 'open', key: step.key, step });
+  };
   const flush = () => {
     if (!chain.length) return;
     if (!live) {
       for (const step of chain) items.push({ kind: 'open', key: step.key, step });
+      chain = [];
+      return;
+    }
+    // Either opt-in switch needs the per-run splitter: keeping the prose
+    // requires it, and naming the tools inside a digest requires the digest to
+    // line up with the run it describes. Only with both switches off does the
+    // author's single-run split stay in charge — his own default behaviour.
+    if (keepProse || keepToolSemantics) {
+      // Fold process runs, never the model's user-facing text. See the issue:
+      // a reader who does not expand the fold cannot tell whether an
+      // explanation was hidden inside it.
+      for (const segment of splitChainKeepingBody(chain, sealed)) pushSegment(segment, chain[0]!.key);
       chain = [];
       return;
     }

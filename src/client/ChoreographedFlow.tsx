@@ -30,7 +30,8 @@ function Summary({ item, open, onChange, motion }: {
   item: Extract<LiveTurnItem, { kind: 'fold' }>; open: boolean; onChange: (open: boolean) => void; motion: boolean;
 }) {
   const button = useRef<HTMLButtonElement>(null);
-  return <div data-reader-live-fold data-expanded={open} data-reader-live-fold-summary={item.summary}>
+  return <div data-reader-live-fold data-expanded={open} data-reader-live-fold-summary={item.summary}
+    data-reader-fold-named={item.named ? 'on' : undefined}>
     <div className={css.summaryRow}>
       <Disclosure open={open} onChange={onChange} buttonRef={button} ariaLabel="此前步骤"
         label={<FoldSummaryText summary={item.summary} motion={motion} />} />
@@ -103,12 +104,16 @@ export function ChoreographedFlow({ frame, motion, enabled, urgent, open, onOpen
   const latest = useRef(frame); latest.current = frame;
   const [visible, setVisible] = useState(() => !document.hidden);
   const [state, setState] = useState<Transaction>(() => idle(frame));
+  // `processOpen` is deliberately absent here: it means "the reader asked to
+  // open everything", which is false in the normal case, and as a bypass term
+  // it switched the whole fold choreography off. `enabled` already covers the
+  // "this turn should not fold" case.
   const bypass = !motion || !enabled || urgent || !visible || !processOpen || (state.phase !== 'idle' && Object.values(open).some(Boolean));
   // Render-time adjustment prevents even one paint of the new authoritative layout.
   if ((bypass || containsNewUser(state.shown.items, frame.items)) && (state.phase !== 'idle' || state.shown !== frame)) {
     setState(idle(frame));
   } else if (state.phase === 'idle' && state.shown !== frame) {
-    const retiring = retiringKeys(state.shown.items, frame.items, open);
+    const retiring = retiringKeys(state.shown.items, frame.items, open, processOpen);
     setState(retiring.length ? { ...state, phase: 'collapse', target: frame, retiring,
       beforeKeys: new Set(flowRows(state.shown.items).map(row => row.key)) } : idle(frame));
   }
@@ -211,6 +216,16 @@ export function ChoreographedFlow({ frame, motion, enabled, urgent, open, onOpen
   }, [state.phase]);
 
   const blocked = state.phase === 'collapse' || state.phase === 'count' || state.phase === 'settle';
+  // Two levels of intent. A row's own key wins; the turn-level flag is only the
+  // default for rows nobody has touched. Previously the turn flag was ANDed in,
+  // so on a closed turn (where it defaults to false) a row could never open on
+  // its own and every digest click had to force the whole turn open instead.
+  // Restored from 0.1.1, where this was written inline:
+  //   !!row.foldKey && (!processOpen || !open[row.foldKey])
+  // `processOpen` true means "the turn is allowed to fold"; a row inside a
+  // digest then stays hidden until the reader opens that row. Reading it as
+  // "open everything" inverted the default and unfolded every digest.
+  const isOpen = (key: string): boolean => processOpen && !!open[key];
   const source = state.phase === 'idle' || state.phase === 'collapse' ? state.shown : state.target;
   const rows = state.phase === 'collapse' ? collapseRows(state.shown.items, state.target.items) : flowRows(source.items);
   return <FlowSnapshot.Provider value={source.snapshot}>
@@ -218,7 +233,7 @@ export function ChoreographedFlow({ frame, motion, enabled, urgent, open, onOpen
       <div id={id} ref={root} className={css.choreographedFlow} data-reader-flow data-reader-transition={state.phase} data-ud-motion="fold-choreography">
         {rows.map(row => {
           if (row.kind === 'summary') return <FlowCell key={row.key} rowKey={row.key} hidden={false} instant motion={motion} summary>
-            <Summary item={row.item} open={processOpen && !!open[row.key]} onChange={value => onOpenChange(row.key, value)} motion={motion && state.phase !== 'collapse'} />
+            <Summary item={row.item} open={isOpen(row.key)} onChange={value => onOpenChange(row.key, value)} motion={motion && state.phase !== 'collapse'} />
           </FlowCell>;
           const hidden = !!row.foldKey && (!processOpen || !open[row.foldKey]) || (blocked && state.phase !== 'collapse' && !state.beforeKeys.has(row.key));
           // Keep retiring child props unchanged until it has actually shrunk.
