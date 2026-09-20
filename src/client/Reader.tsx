@@ -29,9 +29,26 @@ import type { ReaderGroup, TurnBoundary } from './projection.js';
 import type { BlockRenderProps, ReaderProps } from './types.js';
 import css from './Reader.module.css';
 import { markdownLabels, truncatedJsonLabel } from './primitive-labels.js';
+import { translateOf } from './translate.js';
 
 function isNode<K extends ChatNodeKind>(node: ChatConversationViewNode, kind: K): node is ChatNode<K> {
   return node.kind === kind;
+}
+
+/**
+ * Pending user interaction (an approval or a question), read off the Session
+ * snapshot.
+ *
+ * 0.1.6 removed the dedicated \`useSessionPendingInteraction\` standard prop and
+ * moved the value onto \`SessionSnapshot.pendingInteraction\`. The bundled type
+ * packages still describe the older host, so this reads the field structurally
+ * and stays correct on both: an absent field simply reads as "nothing pending",
+ * which is the same thing the removed hook returned for an idle session.
+ */
+type PendingInteractionLike = { kind?: string };
+function pendingInteractionOf(snapshot: unknown): PendingInteractionLike | undefined {
+  const value = (snapshot as { pendingInteraction?: unknown } | undefined)?.pendingInteraction;
+  return typeof value === 'object' && value !== null ? (value as PendingInteractionLike) : undefined;
 }
 
 function cleanErrorMessage(raw: string | undefined): string {
@@ -119,7 +136,12 @@ const ProcessNode = memo(function ProcessNode({ useChat, t, nodeKey, open, motio
   const node = useChat(snapshot => snapshot.nodes.get(nodeKey));
   if (!node || node.visibility === 'hidden') return null;
   let content: ReactNode = null;
-  if (isNode(node, 'context')) content = <ContextInjectionRow {...node.data} t={t} />;
+  // The context row is the one place the reader hands the host translator to a
+  // child. A host that delivers no locale seat (0.1.6 moved how that seat
+  // arrives) used to crash here, and React unmounted the whole boundary — the
+  // reader showed "此内容暂时无法在阅读页显示" over a record it could have drawn.
+  // Resolve it once, at the boundary, so a missing seat degrades to local copy.
+  if (isNode(node, 'context')) content = <ContextInjectionRow {...node.data} t={translateOf(t)} />;
   else if (isNode(node, 'system-prompt')) content = <details className={css.detail}><summary>系统提示词</summary><pre className={css.systemPrompt}>{node.data.text}</pre></details>;
   else if (isNode(node, 'model-retry')) content = <JsonBlock label="模型重试记录" payload={node.data.attempts} truncatedLabel={truncatedJsonLabel} />;
   else if (isNode(node, 'manual-compaction')) {
@@ -269,8 +291,10 @@ function subagentCount(snapshot: { nodes: { get(key: string): ChatConversationVi
   return 0;
 }
 
-function GroupStatus({ group, sessionId, useChat, useSessionPendingInteraction, motion }: Pick<ReaderProps, 'sessionId' | 'useChat' | 'useSessionPendingInteraction'> & { group: ReaderGroup; motion: boolean }) {
-  const pending = useSessionPendingInteraction(snapshot => snapshot.get(sessionId));
+function GroupStatus({ group, useChat, useSession, motion }: Pick<ReaderProps, 'useChat' | 'useSession'> & { group: ReaderGroup; motion: boolean }) {
+  // 0.1.6 dropped the dedicated `useSessionPendingInteraction` standard prop; the
+  // pending interaction now rides the Session snapshot itself.
+  const pending = useSession(pendingInteractionOf);
   const text = useChat(snapshot => {
     const turn = group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn);
     if (turn?.status === 'closed') {
@@ -546,6 +570,9 @@ const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys,
     fileMentions,
     metrics,
     getToolView: props.getToolView,
+    // Tool rows render their own labels through `t`; without it the reader hit
+    // "t is not a function" whenever a tool card expanded.
+    t: props.t,
   };
   const terminal = terminalLabel(boundary.reason);
   const hasTurnError = flow.some(item => item.kind === 'node' && nodes.get(item.nodeKey)?.kind === 'turn-error');
@@ -575,9 +602,9 @@ const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys,
     {startsWithUser && <BlockBoundary><MainNode {...shared} useChat={props.useChat} boundary={boundary} nodeKey={group.keys[0]} /></BlockBoundary>}
     {hasProcess && !isAwaitingModel && <StickyLane kind="status" className={css.turnProcessSticky}>
       <Disclosure open={expanded} onChange={setExpanded} controls={flowId} buttonRef={processButton}
-        label={<GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSessionPendingInteraction={props.useSessionPendingInteraction} motion={motion} />} />
+        label={<GroupStatus group={group} useChat={props.useChat} useSession={props.useSession} motion={motion} />} />
     </StickyLane>}
-    {boundary.status === 'closed' && hasProcess && autoFold && <ClosedProcessSummary open={expanded} onChange={setExpanded} controls={flowId}
+    {boundary.status === 'closed' && hasProcess && autoFold && !settled && <ClosedProcessSummary open={expanded} onChange={setExpanded} controls={flowId}
       steps={steps.filter(step => {
         if (step.kind === 'user') return false;
         if (step.kind !== 'body') return true;
@@ -591,7 +618,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys,
       onOpenChange={(key, value) => { pinProcess(); setFoldOpenByKey(current => ({ ...current, [key]: value })); }} renderStep={renderStep} />
     {/* 状态指示永远排在流程之后：AI 的响应永远出现在最新消息（含补充消息）的下方 */}
     {!hasProcess && boundary.status === 'open' && !isAwaitingModel && <div className={css.disclosure} data-reader-status-only>
-      <GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSessionPendingInteraction={props.useSessionPendingInteraction} motion={motion} />
+      <GroupStatus group={group} useChat={props.useChat} useSession={props.useSession} motion={motion} />
     </div>}
     {showDeliverablesRow(boundary.status, deliverables) && <DeliverablesRow deliverables={deliverables} openFile={props.openFile} revealFile={props.revealFile} openMode={openMode} />}
     {showTerminalNotice && <div className={css.notice} data-reader-terminal>{terminal}</div>}
@@ -605,7 +632,7 @@ export function Reader(props: ReaderProps) {
   const nodes = props.useChat(snapshot => snapshot.nodes);
   const timeline = props.useChat(snapshot => snapshot.timeline);
   const running = props.useSession(snapshot => snapshot.running);
-  const pending = props.useSessionPendingInteraction(snapshot => snapshot.get(props.sessionId));
+  const pending = props.useSession(pendingInteractionOf);
   const openError = props.useSession(snapshot => snapshot.openError);
   const loading = props.useSession(snapshot => snapshot.openState === 'loading');
   const hasMore = props.useSession(snapshot => snapshot.hasMore);
@@ -812,7 +839,7 @@ export function Reader(props: ReaderProps) {
       {historyError && <div className={css.notice}>历史记录加载失败，可再次尝试；现有内容未改变。</div>}
       {openError && <div className={css.error} role="alert">会话暂时无法读取：{openError.message}</div>}
       {loading && groups.length === 0 && <p className={css.empty} role="status">正在读取会话…</p>}
-      {groups.map(group => <TurnGroup key={group.key} {...props} group={group} motion={motion} autoFold={autoFold} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} isAwaitingModel={isAwaitingModel && group.key === groups.at(-1)?.key} />)}
+      {groups.map(group => <TurnGroup key={group.key} {...props} group={group} motion={motion} autoFold={autoFold} keepProse={keepProse} keepToolSemantics={keepToolSemantics} foldLevel={foldLevel} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} isAwaitingModel={isAwaitingModel && group.key === groups.at(-1)?.key} />)}
       {visibleSubmissions.map(submission => {
         const images = pendingSubmissionImages(submission);
         return (
@@ -837,7 +864,7 @@ export function Reader(props: ReaderProps) {
         </div>
         );
       })}
-      {isAwaitingModel && <WaitingStatus anchor={waitAnchor} label={props.t ? props.t('chat.deepDiving') : '深度求索中...'} />}
+      {isAwaitingModel && <WaitingStatus anchor={waitAnchor} label={translateOf(props.t)('chat.deepDiving')} />}
       {pending !== undefined && <div className={css.attention} role="alert" data-reader-attention>
         <strong>{pending.kind === 'question' ? '需要你回答一个问题' : '需要你的确认'}</strong>
         <span>请在下方原生操作区处理。此提示不会收进执行过程。</span>
