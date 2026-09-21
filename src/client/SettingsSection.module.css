@@ -30,6 +30,38 @@
   color: var(--dsw-alias-label-primary);
 }
 
+/* Secondary row: same anatomy as .row, without the divider or the full-weight
+   type. This switch refines the fold the slider above already controls, so it
+   should not read as a peer of the four primary settings. */
+.rowQuiet {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 14px 0;
+}
+
+.quietTitle {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.quietDesc {
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+  opacity: 0.85;
+}
+
+/* Modifier only: the element carries .switch too, which owns size, radius, the
+   knob and the cursor. A bare class here rendered an unstyled, zero-size button. */
+.switchQuiet {
+  transform: scale(0.85);
+  transform-origin: right center;
+}
+
 .desc {
   font-size: 12px;
   font-weight: 400;

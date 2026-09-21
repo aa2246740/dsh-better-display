@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { foldIntensityOf, frostedGlassOf, type FoldIntensity } from './fold-intensity.js';
+import { foldIntensityOf, frostedGlassOf, keepProseOf, keepToolSemanticsOf, type FoldIntensity } from './fold-intensity.js';
 import { deliverableOpenModeOf, type DeliverableOpenMode } from './open-file.js';
 import { settingsCopyFor, type SettingsCopy, type SettingsCopyKey } from './settings-copy.js';
 import { CONVENTIONAL_SKILL_ROOTS, detectGenerativeMcpappsSkill, shortestInstallCommand, type SkillStatusProbe, type SkillStatusSnapshot } from './skill-status.js';
@@ -11,6 +11,8 @@ export interface ReaderPrefsSnapshot {
   foldIntensity?: FoldIntensity;
   autoFold?: boolean;
   processOnly?: boolean;
+  keepProse?: boolean;
+  keepToolSemantics?: boolean;
 }
 
 export interface OpenPrefs {
@@ -20,6 +22,8 @@ export interface OpenPrefs {
     setDeliverableOpenMode: (value: DeliverableOpenMode) => void;
     setFrostedGlass: (value: boolean) => void;
     setFoldIntensity?: (value: FoldIntensity) => void;
+    setKeepProse?: (value: boolean) => void;
+    setKeepToolSemantics?: (value: boolean) => void;
     setAutoFold?: (value: boolean) => void;
   };
 }
@@ -64,7 +68,12 @@ export function SettingsSection(props: SettingsProps) {
   );
   const mode = deliverableOpenModeOf(snap.deliverableOpenMode);
   const glass = frostedGlassOf(snap);
+  const keepProse = keepProseOf(snap);
+  const keepToolSemantics = keepToolSemanticsOf(snap);
   const autoFold = snap.autoFold !== false && snap.foldIntensity !== 0;
+  // The slider is the single owner of fold intensity. Reading it here keeps the
+  // control honest even for snapshots written before the three stops existed.
+  const intensity = foldIntensityOf(snap);
   const setMode = (value: DeliverableOpenMode) => {
     props.prefs.actions.setDeliverableOpenMode(value);
   };
@@ -130,17 +139,53 @@ export function SettingsSection(props: SettingsProps) {
           <div className={css.title}>{text(props, copy, 'foldTitle')}</div>
           <div className={css.desc}>{text(props, copy, 'foldDescription')}</div>
         </div>
+      </div>
+      <div className={css.segment} role="radiogroup" aria-label={text(props, copy, 'foldTitle')}>
+        {FOLD_STOPS.map(stop => (
+          <button
+            key={stop.value}
+            type="button"
+            role="radio"
+            aria-checked={intensity === stop.value}
+            className={css.segmentStop}
+            data-on={intensity === stop.value || undefined}
+            data-better-display-fold-stop={stop.value}
+            onClick={() => { props.prefs.actions.setFoldIntensity?.(stop.value); }}
+          >
+            {text(props, copy, stop.key)}
+          </button>
+        ))}
+      </div>
+
+      <div className={css.rowQuiet}>
+        <div className={css.rowText}>
+          <div className={css.quietTitle}>{text(props, copy, 'keepProseTitle')}</div>
+          <div className={css.quietDesc}>{text(props, copy, 'keepProseDescription')}</div>
+        </div>
         <button
           type="button"
           role="switch"
-          aria-checked={autoFold}
-          className={css.switch}
-          data-on={autoFold || undefined}
-          data-better-display-auto-fold={autoFold ? 'on' : 'off'}
-          onClick={() => {
-            props.prefs.actions.setAutoFold?.(!autoFold);
-            props.prefs.actions.setFoldIntensity?.(!autoFold ? 1 : 0);
-          }}
+          aria-checked={keepProse}
+          className={css.switch + ' ' + css.switchQuiet}
+          data-on={keepProse || undefined}
+          data-better-display-keep-prose={keepProse ? 'on' : 'off'}
+          onClick={() => { props.prefs.actions.setKeepProse?.(!keepProse); }}
+        />
+      </div>
+
+      <div className={css.rowQuiet}>
+        <div className={css.rowText}>
+          <div className={css.quietTitle}>{text(props, copy, 'keepToolSemanticsTitle')}</div>
+          <div className={css.quietDesc}>{text(props, copy, 'keepToolSemanticsDescription')}</div>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={keepToolSemantics}
+          className={css.switch + ' ' + css.switchQuiet}
+          data-on={keepToolSemantics || undefined}
+          data-better-display-keep-tool-semantics={keepToolSemantics ? 'on' : 'off'}
+          onClick={() => { props.prefs.actions.setKeepToolSemantics?.(!keepToolSemantics); }}
         />
       </div>
 

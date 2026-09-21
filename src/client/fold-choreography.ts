@@ -31,8 +31,8 @@ export function flowRows(items: readonly LiveTurnItem[]): FlowRow[] {
     : [{ kind: 'step', key: item.key, step: item.step }]);
 }
 
-export function retiringKeys(before: readonly LiveTurnItem[], after: readonly LiveTurnItem[], open: Readonly<Record<string, boolean>>): string[] {
-  const folded = new Set(flowRows(after).filter(row => row.kind === 'step' && row.foldKey && !open[row.foldKey]).map(row => row.key));
+export function retiringKeys(before: readonly LiveTurnItem[], after: readonly LiveTurnItem[], open: Readonly<Record<string, boolean>>, processOpen = false): string[] {
+  const folded = new Set(flowRows(after).filter(row => row.kind === 'step' && row.foldKey && !(open[row.foldKey] ?? processOpen)).map(row => row.key));
   return flowRows(before).filter(row => row.kind === 'step' && !row.foldKey && folded.has(row.key)).map(row => row.key);
 }
 

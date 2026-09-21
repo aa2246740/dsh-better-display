@@ -10,7 +10,7 @@ import { OfficialActions, OfficialNode, OfficialTail } from './OfficialContent.j
 import { preparingLabel, readerFlow } from './tool-activity.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelection, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
-import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
+import { assistantSegments, boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, hasVisibleBody, isEarlierNarration, processChoiceKey, processExpanded, terminalLabel, toggleProcessOpen } from './projection.js';
 import { basename, createProducedFileMentions, dirname, getTurnDeliverables, showDeliverablesRow } from './deliverables.js';
 import { deliverableOpenModeOf, type DeliverableOpenMode } from './open-file.js';
 import { asReadonlyArray, pendingSubmissionImages, type PendingSubmissionEcho } from './pending-submission.js';
@@ -20,9 +20,9 @@ import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
 import { landTurn, scrollerOf } from './conversation-scroll.js';
 import { mergeTimelineItems, type TimelineItem } from './timeline.js';
-import { presentLiveTurn, segmentLiveTurn } from './live-turn.js';
+import { presentLiveTurn, segmentLiveTurn, settledFoldItems } from './live-turn.js';
 import type { LiveStep } from './live-turn.js';
-import { frostedGlassOf } from './fold-intensity.js';
+import { foldIntensityOf, frostedGlassOf, keepProseOf, keepToolSemanticsOf, type FoldIntensity } from './fold-intensity.js';
 import { ChoreographedFlow, useFlowChat } from './ChoreographedFlow.js';
 import { ClosedProcessSummary } from './ClosedProcessSummary.js';
 import { StickyLane } from './StickyLane.js';
@@ -473,11 +473,11 @@ function DeliverablesRow({ deliverables, openFile, revealFile, openMode }: {
   );
 }
 
-const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys, selectedProcessKeys, isAwaitingModel = false, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; autoFold: boolean; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; isAwaitingModel?: boolean }) {
+const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, keepProse, keepToolSemantics, foldLevel, pinnedKeys, selectedProcessKeys, isAwaitingModel = false, ...props }: ReaderProps & { group: ReaderGroup; motion: boolean; autoFold: boolean; keepProse: boolean; keepToolSemantics: boolean; foldLevel: FoldIntensity; pinnedKeys: readonly string[]; selectedProcessKeys: readonly string[]; isAwaitingModel?: boolean }) {
   const snapshot = props.useChat(snapshot => snapshot);
   const nodes = snapshot.nodes;
   const turn = group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn);
-  const interaction = props.useSessionPendingInteraction(snapshot => snapshot.get(props.sessionId));
+  const interaction = props.useSession(pendingInteractionOf);
   const sessionRunning = props.useSession(snapshot => snapshot.running);
   const boundary = useMemo(() => boundaryOf(turn), [turn]);
   const choiceKey = processChoiceKey(group.key, boundary);
@@ -491,7 +491,19 @@ const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys,
   const mainKeys = startsWithUser ? group.keys.slice(1) : group.keys;
   const flow = useMemo(() => readerFlow({ ...group, keys: mainKeys }, turn, key => nodes.get(key)), [nodes, group, mainKeys, turn]);
   const steps = useMemo(() => segmentLiveTurn(flow, key => nodes.get(key)), [flow, nodes]);
-  const liveItems = useMemo(() => presentLiveTurn(steps, boundary, autoFold), [steps, boundary, autoFold]);
+  // Level 2 ("summary") means "fold the process, never the prose"; the separate
+  // switch extends that same guarantee to levels 0 and 1.
+  const keepBody = keepProse || foldLevel === 2;
+  const liveItems = useMemo(
+    () => presentLiveTurn(steps, boundary, autoFold, keepBody, keepToolSemantics),
+    [steps, boundary, autoFold, keepBody, keepToolSemantics],
+  );
+  // A finished turn used to fall back to one whole-turn disclosure, so the fold
+  // switches silently stopped applying the moment a turn completed.
+  const settled = useMemo(
+    () => settledFoldItems(steps, boundary, autoFold && keepBody, keepToolSemantics),
+    [steps, boundary, autoFold, keepBody, keepToolSemantics],
+  );
   const openMode = deliverableOpenModeOf(useSyncExternalStore(
     props.openPrefs?.subscribe ?? ((fn: () => void) => { void fn; return () => {}; }),
     () => props.openPrefs?.getSnapshot()?.deliverableOpenMode,
@@ -549,9 +561,9 @@ const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys,
     const captured = new Map(group.keys.flatMap(key => {
       const node = nodes.get(key); return node ? [[key, node] as const] : [];
     }));
-    return { items: holdingSelection ? presentLiveTurn(steps, boundary, false) : liveItems,
+    return { items: settled ?? (holdingSelection ? presentLiveTurn(steps, boundary, false) : liveItems),
       snapshot: { ...snapshot, nodes: { ...nodes, get: (key: string) => captured.get(key), values: () => [...captured.values()] } } };
-  }, [snapshot, nodes, group, steps, boundary, liveItems, holdingSelection]);
+  }, [snapshot, nodes, group, steps, boundary, liveItems, settled, holdingSelection]);
   const shared = {
     useChat: useFlowChat,
     renderSlotChain: props.renderSlotChain,
@@ -605,12 +617,13 @@ const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys,
           || node.data.blocks.some(block => block.kind === 'tool-call')
           || (boundary.latestStep > 0 && node.data.step < boundary.latestStep));
       })} />}
-    <ChoreographedFlow id={flowId} frame={presentation} motion={motion} enabled={autoFold && boundary.status === 'open' && !holdingSelection}
-      urgent={hasTurnError || interaction !== undefined || !sessionRunning} open={foldOpenByKey} processOpen={expanded}
-      onOpenChange={(key, value) => { pinProcess(); setFoldOpenByKey(current => ({ ...current, [key]: value })); }} renderStep={renderStep} />
+    <ChoreographedFlow id={flowId} frame={presentation} motion={motion} enabled={autoFold && (boundary.status === 'open' || !!settled) && !holdingSelection}
+      urgent={hasTurnError || interaction !== undefined || !sessionRunning} open={foldOpenByKey}
+      processOpen={expanded}
+      onOpenChange={(key, value) => { setFoldOpenByKey(current => ({ ...current, [key]: value })); }} renderStep={renderStep} />
     {/* 状态指示永远排在流程之后：AI 的响应永远出现在最新消息（含补充消息）的下方 */}
     {!hasProcess && boundary.status === 'open' && !isAwaitingModel && <div className={css.disclosure} data-reader-status-only>
-      <GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSessionPendingInteraction={props.useSessionPendingInteraction} motion={motion} />
+      <GroupStatus group={group} useChat={props.useChat} useSession={props.useSession} motion={motion} />
     </div>}
     {showDeliverablesRow(boundary.status, deliverables) && <DeliverablesRow deliverables={deliverables} openFile={props.openFile} revealFile={props.revealFile} openMode={openMode} />}
     {boundary.status === 'closed' && <BlockBoundary><OfficialTail official={official} owner={tailOwner} produced={deliverables} /></BlockBoundary>}
@@ -651,6 +664,12 @@ export function Reader(props: ReaderProps) {
     if (restored) props.actions.resetExpanded();
   }, [autoFold, props.actions]);
   const frostedGlass = frostedGlassOf(prefsSnap);
+  // Orthogonal to autoFold: the slider decides how much process to fold, this
+  // decides whether the model's user-facing text is foldable at all.
+  const keepProse = keepProseOf(prefsSnap);
+  const keepToolSemantics = keepToolSemanticsOf(prefsSnap);
+  const foldLevel = foldIntensityOf(prefsSnap);
+  void keepToolSemantics;
   const streamMotion = useMemo(() => ({ enabled: motion, activatedAt: activatedAt.current }), [motion]);
   const groups = useMemo(() => groupNodes(order, key => nodes.get(key)), [order, nodes, timeline]);
   const isAwaitingModel = useMemo(() => {
