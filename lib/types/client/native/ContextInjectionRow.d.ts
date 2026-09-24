@@ -12,9 +12,9 @@ export interface ContextInjectionRowProps {
      * optional here and resolved below, so the row renders on either host instead
      * of throwing on `undefined.role` and degrading its whole block boundary.
      */
-    provenance?: ContextMessageNode['provenance'] | null;
+    provenance?: ContextMessageNode['producer'] | null;
     /** Alpha-generation spelling of {@link provenance}. */
-    producer?: ContextMessageNode['provenance'] | null;
+    producer?: ContextMessageNode['producer'] | null;
     /** Producer-declared information form; null renders the opaque body. */
     form: ContextMessageNode['form'];
     /** The owning view's locale seat, passed down as a plain prop. */

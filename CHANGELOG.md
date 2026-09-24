@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1 — 2026-09-24
+
+- Accept Harness `0.1.7-rc.1`. Peer range is `>=0.1.7-rc.1 <0.1.8`.
+- `conversation.chat.turnTail` is a list slot. The old chain expectation threw during client boot and left the page on “Failed to load plugins”.
+- Icon imports use the rc.1 weight names (`IconBrowseOutlineRegular` and the rest). Size stays a prop.
+- Pending confirmation now reads `useSessionStatus` (`pendingInteraction`). The removed `useSessionPendingInteraction` hook threw as soon as the reader painted.
+- Code and terminal labels include the rc.1 toolbar fields (`codeLabel`, wrap, and `noExitCode`).
+
 ## 0.3.0 — 2026-09-21
 
 - 修复关闭自动折叠、查看过程详情后，再开启仍无法折叠的问题；重新开启会恢复自动折叠规则，仍保留文本选择保护和之后的手动展开。

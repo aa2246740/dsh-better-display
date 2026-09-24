@@ -74,7 +74,7 @@ let stopMirror = () => {};
 slots.register({ name: 'root', children: {
   'conversation.chat.assistant-actions': { kind: 'list', scope: 'session' },
   'tool.call.toolview': { kind: 'keyed', scope: 'session' },
-  'conversation.chat.turnTail': { kind: 'chain', scope: 'session' },
+  'conversation.chat.turnTail': { kind: 'list', scope: 'session' },
   'conversation.chat.node': { kind: 'keyed', scope: 'session', inject: { hooks: { turnData: (_s: any, value: any) => () => value } } },
   'conversation.message.images': { kind: 'single', scope: 'session' },
   'conversation.input.overlay': { kind: 'list', scope: 'session' },
@@ -122,7 +122,7 @@ function ReaderFixture({ renderSlot, renderSlotChain }: any) {
       <CopyAnswer blocks={[{ kind: 'text', text }]} extraActions={<OfficialActions official={official} messageId={'message-1' as any} />} />
     </article>
     <div data-reader-tool><OfficialTool {...blockProps} official={official} renderSlotChain={renderSlotChain} block={toolBlock as any} toolName="read" fallback={<span>fallback</span>} /></div>
-    {renderSlotChain(OFFICIAL_SEATS.tail, { openFile: blockProps.openFile, readerProducedPaths: ['/fixture/sample.ts'] })}
+    {renderSlot(OFFICIAL_SEATS.tail, { openFile: blockProps.openFile, readerProducedPaths: ['/fixture/sample.ts'] })}
     {renderSlot(OFFICIAL_SEATS.nodes, {}, { entryKey: 'future-widget', hookContext: 'turn-context' })}
     <button onClick={() => setText(text + '\n\n继续输出。')}>Append text</button>
   </div></main>;

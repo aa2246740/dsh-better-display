@@ -14,22 +14,23 @@ export const markdownLabels: MarkdownLabels = {
 };
 
 export const readBlockLabels: ReadBlockLabels = {
+  codeLabel: '代码', wrapLabel: '自动换行', unwrapLabel: '不换行',
   window: (shown, total) => `显示 ${shown} / ${total} 行`,
   copy: '复制', copied: '已复制', collapseAria: '收起文件内容',
   expandAria: hidden => `展开其余 ${hidden} 行`, collapse: '收起', expand: hidden => `展开其余 ${hidden} 行`,
 };
 
 export const terminalBlockLabels: TerminalBlockLabels = {
-  signal: signal => `信号 ${signal}`, exitCode: code => `退出码 ${code}`,
+  signal: signal => `信号 ${signal}`, exitCode: code => `退出码 ${code}`, noExitCode: '无退出码',
   running: '执行中', failed: '失败', done: '已完成', copy: '复制', copied: '已复制',
   noOutput: '没有输出', collapseAria: '收起命令输出', collapse: '收起',
   expandAria: hidden => `展开其余 ${hidden} 行`, expand: hidden => `展开其余 ${hidden} 行`,
 };
 
 export const diffBlockLabels: DiffBlockLabels = {
+  codeLabel: '代码', wrapLabel: '自动换行', unwrapLabel: '不换行',
   copy: '复制', copied: '已复制', collapseAria: '收起差异', collapse: '收起',
   expandAria: hidden => `展开其余 ${hidden} 行`, expand: hidden => `展开其余 ${hidden} 行`,
-  files: count => `${count} 个文件`,
 };
 
 export const searchBlockLabels: SearchBlockLabels = {

@@ -272,8 +272,7 @@ function subagentCount(snapshot: { nodes: { get(key: string): ChatConversationVi
   return 0;
 }
 
-function GroupStatus({ group, sessionId, useChat, useSessionPendingInteraction, motion }: Pick<ReaderProps, 'sessionId' | 'useChat' | 'useSessionPendingInteraction'> & { group: ReaderGroup; motion: boolean }) {
-  const pending = useSessionPendingInteraction(snapshot => snapshot.get(sessionId));
+function GroupStatus({ group, sessionId, useChat, pending, motion }: Pick<ReaderProps, 'sessionId' | 'useChat'> & { group: ReaderGroup; motion: boolean; pending: { kind?: string } | undefined }) {
   const text = useChat(snapshot => {
     const turn = group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn);
     if (turn?.status === 'closed') {
@@ -477,7 +476,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys,
   const snapshot = props.useChat(snapshot => snapshot);
   const nodes = snapshot.nodes;
   const turn = group.turn === null ? undefined : snapshot.timeline.turns.get(group.turn);
-  const interaction = props.useSessionPendingInteraction(snapshot => snapshot.get(props.sessionId));
+  const interaction = props.useSessionStatus(snapshot => snapshot.get(props.sessionId)?.pendingInteraction);
   const sessionRunning = props.useSession(snapshot => snapshot.running);
   const boundary = useMemo(() => boundaryOf(turn), [turn]);
   const choiceKey = processChoiceKey(group.key, boundary);
@@ -538,8 +537,8 @@ const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys,
   const metrics = useMemo(() => ({
     usage: tailData?.tokenUsage,
     runMs,
-    tokensPerSecond: tailData?.tokensPerSecond,
-    ttftMs: tailData?.ttftMs,
+    tokensPerSecond: (tailData as { tokensPerSecond?: number } | undefined)?.tokensPerSecond,
+    ttftMs: (tailData as { ttftMs?: number } | undefined)?.ttftMs,
     endedAt: tailData?.closing?.time ?? turn?.end?.time,
   }), [tailData, runMs, turn?.end?.time]);
   const forkSeq = forkAnchorSeq([tailData?.closing?.finalNode]);
@@ -594,7 +593,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys,
     {startsWithUser && <BlockBoundary><MainNode {...shared} useChat={props.useChat} boundary={boundary} nodeKey={group.keys[0]} /></BlockBoundary>}
     {hasProcess && !isAwaitingModel && <StickyLane kind="status" className={css.turnProcessSticky}>
       <Disclosure open={expanded} onChange={setExpanded} controls={flowId} buttonRef={processButton}
-        label={<GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSessionPendingInteraction={props.useSessionPendingInteraction} motion={motion} />} />
+        label={<GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} pending={interaction} motion={motion} />} />
     </StickyLane>}
     {boundary.status === 'closed' && hasProcess && autoFold && <ClosedProcessSummary open={expanded} onChange={setExpanded} controls={flowId}
       steps={steps.filter(step => {
@@ -610,7 +609,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys,
       onOpenChange={(key, value) => { pinProcess(); setFoldOpenByKey(current => ({ ...current, [key]: value })); }} renderStep={renderStep} />
     {/* 状态指示永远排在流程之后：AI 的响应永远出现在最新消息（含补充消息）的下方 */}
     {!hasProcess && boundary.status === 'open' && !isAwaitingModel && <div className={css.disclosure} data-reader-status-only>
-      <GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} useSessionPendingInteraction={props.useSessionPendingInteraction} motion={motion} />
+      <GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} pending={interaction} motion={motion} />
     </div>}
     {showDeliverablesRow(boundary.status, deliverables) && <DeliverablesRow deliverables={deliverables} openFile={props.openFile} revealFile={props.revealFile} openMode={openMode} />}
     {boundary.status === 'closed' && <BlockBoundary><OfficialTail official={official} owner={tailOwner} produced={deliverables} /></BlockBoundary>}
@@ -625,7 +624,7 @@ export function Reader(props: ReaderProps) {
   const nodes = props.useChat(snapshot => snapshot.nodes);
   const timeline = props.useChat(snapshot => snapshot.timeline);
   const running = props.useSession(snapshot => snapshot.running);
-  const pending = props.useSessionPendingInteraction(snapshot => snapshot.get(props.sessionId));
+  const pending = props.useSessionStatus(snapshot => snapshot.get(props.sessionId)?.pendingInteraction);
   const openError = props.useSession(snapshot => snapshot.openError);
   const loading = props.useSession(snapshot => snapshot.openState === 'loading');
   const hasMore = props.useSession(snapshot => snapshot.hasMore);
@@ -816,7 +815,7 @@ export function Reader(props: ReaderProps) {
 
   // ChatView publishes data-chat-flow="" on its column. Skins treat a
   // scrollport without that hook as inspect-only and hide [data-composer-seat].
-  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} data-reader-build="0.3.0-preview.1" data-dsh-better-display="0.3.0-preview.1" data-reader-wait-clock-version="input-v1" data-reader-wait-start={waitAnchor.time ?? undefined} data-motion={motion ? 'on' : 'off'} data-reader-glass={frostedGlass || undefined} data-reader-auto-fold={autoFold ? 'on' : 'off'}>
+  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} data-reader-build="0.3.1" data-dsh-better-display="0.3.1" data-reader-wait-clock-version="input-v1" data-reader-wait-start={waitAnchor.time ?? undefined} data-motion={motion ? 'on' : 'off'} data-reader-glass={frostedGlass || undefined} data-reader-auto-fold={autoFold ? 'on' : 'off'}>
     <TimelineRail items={timelineItems} activeTurn={activeTurn} busyTurn={busyTurn} onNavigate={onNavigateTurn} />
     <div className={css.column} data-chat-flow="">
       <StickyLane kind="toolbar" className={css.toolbar}>

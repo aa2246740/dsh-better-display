@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ContextMessageNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
-import { DisclosureRow, IconBrowseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { DisclosureRow, IconBrowseOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ReferenceIcon } from './ReferenceIcon.js'
 import { contextBody } from './ContextBody.js'
 import css from './ContextInjectionRow.module.css'
@@ -18,9 +18,9 @@ export interface ContextInjectionRowProps {
    * optional here and resolved below, so the row renders on either host instead
    * of throwing on `undefined.role` and degrading its whole block boundary.
    */
-  provenance?: ContextMessageNode['provenance'] | null
+  provenance?: ContextMessageNode['producer'] | null
   /** Alpha-generation spelling of {@link provenance}. */
-  producer?: ContextMessageNode['provenance'] | null
+  producer?: ContextMessageNode['producer'] | null
   /** Producer-declared information form; null renders the opaque body. */
   form: ContextMessageNode['form']
   /** The owning view's locale seat, passed down as a plain prop. */
@@ -52,7 +52,7 @@ export function ContextInjectionRow({ content, source, provenance, producer, for
       className={css.root}
       icon={view.role === 'recall'
         ? <span data-context-recall-icon><ReferenceIcon kind="session" /></span>
-        : <IconBrowseOutline16 size={14} />}
+        : <IconBrowseOutlineRegular size={14} />}
       chevronClassName={css.chevron}
       title={t(view.role === 'recall' ? 'message.contextRecall' : 'message.contextInjection')}
       collapsedContent={view.label === null ? undefined : (
