@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.2 — 2026-09-24
+
+- 补齐 0.1.7-rc.1 官方桥接的运行时契约：工具视图传入 `phase`/`useDisclosure`/`hookContext{callId}`，聊天节点改用 `{turnData, disclosureReset}` 快照 store；修复真实宿主里官方工具视图静默落到 fallback 的问题。
+- 折叠区吸顶车道的绘制缝隙：车道只给自己的框刷实心底色，`.turn` 14px gap、前一 cell 16px padding、status 车道右侧 `--reader-control-width` 保留区三条缝滚动时透出内容；改用同色 `box-shadow` 向上/向右补漆连成连续色带。
+
 ## 0.3.1 — 2026-09-24
 
 - Accept Harness `0.1.7-rc.1`. Peer range is `>=0.1.7-rc.1 <0.1.8`.
