@@ -18,7 +18,7 @@ export function OfficialTool({ official, block, toolName, cwd, openFile, fallbac
 }) {
   const home = useSyncExternalStore(official.officialHost.subscribe, official.officialHost.getSnapshot).home;
   return <div data-reader-tool-official>
-    {official.renderSlot(OFFICIAL_SEATS.tools, {
+    {(official.renderSlot as (key: string, owner: object, options: object) => ReactNode)(OFFICIAL_SEATS.tools, {
       callId: block.callId, toolName, block, cwd, home,
       openFile: openFile ?? (() => {}),
       loadImage: official.officialImageLoader,
@@ -33,6 +33,7 @@ export function OfficialNode({ node, fallback, ...render }: BlockRenderProps & {
   const owner: ChatNodeOwnerProps = {
     cwd: render.cwd,
     openFile: render.openFile ?? (() => {}),
+    openSkill: () => {},
     forkAt: render.forkAt ?? (() => {}),
     inspectCall: callId => official.openView('trajectory', callId),
     loadImage: official.officialImageLoader,
@@ -52,6 +53,6 @@ export function OfficialNode({ node, fallback, ...render }: BlockRenderProps & {
 export function OfficialTail({ official, owner, produced }: Pick<BlockRenderProps, 'official'> & { owner?: TurnTailOwnerProps; produced: readonly string[] }) {
   const tailOwner = owner && official ? { ...owner, openFile: official.officialPreviewFile, readerProducedPaths: produced } : undefined;
   return official && tailOwner ? <div data-reader-official-tail style={{ display: 'contents' }}>
-    {official.renderSlotChain(OFFICIAL_SEATS.tail, tailOwner)}
+    {official.renderSlot(OFFICIAL_SEATS.tail, tailOwner)}
   </div> : null;
 }

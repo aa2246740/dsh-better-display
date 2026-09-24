@@ -62,7 +62,7 @@ const READER_NODES = new Set(['user', 'steering', 'assistant-step', 'tool-call',
 const EXPECTED: Record<OfficialFamily, Spec> = {
   actions: { kind: 'list', scope: 'session' },
   tools: { kind: 'keyed', scope: 'session' },
-  tail: { kind: 'chain', scope: 'session' },
+  tail: { kind: 'list', scope: 'session' },
   nodes: { kind: 'keyed', scope: 'session' },
   images: { kind: 'single', scope: 'session' },
 };

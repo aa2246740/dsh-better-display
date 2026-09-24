@@ -43,7 +43,7 @@ const useReaderStore: ReaderProps['useStore'] = selector => selector(useSyncExte
 const props = {
   sessionId: 'auto-fold-fixture', useChat: selector => selector(chat),
   useSession: selector => selector(sessionSnapshot), useSessions: selector => selector(sessionsSnapshot),
-  useSessionPendingInteraction: selector => selector(pending),
+  useSessionStatus: selector => selector(new Map([['auto-fold-fixture', { running: true, pendingInteraction: pending.get('auto-fold-fixture'), completionUnread: false }]])),
   useStore: useReaderStore, actions: session.actions, openPrefs: prefs,
   t: key => key, renderSlot: (_name, _owner, options) => options?.fallback ?? null,
   renderSlotChain: (_name, _owner, options) => options?.fallback ?? null,
