@@ -524,7 +524,8 @@ function renderImage(url: string, alt: string, key: Key, context: MarkdownRender
   let imageSrc = remote
   if (rewritten !== undefined) {
     try {
-      if (['http:', 'https:', 'blob:', 'data:'].includes(new URL(rewritten).protocol)) imageSrc = rewritten
+      const parsed = new URL(rewritten)
+      if (['http:', 'https:', 'blob:', 'data:'].includes(parsed.protocol) || rewritten.startsWith('dsh-app://app/api/file?')) imageSrc = rewritten
     } catch { /* A vocabulary result must be an absolute URL. */ }
   }
   if (imageSrc === undefined) {

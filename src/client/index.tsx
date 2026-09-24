@@ -1,5 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis';
+import type {} from '@deepseek-ai/dsh-api-remotes/client';
 import type {} from '@deepseek-ai/dsh-api-session-controller/client';
+import type {} from '@deepseek-ai/dsh-client-connection/client';
 import type { SessionId } from '@deepseek-ai/dsh-session/types';
 import { resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path';
 import * as workspacePathPkg from '@deepseek-ai/dsh-util-workspace-path';

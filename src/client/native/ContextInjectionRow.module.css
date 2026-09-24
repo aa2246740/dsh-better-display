@@ -60,3 +60,7 @@
   /* Figma 10:2482 code text: the form bodies inherit it from the scrollport. */
   font: 400 11px/16px var(--ds-font-family-code);
 }
+
+.toolChanges {
+  white-space: nowrap;
+}

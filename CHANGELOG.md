@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.3 — 2026-09-24
+
+- Accept Harness `0.1.7-rc.2` (`dsh-v0.1.7-rc.2`, `477b4f420553e8a52c2fbccc464d7561b239c443`). Peer range stays `>=0.1.7-rc.1 <0.1.8`.
+- `conversation.chat.turnTail` stays a list slot. The new `schedule-created` tail entry and `schedule_update` tool view are additional official registrations, mirrored through the existing seats.
+- Developer tool-change context (`tool-addition` / `tool-removal`) uses the official title and count copy instead of a generic injection row.
+- Local Markdown images accept the Desktop file route `dsh-app://app/api/file`.
+
 ## 0.3.2 — 2026-09-24
 
 - 补齐 0.1.7-rc.1 官方桥接的运行时契约：工具视图传入 `phase`/`useDisclosure`/`hookContext{callId}`，聊天节点改用 `{turnData, disclosureReset}` 快照 store；修复真实宿主里官方工具视图静默落到 fallback 的问题。
