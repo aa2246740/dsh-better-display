@@ -538,8 +538,19 @@
    pinned straight on top of it. Give each lane its own band instead, stacked
    from the measured top: status first, then the summary, then the fold body. */
 .turnProcessSticky { box-sizing: border-box; width: calc(100% - var(--reader-control-width, 148px)); top: max(var(--reader-toolbar-height, 40px), var(--reader-status-height, 40px)); min-height: 40px; padding-right: 0; z-index: 6; border-bottom: 1px solid transparent; background-clip: padding-box; backdrop-filter: none; -webkit-backdrop-filter: none; }
+/* A pinned lane's in-flow gap stays visible as an uncovered scrollport strip
+   while the lane itself paints opaque. Cast each plate upward over its strip
+   (the .turn 14px gap / the prior cell's 16px flowCellInner padding) so the
+   lanes read as one band instead of solid plates with notches between them.
+   The status lane reserves --reader-control-width on its right for the
+   toolbar's control group, which leaves the same kind of strip there; paint
+   it too. The toolbar is z-index 7, above the lane's 6, so its buttons still
+   render on top of the extension. */
+.turnProcessSticky { box-shadow: 0 -14px 0 var(--dsw-alias-bg-base), var(--reader-control-width, 148px) 0 0 var(--dsw-alias-bg-base); }
 /* The same summary row stays in flow until it reaches the measured top lane. */
 .flowCell[data-flow-summary], .closedProcessSummary { position: sticky; top: calc(max(var(--reader-toolbar-height, 40px), var(--reader-status-height, 40px)) + var(--reader-sticky-lane, 40px)); z-index: 5; overflow: visible; box-sizing: border-box; min-height: 40px; padding-block: 4px; background: var(--dsw-alias-bg-base); border-bottom: 0; }
+.flowCell[data-flow-summary] { box-shadow: 0 -16px 0 var(--dsw-alias-bg-base); }
+.closedProcessSummary { box-shadow: 0 -14px 0 var(--dsw-alias-bg-base); }
 .foldControl { display: inline-flex; align-items: center; gap: 0; padding: 2px; border-radius: 8px; background: var(--dsw-alias-bg-module-platform); }
 .foldStop { border: 0; background: transparent; color: var(--dsw-alias-label-secondary); padding: 2px 8px; border-radius: 6px; white-space: nowrap; font: inherit; font-size: 12px; line-height: 18px; cursor: pointer; }
 .foldStop[data-on] { background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); }
@@ -573,6 +584,7 @@
    a glass reader keeps exactly the same footer precedence as an opaque one. */
 .root[data-reader-glass] .flowCell[data-flow-summary],
 .root[data-reader-glass] .closedProcessSummary {
+  box-shadow: none;
   position: static;
   z-index: auto;
   min-height: 32px;

@@ -22,6 +22,7 @@ const paths = {
   feedback: 'ui-message-feedback/src/client/index.ts', 'read-row': 'ui-tool/src/client/tool/toolviews/read-row.tsx',
   'read-image-row': 'ui-tool/src/client/tool/toolviews/read-image-row.tsx', 'tool-locale': 'ui-conversation/src/client/locales.ts',
   deliverables: 'ui-deliverables/src/client/Deliverables.tsx', 'deliverables-locale': 'ui-deliverables/src/client/locales.ts',
+  'open-in-app-action': 'ui-open-in-app/src/client/FileRouteAction.tsx', 'open-in-app-locale': 'ui-open-in-app/src/client/locales.ts',
 };
 const webRequire = createRequire(join(harness, 'packages/client/web/package.json'));
 await build({
@@ -39,6 +40,7 @@ const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQ
 const server = createServer(async (req, res) => {
   if (req.url === '/') { res.setHeader('Content-Type', 'text/html'); res.end('<!doctype html><html lang="zh"><meta charset="utf-8"><link rel="stylesheet" href="/fixture.css"><style>body{font-family:system-ui;margin:24px}button{cursor:pointer}</style><div id="app"></div><script type="module" src="/fixture.js"></script></html>'); return; }
   if (req.url?.startsWith('/api/file?') || req.url === '/pixel.png') { res.setHeader('Content-Type', 'image/png'); res.end(pixel); return; }
+  if (req.url?.startsWith('/api/present.open')) { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify([{ id: 'preview-app', name: 'Preview App', default: true, icon: null }, { id: 'other-app', name: 'Other App', default: false, icon: null }])); return; }
   const file = req.url === '/fixture.js' ? 'fixture.js' : req.url === '/fixture.css' ? 'fixture.css' : null;
   if (!file) { res.writeHead(404); res.end(); return; }
   res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : 'text/css');
@@ -90,11 +92,11 @@ try {
   await tool.getByText('export const value = 1;', { exact: true }).waitFor();
   assert.equal(await page.locator('[data-presented-file]').count(), 1);
   assert.equal(await page.locator('[data-produced-files-row]').count(), 0);
-  await page.getByRole('button', { name: '在侧边栏打开 /fixture/report.pdf', exact: true }).click();
+  await page.getByRole('button', { name: '在侧边栏预览 /fixture/report.pdf', exact: true }).click();
   assert.equal(await page.evaluate(() => window.fixture.observations.opens.at(-1).path), '/fixture/report.pdf');
-  await page.getByRole('button', { name: '/fixture/report.pdf 的更多文件操作', exact: true }).click();
-  await page.getByRole('menuitem', { name: '用默认应用打开', exact: true }).click();
-  assert.deepEqual(await page.evaluate(() => window.fixture.observations.opens.at(-1)), ['presented', 'session-a', 42, 0, 'open']);
+  await page.getByRole('button', { name: '更多打开方式', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Other App', exact: true }).click();
+  assert.deepEqual(await page.evaluate(() => window.fixture.observations.opens.at(-1)), ['presented', 'session-a', 42, 0, 'open', 'other-app']);
   await page.evaluate(() => window.fixture.language());
   await page.getByRole('button', { name: 'Good response', exact: true }).waitFor();
   const image = page.locator('img[alt="本地样例"]');

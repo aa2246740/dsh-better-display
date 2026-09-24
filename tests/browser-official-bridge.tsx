@@ -10,8 +10,10 @@ import { readImageToolview } from '@fixture/read-image-row';
 import { en as conversationEn } from '@fixture/tool-locale';
 import { officialChildren, installOfficialSlots, OFFICIAL_SEATS } from '../src/client/official-slots.js';
 import { OfficialActions, OfficialTool } from '../src/client/OfficialContent.js';
-import { Deliverables } from '@fixture/deliverables';
+import { DeliverablesTail } from '@fixture/deliverables';
 import { zh as deliverablesZh, en as deliverablesEn } from '@fixture/deliverables-locale';
+import { FileRouteAction } from '@fixture/open-in-app-action';
+import { zh as openInAppZh, en as openInAppEn } from '@fixture/open-in-app-locale';
 import { CopyAnswer } from '../src/client/Blocks.js';
 import { MotionMarkdown } from '../src/client/word-motion.js';
 import css from '../src/client/Reader.module.css';
@@ -32,7 +34,7 @@ const source = <T,>(initial: T) => {
 };
 const localeSource = source({ revision: 0 });
 let language = 'zh';
-const dictionaries: Record<string, any> = { deliverables: { zh: deliverablesZh, en: deliverablesEn }, conversation: { zh: conversationEn, en: conversationEn } };
+const dictionaries: Record<string, any> = { deliverables: { zh: deliverablesZh, en: deliverablesEn }, 'open-in-app': { zh: openInAppZh, en: openInAppEn }, conversation: { zh: conversationEn, en: conversationEn } };
 const locale = {
   ...localeSource,
   register(ns: string, dictionary: any) { dictionaries[ns] = dictionary; return () => { delete dictionaries[ns]; }; },
@@ -60,7 +62,7 @@ ctx.provide('remote', {
 });
 const binding = { key: 'session-a', ctx: new Context(), hooks: {}, keyedHooks: {}, props: { sessionId: 'session-a' } };
 const current = source(binding);
-slots.installScope('session', { current, resolve: (id: string) => id === binding.key ? binding : undefined, renderArea: (_b: any, props: any) => props.children });
+slots.installScope('session', { current, bindingSource: (target: any) => source(target === binding.key ? binding : undefined), renderArea: (_b: any, props: any) => props.children });
 const toolBlock = {
   kind: 'tool-result', callId: 'read-1', call: { name: 'read', args: { file_path: '/fixture/sample.ts', offset: 12 }, argsRaw: '{"file_path":"/fixture/sample.ts","offset":12}' },
   content: [{ type: 'text', text: '<path>/fixture/sample.ts</path>\n<type>file</type>\n<content>\n12: export const value = 1;\n</content>' }], isError: false, subCalls: [], time: 100, callTime: 10,
@@ -90,12 +92,18 @@ slots.provideRoot({ hooks: { sessions: source({ byId: { 'session-a': { cwd: '/fi
 const artifact = { path: '/fixture/report.pdf', description: '演示报告', seq: 42, index: 0 };
 const presentedOpen = source({});
 const presentedHost = source({ available: true, fileManager: 'finder' });
-slots.register({ name: 'conversation.chat.turnTail', locale: 'deliverables',
-  select: () => ({ produced: ['/fixture/sample.ts'], presented: [artifact] }),
-  inject: () => ({ hooks: { presentedOpen, presentedHost }, reloadPresentedHost: async () => {},
+const changesDiff = source({});
+const changesSummary = source({});
+const showCodeDiff = source(false);
+slots.register({ name: 'conversation.chat.turnTail', id: '@deepseek-ai/dsh-client-ui-deliverables', locale: 'deliverables',
+  children: { 'deliverables.file.actions': { kind: 'list', scope: 'session' } },
+  inject: () => ({ hooks: { changesDiff, showCodeDiff, presentedOpen, presentedHost, changesSummary },
+    loadChangesDiff: async () => {}, reloadPresentedHost: async () => {}, loadChangesSummary: async () => {},
     openPresented: async (...args: any[]) => { observations.opens.push(['presented', ...args]); },
+    openChanged: async () => {}, openChangesReview: () => {},
   }),
-}, Deliverables);
+}, DeliverablesTail);
+slots.register({ name: 'deliverables.file.actions', id: 'open-in-app', locale: 'open-in-app' }, FileRouteAction);
 let liveDetail = source('initial');
 const storeHandle = { create: () => {
   observations.mounts++;
@@ -122,7 +130,7 @@ function ReaderFixture({ renderSlot, renderSlotChain }: any) {
       <CopyAnswer blocks={[{ kind: 'text', text }]} extraActions={<OfficialActions official={official} messageId={'message-1' as any} />} />
     </article>
     <div data-reader-tool><OfficialTool {...blockProps} official={official} renderSlotChain={renderSlotChain} block={toolBlock as any} toolName="read" fallback={<span>fallback</span>} /></div>
-    {renderSlot(OFFICIAL_SEATS.tail, { openFile: blockProps.openFile, readerProducedPaths: ['/fixture/sample.ts'] })}
+    {renderSlot(OFFICIAL_SEATS.tail, { turn: { data: new Map([['deliverables', { changes: null, presented: [artifact] }]]) }, seq: 43, openFile: blockProps.openFile, readerProducedPaths: ['/fixture/sample.ts'] })}
     {renderSlot(OFFICIAL_SEATS.nodes, {}, { entryKey: 'future-widget', hookContext: 'turn-context' })}
     <button onClick={() => setText(text + '\n\n继续输出。')}>Append text</button>
   </div></main>;
