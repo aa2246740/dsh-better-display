@@ -63,6 +63,7 @@
     "@types/mdast": "^4.0.4",
     "@types/node": "^22.20.0",
     "@types/react": "~18.3.1",
+    "lightningcss": "^1.33.0",
     "tsdown": "^0.22.2",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3"
