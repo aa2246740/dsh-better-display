@@ -14,4 +14,10 @@ test('relative, protocol-relative and non-HTTP page paths are not sent to the Ho
     assert.equal(localPathMediaUrl('http:', 'http://local', path), undefined);
   }
   assert.equal(localPathMediaUrl('file:', 'null', '/tmp/image.png'), undefined);
+  assert.equal(localPathMediaUrl('dsh-app:', 'dsh-app://other', '/tmp/image.png'), undefined);
+});
+test('Desktop file routes use the application file API', () => {
+  const url = localPathMediaUrl('dsh-app:', 'dsh-app://app', '/tmp/a.png')!;
+  assert.equal(url.startsWith('dsh-app://app/api/file?'), true);
+  assert.equal(new URL(url).searchParams.get('path'), '/tmp/a.png');
 });
