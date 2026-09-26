@@ -118,6 +118,20 @@ function fallback(block: AssistantBlock, streaming: boolean, source: ReaderBlock
         if ((item.type === 'mcp-app' || item.type === 'mcpapp' || item.type === 'ui') && typeof item.html === 'string') {
           return <McpAppFrame html={item.html} title={typeof item.title === 'string' ? item.title : undefined} fillComposer={fillComposer} />;
         }
+        if (item.type === 'file') {
+          const att = (item.attachment ?? {}) as { name?: string; bytes?: number };
+          const name = typeof att.name === 'string' && att.name ? att.name : '附件';
+          const bytes = Number(att.bytes);
+          const size = Number.isFinite(bytes) && bytes > 0
+            ? (bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + ' MB' : bytes >= 1024 ? (bytes / 1024).toFixed(1) + ' KB' : bytes + ' B')
+            : '';
+          return (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', fontSize: '12px', lineHeight: '1.6' }}>
+              <span>📄 {name}</span>
+              {size && <span style={{ opacity: 0.55 }}>{size}</span>}
+            </div>
+          );
+        }
       }
       return <div className={css.unknown}>
         <p>此内容类型尚未接入阅读页，原始内容已保留。</p>
