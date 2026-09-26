@@ -514,14 +514,70 @@
 @media (max-width: 600px) { .root { padding-inline: 20px; } .column { gap: 18px; } .toolbar { font-size: 11px; } .user { max-width: 90%; } }
 
 /* Measured flow owns geometry; steps never change React parents when folded. */
+/* One rail geometry for every nested lane: same left edge, same rail width,
+   same gutter. The rules below used to disagree (6px/1px, 24px/1px, 6px/2px),
+   so the vertical guides visibly stepped in and out down the page. */
+.root { --reader-rail: 6px; --reader-gutter: 16px; --reader-sticky-lane: 40px; }
 .choreographedFlow { display: flex; flex-direction: column; min-width: 0; overflow-anchor: none; }
-.flowCell { min-width: 0; overflow: clip; display: flow-root; }
+/* `overflow: clip` cut off anything a cell expanded into — a nested menu grew
+   inside a clipped box, so it neither pushed the content below it nor floated
+   above its neighbours. Nothing here needs clipping: the fold already controls
+   what is laid out. */
+.flowCell { min-width: 0; display: flow-root; }
 .flowCell[hidden] { display: none; }
 .flowCellInner { display: flex; flex-direction: column; min-width: 0; padding-bottom: 16px; }
 /* A null-rendered ProcessFragment must contribute no cumulative row spacing. */
 .flowCellInner:empty { padding-bottom: 0; }
 .choreographedFlow[data-reader-transition=collapse] .flowCell * { animation-play-state: paused !important; }
 .numberRollExit, .numberRollEnter { animation-duration: 160ms; }
+/* A digest row stands in for a run of folded process. It had no rule at all,
+   so it sat flush against the following paragraph and read as part of it
+   rather than as a collapsed substitute for the steps above. Give it its own
+   block and a little breathing room on both sides. */
+[data-reader-live-fold] { display: flex; flex-direction: column; gap: 4px; margin: 2px 0 10px; }
+[data-reader-live-fold][data-expanded] .summaryRow { color: var(--dsw-alias-label-secondary); }
+[data-reader-live-fold] .summaryRow { min-height: 24px; color: var(--dsw-alias-label-tertiary); }
+/* The disclosure chevron belongs to the digest, not to the prose under it. */
+[data-reader-live-fold] .summaryRow button { font-size: 13px; line-height: 20px; }
+/* Tool-named digests are longer than the author's count-only ones, which is
+   why he could keep the row on one nowrap line. Rather than fight the flex
+   chain for width, let a *named* digest wrap: it lists at most three tools, so
+   it grows to at most two or three short lines and every tool stays readable.
+   Everything here is scoped to the marker, so switching the option off puts
+   the author's single-line geometry back byte for byte. */
+.flowCell[data-flow-summary] [data-reader-fold-named] .summaryRow > .disclosure,
+[data-reader-fold-named] .summaryRow > .disclosure {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.flowCell[data-flow-summary] [data-reader-fold-named] .disclosureButton,
+[data-reader-fold-named] .disclosureButton {
+  width: 100%;
+  max-width: 100%;
+  align-items: flex-start;
+}
+/* The base rule pins this to one line with !important; a named digest has to
+   lift that, and only for itself. */
+.flowCell[data-flow-summary] [data-reader-fold-named] .foldSummary,
+[data-reader-fold-named] .foldSummary {
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap !important;
+  white-space: normal !important;
+  row-gap: 2px;
+  text-align: left;
+}
+.flowCell[data-flow-summary] [data-reader-fold-named] .foldSummaryPart,
+[data-reader-fold-named] .foldSummaryPart {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: normal !important;
+}
+.flowCell[data-flow-summary] [data-reader-fold-named] .foldSummaryPart > span,
+[data-reader-fold-named] .foldSummaryPart > span {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
 .foldSummary { display: inline-flex; align-items: baseline; flex-wrap: nowrap !important; white-space: nowrap !important; }
 /* A flex item's intrinsic width must include its real label and chevron.
    The previous shrink-to-fit + max-width chain clipped even four CJK glyphs. */
