@@ -2,27 +2,25 @@
 
 [English](./README.en.md)
 
-推荐用 npm（可钉版本）：
+## 安装
 
-```sh
-dsh plugin --profile web add dsh-better-display@0.3.3
+### DSH Studio 桌面 App（推荐）
+
+打开 **设置 → 插件 → 添加插件**，在“包名或地址”中输入：
+
+```text
+github:aa2246740/dsh-better-display#v0.3.3
 ```
 
-也可以装 latest：
+桌面端的插件管理器负责 Desktop profile 和其内置包管理器。本发布已包含编译好的 `lib/`；普通使用不需要 clone、构建或安装 DSHX。若应用在安装完成后提示刷新或重新打开，请按提示完成。
+
+### Web CLI
 
 ```sh
-dsh plugin --profile web add dsh-better-display
+dsh plugin --profile web add github:aa2246740/dsh-better-display#v0.3.3
 ```
 
-备选：从 GitHub 直装（跟默认分支最新提交）：
-
-```sh
-dsh plugin --profile web add github:aa2246740/dsh-better-display
-```
-
-PATH 上要有官方 `dsh`（没有就用 `npx @deepseek-ai/dsh`）和 **pnpm**。`dsh plugin add` 会在 `$DSH_HOME/profiles/web` 里跑 pnpm。仓库已提交编译好的 `lib/`，git / npm 安装都不用 `prepare`，也不用改 profile 的 `allowBuilds`。
-
-然后重启这个 Host，再刷新页面。`dsh plugin add` 只写 profile，不会热挂正在跑的进程。
+这条官方 CLI 命令只写入 `web` profile，不能修改 Desktop App 的 profile。对于已经运行的 Web Host，请重新打开该 Host 一次，再刷新网页；插件 bundle 会在启动时读取。
 
 给 DeepSeek Harness 加一个 **阅读** 页签：执行时能看到步骤、思考和进度；整轮成功结束后把过程收起来，留下最终回答。原版「对话 / 轨迹」、输入框、模型选择、工具和审批都还在。阅读列保留宿主 ChatView 的 `data-chat-flow` 钩子，依赖该标记显示输入框的第三方皮肤不会把阅读页当成仅检视视图。
 
@@ -32,7 +30,7 @@ PATH 上要有官方 `dsh`（没有就用 `npx @deepseek-ai/dsh`）和 **pnpm**�
 
 **0.3.0** 保留现有阅读布局、折叠和动效，接入官方反馈、工具详情、文件卡片及文件链接；并修复重新开启自动折叠后仍保持展开的问题。接入范围和升级检查见 [官方能力接入说明](docs/official-rendering-bridge.md)。
 
-本地目录或 tarball：
+本地目录或 tarball（开发/本地测试）：
 
 ```sh
 dsh plugin --profile web add ./dsh-better-display

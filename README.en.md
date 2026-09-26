@@ -2,27 +2,25 @@
 
 [中文](./README.md)
 
-Prefer npm (version-pinable):
+## Install
 
-```sh
-dsh plugin --profile web add dsh-better-display@0.3.3
+### DSH Studio desktop app (recommended)
+
+Open **Settings → Plugins → Add plugin** and enter this in “Package name or address”:
+
+```text
+github:aa2246740/dsh-better-display#v0.3.3
 ```
 
-Or latest:
+The desktop plugin manager owns the Desktop profile and its bundled package manager. This release includes built `lib/`; normal use needs no clone, build, or DSHX installation. Follow the app if it asks you to reload or reopen after installation.
+
+### Web CLI
 
 ```sh
-dsh plugin --profile web add dsh-better-display
+dsh plugin --profile web add github:aa2246740/dsh-better-display#v0.3.3
 ```
 
-Fallback: install from GitHub (tracks the default branch tip):
-
-```sh
-dsh plugin --profile web add github:aa2246740/dsh-better-display
-```
-
-You need official `dsh` (or `npx @deepseek-ai/dsh`) and **pnpm** on PATH. `dsh plugin add` runs pnpm in `$DSH_HOME/profiles/web`. This repo commits built `lib/`, so git / npm installs do not need `prepare` or a profile `allowBuilds` entry.
-
-Then restart that Host and reload the page. `dsh plugin add` writes the profile. It does not hot-load a running process.
+This official CLI command writes only the `web` profile; it cannot modify the Desktop App profile. For an already-running Web Host, reopen that Host once and reload the page because bundles are read at boot.
 
 Adds a **阅读** tab to DeepSeek Harness. While a turn runs you see steps, thinking, and progress. After a successful turn those collapse and the final answer stays. Native Chat / Trajectory, the composer, model picker, tools, and approvals stay. The reading column keeps ChatView's `data-chat-flow` hook so third-party skins that gate the composer on that mark still treat Reader as an interactive conversation.
 
@@ -32,7 +30,7 @@ Targets DeepSeek Harness **0.1.7-rc.2**. Display only. It does not change Agent 
 
 **0.3.0** keeps the existing reading layout, folding, and motion while using official feedback, tool details, file cards, and file links. It also fixes process content staying expanded after auto-folding is re-enabled. See the [official integration notes](docs/official-rendering-bridge.md) for coverage and upgrade checks.
 
-From a local checkout or tarball:
+From a local checkout or tarball (development/local testing):
 
 ```sh
 dsh plugin --profile web add ./dsh-better-display
