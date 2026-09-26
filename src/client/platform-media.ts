@@ -1,8 +1,14 @@
-/** RC2 Chat's same-origin local media contract. Authorization stays Host-side. */
+/** Web or Desktop file route. Authorization stays Host-side. */
 export function localPathMediaUrl(protocol: string, origin: string, value: string): string | undefined {
-  if (protocol !== 'http:' && protocol !== 'https:') return undefined;
   if (!value.startsWith('/') || value.startsWith('//')) return undefined;
-  return `${origin}/api/file?path=${encodeURIComponent(value)}`;
+  if (protocol === 'http:' || protocol === 'https:') {
+    return `${origin}/api/file?path=${encodeURIComponent(value)}`;
+  }
+  // Official fileMediaUrl accepts the Desktop application base dsh-app://app/.
+  if (protocol === 'dsh-app:' && origin === 'dsh-app://app') {
+    return `dsh-app://app/api/file?path=${encodeURIComponent(value)}`;
+  }
+  return undefined;
 }
 
 export const readerPathImages = {

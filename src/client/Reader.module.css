@@ -250,13 +250,16 @@
     currentColor 0%, currentColor 35%,
     color-mix(in srgb, currentColor 35%, transparent) 50%,
     currentColor 65%, currentColor 100%);
-  background-size: 220% 100%;
+  /* Keep the travelling band outside the text at both loop endpoints. A single
+     tile covers the row throughout, so wrapping cannot start a second sweep. */
+  background-size: 300% 100%;
+  background-repeat: no-repeat;
   background-position: 100% 0;
   -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent;
   animation: readerStepShimmer 1.6s linear infinite;
 }
-@keyframes readerStepShimmer { to { background-position: -120% 0; } }
+@keyframes readerStepShimmer { to { background-position: 0% 0; } }
 /* The duration stays on a step that ran long, so a slow command keeps its number;
    a fast one shows nothing once it returns. */
 .toolElapsed[data-slow] { opacity: 1; font-weight: 500;

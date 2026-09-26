@@ -4,6 +4,7 @@ import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { DisclosureRow, IconBrowseOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ReferenceIcon } from './ReferenceIcon.js'
 import { contextBody } from './ContextBody.js'
+import { toolUpdateRows } from './tool-update.js'
 import css from './ContextInjectionRow.module.css'
 
 /** Props for the logged non-user message presentation. */
@@ -46,16 +47,32 @@ export function ContextInjectionRow({ content, source, provenance, producer, for
   // Resolved rather than declared: a form whose fields are unreadable renders
   // the opaque body, and the marker must say what the row actually shows.
   const { rendered, summary, body } = contextBody(form, { content, source, t })
+  const tools = toolUpdateRows(content)
+  const toolSummary = tools === null || tools.single !== null ? null
+    : tools.added.length > 0 && tools.removed.length > 0
+      ? t('message.toolsChanged', { added: tools.added.length, removed: tools.removed.length })
+      : tools.added.length > 0
+        ? t('message.toolsAddedCount', { count: tools.added.length })
+        : t('message.toolsRemovedCount', { count: tools.removed.length })
 
   return (
     <DisclosureRow
       className={css.root}
-      icon={view.role === 'recall'
+      icon={view.role === 'recall' && tools === null
         ? <span data-context-recall-icon><ReferenceIcon kind="session" /></span>
         : <IconBrowseOutlineRegular size={14} />}
       chevronClassName={css.chevron}
-      title={t(view.role === 'recall' ? 'message.contextRecall' : 'message.contextInjection')}
-      collapsedContent={view.label === null ? undefined : (
+      title={tools?.single !== undefined && tools.single !== null
+        ? t(tools.single.type === 'tool-addition' ? 'message.toolAdded' : 'message.toolRemoved', { name: tools.single.toolName })
+        : tools !== null
+          ? t('message.toolsUpdated')
+          : t(view.role === 'recall' ? 'message.contextRecall' : 'message.contextInjection')}
+      collapsedContent={toolSummary !== null ? (
+        <>
+          <span className={css.sep} aria-hidden />
+          <span className={css.summary}>{toolSummary}</span>
+        </>
+      ) : tools !== null || view.label === null ? undefined : (
         /* ToolRow's separator shape: an aria-hidden dot, so the accessible name
            stays the two readable parts and the two disclosure rows expose one
            name shape. A source that names no producer drops the dot with it. */
@@ -71,13 +88,18 @@ export function ContextInjectionRow({ content, source, provenance, producer, for
         </>
       )}
       keepContentWhenOpen
-      open={open}
-      expandable
+      open={open && tools?.single == null}
+      expandable={tools?.single == null}
       expandOnRowClick
       onToggle={() => { setOpen(value => !value) }}
     >
       <div className={css.body} data-context-injection-body data-context-form={rendered ?? undefined}>
-        {body}
+        {tools === null ? body : (
+          <div className={css.toolChanges}>
+            {tools.added.length > 0 && <div>{t('message.toolsAdded', { names: tools.added.join(', ') })}</div>}
+            {tools.removed.length > 0 && <div>{t('message.toolsRemoved', { names: tools.removed.join(', ') })}</div>}
+          </div>
+        )}
       </div>
     </DisclosureRow>
   )

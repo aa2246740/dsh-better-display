@@ -1,6 +1,6 @@
 # 官方能力接入说明
 
-`0.3.0` 在 `v0.2.1` 的阅读布局上接入官方内容和控件，经过试用验收后发布。当前验收目标是 Harness `0.1.7-rc.1`。`conversation.chat.turnTail` 在这一版是 `list`，不再是 `chain`。后续仍需维护的自有展示逻辑和升级边界见下文。
+`0.3.0` 在 `v0.2.1` 的阅读布局上接入官方内容和控件，经过试用验收后发布。当前验收目标是 Harness `0.1.7-rc.2`。`conversation.chat.turnTail` 仍是 `list`。`0.1.7-rc.2` 在这条 list 上新增 `schedule-created`，并新增 `schedule_update` 工具视图；Reader 继续镜像官方注册，不另写这两张卡片。开发者消息里的工具增减行用官方标题和计数，本地 Markdown 图片接受 Desktop 文件路由 `dsh-app://app/api/file`。后续仍需维护的自有展示逻辑和升级边界见下文。
 
 ## 一个具体例子
 
