@@ -172,7 +172,7 @@ const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, 
       </article>
     </ProcessFragment>
     : hasVisibleBody(part.blocks) && <RetiringContent key={part.start} visible={pinned || processOpen || (!earlier && !folded)}>
-      <article className={css.answer} data-reader-answer data-reader-anchor data-reader-key={nodeKey} data-reader-source-start={part.start} data-answer-status={data.status} data-answer-phase={earlier || folded ? 'process' : 'body'}>
+      <article className={css.answer} data-reader-answer data-reader-anchor data-reader-key={nodeKey} data-chat-anchor-key={nodeKey} data-chat-flow-kind={node.kind} data-reader-source-start={part.start} data-answer-status={data.status} data-answer-phase={earlier || folded ? 'process' : 'body'}>
         <Blocks {...render} blocks={part.blocks} streaming={data.status === 'running'} holdFormatting={pinned} startedAt={data.time} interrupted={data.status === 'interrupted'} liveText />
         {last && data.status === 'interrupted' && <span className={css.stopped}>已停止</span>}
         {last && !earlier && !folded && data.status !== 'running' && boundary.status === 'closed' && (
@@ -198,7 +198,7 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
     const otherBlocks = blocks.filter(b => b.kind !== 'image');
     const text = otherBlocks.filter((block): block is Extract<typeof block, { kind: 'text' }> => block.kind === 'text').map(block => block.text).join('\n\n');
     const time = node.data.time;
-    return <div className={css.userCluster} data-reader-anchor data-reader-key={nodeKey}>
+    return <div className={css.userCluster} data-reader-anchor data-reader-key={nodeKey} data-chat-anchor-key={nodeKey} data-chat-flow-kind={node.kind}>
       {node.kind === 'steering' && <p className={css.meta}>补充消息</p>}
       {imageBlocks.length > 0 && <div className={css.userImages}>
         <Blocks {...render} blocks={imageBlocks} source="user" />
@@ -211,7 +211,7 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
   }
   if (isNode(node, 'assistant-step')) return null;
   if (isNode(node, 'tool-call')) return <ToolMedia {...render} block={node.data.root} />;
-  if (isNode(node, 'turn-error')) return <div className={css.error} role="alert" data-reader-anchor>
+  if (isNode(node, 'turn-error')) return <div className={css.error} role="alert" data-reader-anchor data-chat-anchor-key={nodeKey} data-chat-flow-kind={node.kind}>
     <svg className={css.errorIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor">
       <circle cx="8" cy="8" r="6.5" strokeWidth="1.2" />
       <path d="M8 5v3.5M8 11.2h.01" strokeWidth="1.5" strokeLinecap="round" />
@@ -247,7 +247,7 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
   // host (it appears nowhere in the installed packages), so a slash command arrives
   // as 'command' above and is rendered there. Keeping the branch only made the file
   // look like it handled a case that cannot occur.
-  return <OfficialNode {...render} node={node} fallback={<div className={css.unknown} data-reader-anchor>
+  return <OfficialNode {...render} node={node} fallback={<div className={css.unknown} data-reader-anchor data-chat-anchor-key={nodeKey} data-chat-flow-kind={node.kind}>
     <p>此记录类型暂未接入阅读页：{node.kind}</p>
     {render.official && <button type="button" className={css.textButton} onClick={() => render.official!.openView('chat', node.key)}>在对话中查看</button>}
     <JsonBlock label="查看原始记录" payload={node.data} truncatedLabel={truncatedJsonLabel} />

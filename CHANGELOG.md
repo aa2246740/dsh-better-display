@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Reader rows restore the host ChatView anchor contract: user / steering / assistant answer / turn-error / unknown rows now carry `data-chat-anchor-key={node.key}` and `data-chat-flow-kind={node.kind}` alongside the reader attributes, matching what `OfficialNode` already does for fallback nodes. Ecosystem plugins that read the native anchors as their DOM source of truth (e.g. dsh-tidychat's message rail) find zero rows under the reader and silently render nothing — the native contract is stable across 0.1.0-rc.7 → 0.1.7-rc.2, and the values are passed through verbatim from the engine node key / kind the reader already holds.
+
 ## 0.3.3 — 2026-09-24
 
 - Accept Harness `0.1.7-rc.2` (`dsh-v0.1.7-rc.2`, `477b4f420553e8a52c2fbccc464d7561b239c443`). Peer range stays `>=0.1.7-rc.1 <0.1.8`.
