@@ -36,13 +36,16 @@ test('plugin-tree skills/ is not a harness skill root', () => {
     ...projectSkillRoots('/plugin/dsh-better-display'),
     ...userSkillRoots({ DSH_HOME: '/home/me/.dsh', DSH_AGENTS_HOME: '/home/me/.agents' }, '/home/me'),
   ];
-  assert.deepEqual(roots.map(root => root.path), [
+  // join()/resolve() use platform separators (and resolve() adds a drive letter on Windows) —
+  // normalize before comparing so the assertion describes structure, not the host OS.
+  const norm = (path: string): string => path.replace(/\\/g, '/').replace(/^[A-Za-z]:/, '');
+  assert.deepEqual(roots.map(root => norm(root.path)), [
     '/plugin/dsh-better-display/.dsh/skills',
     '/plugin/dsh-better-display/.agents/skills',
     '/home/me/.dsh/skills',
     '/home/me/.agents/skills',
   ]);
-  assert.equal(roots.some(root => root.path.endsWith('/dsh-better-display/skills')), false);
+  assert.equal(roots.some(root => norm(root.path).endsWith('/dsh-better-display/skills')), false);
 });
 
 test('a real user skill root with the pack is installed; the plugin pack path is not', async () => {

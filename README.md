@@ -46,6 +46,7 @@ dsh plugin --profile web remove dsh-better-display
 ## 开发
 
 ```sh
+pnpm install
 npm test
 npm run typecheck
 ```
