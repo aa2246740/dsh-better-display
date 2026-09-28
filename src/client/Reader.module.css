@@ -10,11 +10,11 @@
   container-type: inline-size;
 }
 .column { max-width: var(--dsh-chat-content-width, 748px); width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; min-width: 0; }
-.toolbar { position: sticky; top: 0; display: flex; justify-content: flex-end; align-items: center; gap: 6px; min-height: 32px; padding: 0; color: var(--dsw-alias-label-tertiary); font-size: 12px; background: var(--dsw-alias-bg-base); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.toolbar { position: sticky; top: 0; display: flex; justify-content: flex-end; align-items: center; gap: 6px; min-height: 32px; padding: 0; color: var(--dsw-alias-label-tertiary); font-size: 12px; background: var(--dsw-alias-bg-base); backdrop-filter: blur(12px); }
 /* 吸顶带第二车道：左「正在处理」+ 右「自动折叠」共享同一条 40px 水平基线。
    top / z-index 由下方 measured-flow 段统一定义：这一道永远钉在工具栏车道
    之下、且永远低于宿主输入卡（composerSeat z-index 7）。 */
-.turnProcessSticky { position: sticky; background: var(--dsw-alias-bg-base); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); min-height: 32px; display: flex; align-items: center; }
+.turnProcessSticky { position: sticky; background: var(--dsw-alias-bg-base); backdrop-filter: blur(12px); min-height: 32px; display: flex; align-items: center; }
 .turnProcessSticky .disclosureButton { min-height: 32px; }
 /* 第二车道：折叠胶囊吸附在第一车道正下方，互不重叠 */
 .textButton, .historyButton, .iconButton, .jump, .disclosureButton, .imageOpen, .dialogClose { font: inherit; cursor: pointer; }
@@ -473,7 +473,7 @@
 .morphDrawer { overflow: hidden; height: 0; transform-origin: top center; will-change: height, opacity, transform; }
 .liveFoldImpact { animation: liveFoldElastic 180ms cubic-bezier(0.2, 0, 0, 1) both; }
 @keyframes liveFoldElastic { 0% { transform: scale(1); } 50% { transform: scale(1.015); } 100% { transform: scale(1); } }
-.liveFoldContainer { position: sticky; top: calc(max(var(--reader-toolbar-height, 40px), var(--reader-status-height, 40px)) + var(--reader-sticky-lane, 40px) * 2); z-index: 4; background: var(--dsw-alias-bg-base); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 4px 0; margin-bottom: 6px; animation: liveFoldPulse 320ms cubic-bezier(0.16, 1, 0.3, 1) both; transform-origin: left center; will-change: transform, opacity; }
+.liveFoldContainer { position: sticky; top: calc(max(var(--reader-toolbar-height, 40px), var(--reader-status-height, 40px)) + var(--reader-sticky-lane, 40px) * 2); z-index: 4; background: var(--dsw-alias-bg-base); backdrop-filter: blur(12px); padding: 4px 0; margin-bottom: 6px; animation: liveFoldPulse 320ms cubic-bezier(0.16, 1, 0.3, 1) both; transform-origin: left center; will-change: transform, opacity; }
 @keyframes liveFoldPulse { 0% { transform: translateY(-4px) scale(0.98); opacity: 0.8; } 50% { transform: translateY(0) scale(1.02); opacity: 1; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
 [data-motion=off] .liveFoldContainer { animation: none !important; }
 @media (prefers-reduced-motion: reduce) { .liveFoldContainer { animation: none !important; } }
@@ -532,7 +532,7 @@
    input card. Only the top toolbar lane may use 7: it pins to the scrollport's
    first lane and its containing block always ends above the seat, so it can
    never reach the band, and 7 keeps it above the host's code-block banners. */
-.toolbar { width: 100%; max-width: 100%; align-self: stretch; box-sizing: border-box; min-height: 40px; z-index: 7; border-bottom: 0; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.toolbar { width: 100%; max-width: 100%; align-self: stretch; box-sizing: border-box; min-height: 40px; z-index: 7; border-bottom: 0; backdrop-filter: none; }
 /* Every sticky lane used to pin to the SAME top: the status row, the folded
    summary row and the live-fold container all sat at
    max(toolbar-height, status-height) with z-index 6. Three siblings competing
@@ -540,7 +540,7 @@
    内容被盖住、看不见" was: the disclosure opened, and the row that followed
    pinned straight on top of it. Give each lane its own band instead, stacked
    from the measured top: status first, then the summary, then the fold body. */
-.turnProcessSticky { box-sizing: border-box; width: calc(100% - var(--reader-control-width, 148px)); top: max(var(--reader-toolbar-height, 40px), var(--reader-status-height, 40px)); min-height: 40px; padding-right: 0; z-index: 6; border-bottom: 1px solid transparent; background-clip: padding-box; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.turnProcessSticky { box-sizing: border-box; width: calc(100% - var(--reader-control-width, 148px)); top: max(var(--reader-toolbar-height, 40px), var(--reader-status-height, 40px)); min-height: 40px; padding-right: 0; z-index: 6; border-bottom: 1px solid transparent; background-clip: padding-box; backdrop-filter: none; }
 /* A pinned lane's in-flow gap stays visible as an uncovered scrollport strip
    while the lane itself paints opaque. Cast each plate upward over its strip
    (the .turn 14px gap / the prior cell's 16px flowCellInner padding) so the
@@ -578,10 +578,32 @@
 .root[data-reader-glass] .liveFoldContainer {
   background: transparent;
   backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border: 0;
   border-radius: 0;
   box-shadow: none;
+}
+/* Over a skin, any full-width pinned band reads as a slab across the artwork,
+   frosted or not, and the toolbar (full width) and status lane (width minus
+   the control group) leave a stepped edge. Pin nothing that needs a plate:
+   the status lane scrolls with its turn like the summary rows below, and the
+   toolbar stays pinned but only its controls carry a small pill. */
+.root[data-reader-glass] .turnProcessSticky {
+  position: static;
+  backdrop-filter: none;
+}
+.root[data-reader-glass] .toolbar {
+  backdrop-filter: none;
+  pointer-events: none;
+}
+.root[data-reader-glass] .toolbar > * {
+  pointer-events: auto;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, rgba(255, 255, 255, .7)) 80%, transparent);
+  backdrop-filter: blur(12px);
+}
+.root[data-reader-glass] .toolbar > *:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
 }
 /* The z-index ladder is mode-independent: skin mode only drops the plate, so
    a glass reader keeps exactly the same footer precedence as an opaque one. */
@@ -601,7 +623,6 @@
 .root[data-reader-glass] .user {
   background: color-mix(in srgb, var(--dsw-specific-bubble, rgba(0,0,0,.08)) 25%, transparent);
   backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l1, rgba(128,128,128,.3)) 30%, transparent);
 }
 /* Skin mode paints no plates of the reader's own: cards, panels and frames go
@@ -625,7 +646,6 @@
 .root[data-reader-glass] .diffOverlay {
   background: color-mix(in srgb, var(--dsw-alias-bg-module-platform, rgba(127,127,127,.1)) 20%, transparent);
   backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
 }
 .root[data-reader-glass] .diffScrollArea {
   background: transparent;
@@ -642,7 +662,6 @@
   background: color-mix(in srgb, var(--dsw-alias-markdown-code-block, rgba(0,0,0,.06)) 25%, transparent) !important;
   border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l1, rgba(128,128,128,.2)) 30%, transparent);
   backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
 }
 /* The fold control rides a sticky row: it must not paint a plate of its own. */
 .root[data-reader-glass] .foldControl {
