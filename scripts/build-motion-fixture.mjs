@@ -16,6 +16,18 @@ const build = await rolldown({ input: process.argv[2] ?? 'tests/browser-motion.t
     const map=Object.fromEntries(Object.entries(exports).map(([key,value])=>[key,value.name]));
     return `const style=document.createElement('style');style.textContent=${JSON.stringify(code.toString())};document.head.append(style);export default ${JSON.stringify(map)};`;
   },
+}, {
+  name: 'fixture-plain-css',
+  async resolveId(source, importer) {
+    if (!source.endsWith('.css') || source.endsWith('.module.css')) return null;
+    const resolved = await this.resolve(source, importer, { skipSelf: true });
+    return resolved ? resolved.id + '.mjs' : null;
+  },
+  async load(id) {
+    if (!id.endsWith('.css.mjs') || id.endsWith('.module.css.mjs')) return;
+    const text = await readFile(id.slice(0, -4), 'utf8');
+    return `const style=document.createElement('style');style.textContent=${JSON.stringify(text)};document.head.append(style);export default {};`;
+  },
 }] });
 await mkdir('.delivery',{recursive:true});
 const result = await build.generate({ format:'iife', name:'ReaderMotionFixture' });
