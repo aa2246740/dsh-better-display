@@ -1,6 +1,6 @@
 {
   "name": "dsh-better-display",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "A calmer reading view for DeepSeek Harness: native process details, live reasoning, and clean final answers.",
   "type": "module",
   "license": "MIT",
@@ -39,7 +39,8 @@
     "test:auto-fold": "node scripts/verify-auto-fold.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --import tsx/esm --test tests/*.test.ts",
-    "link:harness": "node scripts/link-harness-dependencies.mjs"
+    "link:harness": "node scripts/link-harness-dependencies.mjs",
+    "test:flowcell": "node scripts/verify-flowcell.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",

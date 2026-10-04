@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.5 — 2026-10-04
+
+- Release finished expand animations so process rows return to their natural height. Content changes after expanding no longer leave blank space or clip steps until a page refresh.
+- Preserve the collapse animation until React removes the content, avoiding a one-frame flash.
+- Restore plain CSS handling in the motion fixture builder and add browser regression coverage for content resize, repeated disclosures, instant collapse, disabled motion, and rapid reversal.
+
 ## 0.3.4 — 2026-09-28
 
 - Accept Harness `0.2.0-rc.1` (`dsh-v0.2.0-rc.1`, `4878cdabd87d4041bdaff61d04c966883b9fd07a`). Peer range is `>=0.2.0-rc.1 <0.2.1`. That range accepts `0.2.0-rc.1` and stable `0.2.0`, rejects `0.2.0` alphas, and rejects `0.1.7-rc.2`.
