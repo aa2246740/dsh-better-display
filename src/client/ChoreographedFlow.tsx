@@ -70,6 +70,11 @@ function FlowCell({ hidden, instant, motion, rowKey, children, summary = false }
     const settle = () => {
       if (settled) return;
       settled = true;
+      // Expanding retires nothing: the fill only pins the measured height. Drop it
+      // now — if the cell's content later shrinks, the stale fill would hold the
+      // empty space open. Collapsing still keeps the fill until React commits
+      // the removal (see the comment above), then the cleanup cancels it.
+      if (!hidden) animation.cancel();
       setPresent(!hidden);
       release();
     };
