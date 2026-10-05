@@ -6,7 +6,7 @@ import { DiffBlock, DisclosureRow, JsonTree, ReadBlock, SearchBlock, TerminalBlo
 import { Blocks, contentBlocks } from './Blocks.js';
 import { OfficialTool } from './OfficialContent.js';
 import { ProcessFragment } from './motion.js';
-import { activityPhase, activitySummary, callDiffHunks, diffTotals, executionFacts, objectValue, toolIdentity } from './tool-activity.js';
+import { activityPhase, activitySummary, callDiffHunks, diffTotals, executionFacts, forgetCallClock, objectValue, runningClockBase, toolIdentity } from './tool-activity.js';
 import type { ToolActivityEntry, ToolCategory, ToolPhase } from './tool-activity.js';
 import type { BlockRenderProps } from './types.js';
 import { classifyTool, toolRowModel, VARIANT_TITLES } from './native/tool-call-model.js';
@@ -194,19 +194,19 @@ export const ToolActivity = memo(function ToolActivityView({ entry, motion, turn
   const showState = phase === 'preparing' || phase === 'running' || phase === 'failed' || phase === 'interrupted';
   const running = phase === 'preparing' || phase === 'running';
   // A step that has not returned yet counts its own seconds, so a long command
-  // reads as progress rather than as a stall. The clock is idle-rendered off the
-  // row's own call time, and disappears the moment the result arrives.
+  // reads as progress rather than as a stall. The clock counts from the call's
+  // stamped start — a session event time, not the moment this view mounted —
+  // so switching conversations and back keeps it running instead of resetting
+  // it to zero, and it disappears the moment the result arrives.
   const [liveMs, setLiveMs] = useState<number | null>(null);
-  const openedAt = useRef<number | null>(null);
   useEffect(() => {
-    if (!running) { openedAt.current = null; setLiveMs(null); return; }
-    const stamped = block && 'kind' in block && block.callTime != null ? block.callTime : null;
-    const base = stamped ?? (openedAt.current ??= Date.now());
+    if (!running) { forgetCallClock(entry.callId); setLiveMs(null); return; }
+    const base = runningClockBase(entry.callId, block);
     const tick = () => setLiveMs(Math.max(0, Date.now() - base));
     tick();
     const timer = setInterval(tick, 200);
     return () => clearInterval(timer);
-  }, [running, block]);
+  }, [running, block, entry.callId]);
   const elapsed = block && 'kind' in block && block.callTime != null ? Math.max(0, block.time - block.callTime) : null;
   // A step that ran long keeps showing how long it took after it returns: the
   // number is the point of the readout. A fast step shows nothing once it is done.

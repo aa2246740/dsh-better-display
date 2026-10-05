@@ -264,6 +264,48 @@ export function activityPhase(entry: Pick<ToolActivityEntry, 'block' | 'draft'>,
   return 'returned';
 }
 
+/**
+ * First-seen time for calls the host has not stamped yet. A draft that
+ * precedes a landed call carries no timestamp, so without this memory the
+ * running clock would restart at zero on every remount — e.g. switching to
+ * another conversation and back while the call is still preparing. Keyed by
+ * call id, dropped when the call leaves the running phases.
+ */
+const clockFirstSeen = new Map<string, number>();
+const CLOCK_FIRST_SEEN_LIMIT = 512;
+
+/**
+ * Session-stamped start of a call, or null while only a draft exists.
+ * A settled result carries `callTime`, the paired tool/call event's time; a
+ * still-running call head stamps the same instant in its own `time` field.
+ */
+export function callStartTime(entry: Pick<ToolActivityEntry, 'block'>): number | null {
+  const block = entry.block;
+  if (!block) return null;
+  return 'kind' in block ? block.callTime : block.time;
+}
+
+/**
+ * The instant a still-running call's elapsed clock counts from. The stamped
+ * time wins so a remounted view keeps counting from the real start; an
+ * un-stamped draft falls back to when this view first saw that call id, which
+ * survives remounts for the same reason.
+ */
+export function runningClockBase(callId: string, block: ToolCallBlock | undefined, now = Date.now()): number {
+  const stamped = callStartTime({ block });
+  if (stamped != null) return stamped;
+  const seen = clockFirstSeen.get(callId);
+  if (seen !== undefined) return seen;
+  if (clockFirstSeen.size >= CLOCK_FIRST_SEEN_LIMIT) clockFirstSeen.delete(clockFirstSeen.keys().next().value!);
+  clockFirstSeen.set(callId, now);
+  return now;
+}
+
+/** Forget a call's first-seen time once its clock is no longer live. */
+export function forgetCallClock(callId: string): void {
+  clockFirstSeen.delete(callId);
+}
+
 export function activitySummary(entry: Pick<ToolActivityEntry, 'block' | 'draft'>) {
   const { name, raw } = toolIdentity(entry);
   const args = inputFields(raw);
