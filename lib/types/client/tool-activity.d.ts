@@ -83,6 +83,21 @@ export declare function foldDiffHunks(steps: readonly {
     entry?: ToolActivityEntry;
 }[]): DiffHunk[];
 export declare function activityPhase(entry: Pick<ToolActivityEntry, 'block' | 'draft'>, turnClosed?: boolean): ToolPhase;
+/**
+ * Session-stamped start of a call, or null while only a draft exists.
+ * A settled result carries `callTime`, the paired tool/call event's time; a
+ * still-running call head stamps the same instant in its own `time` field.
+ */
+export declare function callStartTime(entry: Pick<ToolActivityEntry, 'block'>): number | null;
+/**
+ * The instant a still-running call's elapsed clock counts from. The stamped
+ * time wins so a remounted view keeps counting from the real start; an
+ * un-stamped draft falls back to when this view first saw that call id, which
+ * survives remounts for the same reason.
+ */
+export declare function runningClockBase(callId: string, block: ToolCallBlock | undefined, now?: number): number;
+/** Forget a call's first-seen time once its clock is no longer live. */
+export declare function forgetCallClock(callId: string): void;
 export declare function activitySummary(entry: Pick<ToolActivityEntry, 'block' | 'draft'>): {
     name: string;
     raw: string;
