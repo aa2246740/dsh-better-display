@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.6 — 2026-10-05
+
+- Keep a running tool's elapsed clock counting from the call's stamped start instead of the moment the row mounted. Switching sessions and back — or even reloading the page mid-run — now continues the count rather than restarting it at zero; draft-only calls remember their first-seen time per call id until they settle.
+
 ## 0.3.5 — 2026-10-04
 
 - Release finished expand animations so process rows return to their natural height. Content changes after expanding no longer leave blank space or clip steps until a page refresh.

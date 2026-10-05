@@ -1,6 +1,6 @@
 {
   "name": "dsh-better-display",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "A calmer reading view for DeepSeek Harness: native process details, live reasoning, and clean final answers.",
   "type": "module",
   "license": "MIT",

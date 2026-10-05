@@ -9,7 +9,7 @@
 Open **Settings → Plugins → Add plugin** and enter this in “Package name or address”:
 
 ```text
-github:aa2246740/dsh-better-display#v0.3.5
+github:aa2246740/dsh-better-display#v0.3.6
 ```
 
 The desktop plugin manager owns the Desktop profile and its bundled package manager. This release includes built `lib/`; normal use needs no clone, build, or DSHX installation. Follow the app if it asks you to reload or reopen after installation.
@@ -17,7 +17,7 @@ The desktop plugin manager owns the Desktop profile and its bundled package mana
 ### Web CLI
 
 ```sh
-dsh plugin --profile web add github:aa2246740/dsh-better-display#v0.3.5
+dsh plugin --profile web add github:aa2246740/dsh-better-display#v0.3.6
 ```
 
 This official CLI command writes only the `web` profile; it cannot modify the Desktop App profile. **pnpm** must be on PATH. For an already-running Web Host, reopen that Host once and reload the page because bundles are read at boot.
@@ -34,7 +34,7 @@ From a local checkout or tarball (development/local testing):
 
 ```sh
 dsh plugin --profile web add ./dsh-better-display
-dsh plugin --profile web add ./dsh-better-display-0.3.5.tgz
+dsh plugin --profile web add ./dsh-better-display-0.3.6.tgz
 ```
 
 `dsh.bundle` is captured at Host boot. Do not also insert the same row by hand in the profile `cordis.patch.yml`, or it will mount twice.

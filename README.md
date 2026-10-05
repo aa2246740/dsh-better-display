@@ -9,7 +9,7 @@
 打开 **设置 → 插件 → 添加插件**，在“包名或地址”中输入：
 
 ```text
-github:aa2246740/dsh-better-display#v0.3.5
+github:aa2246740/dsh-better-display#v0.3.6
 ```
 
 桌面端的插件管理器负责 Desktop profile 和其内置包管理器。本发布已包含编译好的 `lib/`；普通使用不需要 clone、构建或安装 DSHX。若应用在安装完成后提示刷新或重新打开，请按提示完成。
@@ -17,7 +17,7 @@ github:aa2246740/dsh-better-display#v0.3.5
 ### Web CLI
 
 ```sh
-dsh plugin --profile web add github:aa2246740/dsh-better-display#v0.3.5
+dsh plugin --profile web add github:aa2246740/dsh-better-display#v0.3.6
 ```
 
 这条官方 CLI 命令只写入 `web` profile，不能修改 Desktop App 的 profile。本机 PATH 上需要有 **pnpm**。对于已经运行的 Web Host，请重新打开该 Host 一次，再刷新网页；插件 bundle 会在启动时读取。
@@ -34,7 +34,7 @@ dsh plugin --profile web add github:aa2246740/dsh-better-display#v0.3.5
 
 ```sh
 dsh plugin --profile web add ./dsh-better-display
-dsh plugin --profile web add ./dsh-better-display-0.3.5.tgz
+dsh plugin --profile web add ./dsh-better-display-0.3.6.tgz
 ```
 
 `dsh.bundle` 是开机捕获的。不要再往 profile 的 `cordis.patch.yml` 手写同一条 insert，会重复挂载。
