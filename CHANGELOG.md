@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Restore the official chat seat attributes on Better Display user and steering rows so rewind actions can find durable messages.
+- Render pending inbox steering rows and deduplicate them against observed local submissions.
+
 ## 0.3.6 — 2026-10-05
 
 - Keep a running tool's elapsed clock counting from the call's stamped start instead of the moment the row mounted. Switching sessions and back — or even reloading the page mid-run — now continues the count rather than restarting it at zero; draft-only calls remember their first-seen time per call id until they settle.
@@ -223,6 +228,7 @@
   step-and-hold: it used to advance two lines every ~1.3 seconds no matter how
   fast the text arrived, which is what made the pane look like it was lagging
   behind a fast model.
+
 ### Host DOM hooks
 
 - Keep ChatView's `data-chat-flow=""` hook on the Reader column so skins that hide `[data-composer-seat]` when the scrollport has no chat-flow (maid-atelier, phoebe-atelier, and others) still show the composer in reading view.

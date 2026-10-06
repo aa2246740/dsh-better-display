@@ -58,6 +58,10 @@ npm run test:auto-fold
 
 `build` 先检查兼容基线。Harness 版本、敏感接口、尚未收敛的官方实现或相关注册清单改变时，构建明确要求审查。审查差异并通过功能与视觉测试后，才可运行 `check-harness-compat.mjs --record` 记录新基线。记录本身不构成兼容证明。
 
+## rewind 座位兼容
+
+Reader 的 user 与 steering 行会同时发布 `data-chat-anchor-key`、`data-chat-flow-key`、`data-chat-node-key` 和 `data-chat-flow-kind`，这些属性是 rewind 用来定位 durable 回退操作的官方 chat 座位契约。排队中的 inbox steering 也会渲染为 `data-pending-steering` 行，并按非文本内容块数量发布附件计数；本地 pending submission 与已落 durable 节点通过 source.rpcId 去重。纯图片消息仍不保证显示 durable 回退箭头，这是 rewind 文本匹配契约的边界。
+
 ## 后续仍需完成
 
 Markdown 定制仍保留逐字动效和 MCP 展示钩子，官方公共组件还没有对应的注入接口。上下文行、部分过程展示和工具摘要也仍有自有实现。本分支先建立官方能力的完整运行路径，后续按视觉基线逐模块收敛这些副本，并拆分 Reader 的阅读策略与动画执行。不能据此承诺所有未来版本零维护，也不承诺任意第三方插件兼容。

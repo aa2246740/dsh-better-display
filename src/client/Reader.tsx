@@ -1,4 +1,5 @@
 import type {} from '@deepseek-ai/dsh-session-turn-outline/types';
+import type {} from '@deepseek-ai/dsh-agent/types';
 import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
@@ -30,9 +31,31 @@ import type { ReaderGroup, TurnBoundary } from './projection.js';
 import type { BlockRenderProps, ReaderProps } from './types.js';
 import css from './Reader.module.css';
 import { markdownLabels, truncatedJsonLabel } from './primitive-labels.js';
+import { chatSeatProps } from './chat-seat.js';
 
 function isNode<K extends ChatNodeKind>(node: ChatConversationViewNode, kind: K): node is ChatNode<K> {
   return node.kind === kind;
+}
+
+function observedInputIds(order: readonly string[], getNode: (key: string) => ChatConversationViewNode | undefined): Set<string> {
+  const ids = new Set<string>();
+  for (const key of order) {
+    const node = getNode(key);
+    if (!node || (node.kind !== 'user' && node.kind !== 'steering' && node.kind !== 'turn-trigger')) continue;
+    const source = (node.data as { source?: { kind?: string; rpcId?: unknown } }).source;
+    if (source?.kind === 'user' && typeof source.rpcId === 'string') ids.add(source.rpcId);
+  }
+  return ids;
+}
+
+function inboxText(item: { content?: readonly unknown[] }): string {
+  return (item.content ?? []).filter((block): block is { type: 'text'; text: string } => {
+    return typeof block === 'object' && block !== null && (block as { type?: unknown }).type === 'text' && typeof (block as { text?: unknown }).text === 'string';
+  }).map(block => block.text).join('');
+}
+
+function inboxAttachmentCount(item: { content?: readonly unknown[] }): number {
+  return (item.content ?? []).filter(block => typeof block === 'object' && block !== null && (block as { type?: unknown }).type !== 'text').length;
 }
 
 function cleanErrorMessage(raw: string | undefined): string {
@@ -198,7 +221,7 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
     const otherBlocks = blocks.filter(b => b.kind !== 'image');
     const text = otherBlocks.filter((block): block is Extract<typeof block, { kind: 'text' }> => block.kind === 'text').map(block => block.text).join('\n\n');
     const time = node.data.time;
-    return <div className={css.userCluster} data-reader-anchor data-reader-key={nodeKey}>
+    return <div className={css.userCluster} data-reader-anchor data-reader-key={nodeKey} {...chatSeatProps(node.kind, nodeKey)}>
       {node.kind === 'steering' && <p className={css.meta}>补充消息</p>}
       {imageBlocks.length > 0 && <div className={css.userImages}>
         <Blocks {...render} blocks={imageBlocks} source="user" />
@@ -631,6 +654,25 @@ export function Reader(props: ReaderProps) {
   const loadingOlder = props.useSession(snapshot => snapshot.loadingOlder);
   const pendingSubmissions = props.useSession(snapshot => snapshot.pendingSubmissions);
   const pendingList = asReadonlyArray<PendingSubmissionEcho>(pendingSubmissions);
+  const inbox = props.useProjection?.('inbox');
+  type PendingInboxItem = { source?: { kind?: string; rpcId?: unknown }; content?: readonly unknown[] };
+  const inboxSteering = asReadonlyArray<PendingInboxItem>(inbox?.['next-step']).filter(item => item.source?.kind === 'user');
+  const observed = useMemo(() => observedInputIds(order, key => nodes.get(key)), [order, nodes]);
+  const visibleSubmissions = useMemo(() => pendingList.filter(sub => sub.placement !== 'queued' && !observed.has(sub.requestId)), [pendingList, observed]);
+  const pendingInputs = useMemo(() => {
+    const local = new Map<string, PendingSubmissionEcho>(visibleSubmissions.map(sub => [sub.requestId, sub]));
+    const localIds = new Set(pendingList.filter(sub => sub.placement !== 'queued').map(sub => sub.requestId));
+    const rows: Array<PendingSubmissionEcho | (typeof inboxSteering)[number]> = [];
+    for (const item of inboxSteering) {
+      const rpcId = typeof item.source?.rpcId === 'string' ? item.source.rpcId : undefined;
+      if (!rpcId) { rows.push(item); continue; }
+      const submission = local.get(rpcId);
+      if (submission) { local.delete(rpcId); rows.push(submission); }
+      else if (!localIds.has(rpcId)) rows.push(item);
+    }
+    rows.push(...local.values());
+    return rows;
+  }, [inboxSteering, pendingList, visibleSubmissions]);
   const waitAnchor = waitingAnchor(order, key => nodes.get(key), pendingList);
   const motionPreference = props.useStore(state => state.motion);
   const motion = useMotionAllowed(motionPreference);
@@ -808,11 +850,6 @@ export function Reader(props: ReaderProps) {
     }
   }, [lastKey, lastNode?.kind, lastSubmissionId, scroll]);
 
-  const visibleSubmissions = useMemo(() => {
-    if (pendingList.length === 0) return [];
-    return pendingList.filter(sub => sub.placement !== 'queued');
-  }, [pendingList]);
-
   // ChatView publishes data-chat-flow="" on its column. Skins treat a
   // scrollport without that hook as inspect-only and hide [data-composer-seat].
   return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} data-reader-build="0.3.4" data-dsh-better-display="0.3.4" data-reader-wait-clock-version="input-v1" data-reader-wait-start={waitAnchor.time ?? undefined} data-motion={motion ? 'on' : 'off'} data-reader-glass={frostedGlass || undefined} data-reader-auto-fold={autoFold ? 'on' : 'off'}>
@@ -840,10 +877,14 @@ export function Reader(props: ReaderProps) {
       {openError && <div className={css.error} role="alert">会话暂时无法读取：{openError.message}</div>}
       {loading && groups.length === 0 && <p className={css.empty} role="status">正在读取会话…</p>}
       {groups.map(group => <TurnGroup key={group.key} {...props} group={group} motion={motion} autoFold={autoFold} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} isAwaitingModel={isAwaitingModel && group.key === groups.at(-1)?.key} />)}
-      {visibleSubmissions.map(submission => {
-        const images = pendingSubmissionImages(submission);
+      {pendingInputs.map((item, index) => {
+         const submission = 'requestId' in item ? item : undefined;
+         const text = submission?.text ?? inboxText(item as PendingInboxItem);
+         const images = submission ? pendingSubmissionImages(submission) : [];
+         const attachmentCount = images.length;
+        const requestId = submission?.requestId ?? `inbox-${index}`;
         return (
-        <div key={submission.requestId} className={css.userCluster} data-reader-pending-submission>
+        <div key={requestId} className={css.userCluster} data-reader-pending-submission data-pending-steering={submission ? undefined : ''} data-pending-attachment-count={attachmentCount}>
           {images.length > 0 && (
             <div className={css.userImages}>
               {images.map((item, idx) => (
@@ -855,12 +896,12 @@ export function Reader(props: ReaderProps) {
               ))}
             </div>
           )}
-          {submission.text ? (
+          {text ? (
             <div className={css.user}>
-              <div className={css.blocks}>{submission.text}</div>
+              <div className={css.blocks}>{text}</div>
             </div>
           ) : null}
-          <UserMessageActions text={submission.text ?? ''} time={submission.time} />
+          <UserMessageActions text={text} time={submission?.time} />
         </div>
         );
       })}

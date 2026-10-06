@@ -41,6 +41,13 @@ const portableOutput: TsdownPlugin = {
 };
 
 export default bundle.map((config) => {
+  if (config.name === 'dsh-better-display') {
+    const { external: _external, ...hostConfig } = config;
+    return {
+      ...hostConfig,
+      deps: { ...hostConfig.deps, neverBundle: (specifier: string) => !specifier.startsWith('.') },
+    };
+  }
   if (config.name !== 'dsh-better-display/client') return config;
   const plugins = Array.isArray(config.plugins)
     ? config.plugins
