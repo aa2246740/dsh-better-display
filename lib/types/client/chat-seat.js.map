@@ -1,0 +1,1 @@
+{"version":3,"file":"chat-seat.js","sourceRoot":"","sources":["../../../src/client/chat-seat.ts"],"names":[],"mappings":"AAEA,MAAM,UAAU,aAAa,CAAC,IAAkB,EAAE,GAAW;IAC3D,OAAO;QACL,sBAAsB,EAAE,GAAG;QAC3B,oBAAoB,EAAE,GAAG;QACzB,oBAAoB,EAAE,GAAG;QACzB,qBAAqB,EAAE,IAAI;KAC5B,CAAC;AACJ,CAAC"}
