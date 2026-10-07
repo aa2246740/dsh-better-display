@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { RunningToolCall, ToolResultNode } from '@deepseek-ai/dsh-client-ui-conversation/client';
+import type { PreparingToolCall, RunningToolCall, ToolResultNode } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import { activityPhase, activitySummary } from '../src/client/tool-activity.ts';
 import type { ToolDraft } from '../src/client/tool-activity.ts';
 
@@ -75,4 +75,39 @@ test('the activity lifecycle distinguishes draft, dispatched call, and result', 
   assert.equal(activityPhase({ draft: pending }), 'preparing');
   assert.equal(activityPhase({ block: running }), 'running');
   assert.equal(activityPhase({ block: result }), 'succeeded');
+});
+
+test('a canonical preparing call remains preparing until dispatch', () => {
+  for (const name of ['bash', 'pwsh']) {
+    const block: PreparingToolCall = {
+      phase: 'preparing', callId: 'preparing-head', name, turn: 1, step: 0, time: 1000, subCalls: [],
+    };
+    assert.equal(activityPhase({ block }), 'preparing');
+    assert.equal(activityPhase({ block }, true), 'interrupted');
+    const model = activitySummary({ block });
+    assert.equal(model.name, name);
+    assert.equal(model.argsState, 'partial');
+    assert.equal(model.raw, '');
+    assert.equal(model.command, undefined);
+  }
+});
+
+test('a canonical preparing head retains progressively generated draft arguments', () => {
+  for (const name of ['bash', 'pwsh']) {
+    const block: PreparingToolCall = {
+      phase: 'preparing', callId: 'preparing-head', name, turn: 1, step: 0, time: 1000, subCalls: [],
+    };
+    for (const raw of ['{"comman', '{"command":"echo ready']) {
+      const pending = { ...draft(name, raw), callId: block.callId };
+      const model = activitySummary({ block, draft: pending });
+      assert.equal(model.raw, raw);
+      assert.equal(model.argsState, 'partial');
+      assert.equal(model.command, raw === '{"comman' ? undefined : 'echo ready');
+    }
+    const dispatched: RunningToolCall = { ...block, phase: 'start', argsRaw: '{"command":"echo sent"}' };
+    const model = activitySummary({ block: dispatched, draft: draft(name, '{"command":"stale') });
+    assert.equal(activityPhase({ block: dispatched }), 'running');
+    assert.equal(model.command, 'echo sent');
+    assert.equal(model.argsState, 'complete');
+  }
 });

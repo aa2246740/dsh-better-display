@@ -105,7 +105,7 @@ export function toolIdentity(entry: Pick<ToolActivityEntry, 'block' | 'draft'>) 
   const block = entry.block;
   return {
     name: block ? 'kind' in block ? block.call?.name ?? entry.draft?.name ?? '工具调用' : block.name : entry.draft?.name ?? '工具调用',
-    raw: block ? 'kind' in block ? block.call?.argsRaw ?? entry.draft?.argsRaw ?? '' : ('argsRaw' in block ? block.argsRaw : '') : entry.draft?.argsRaw ?? '',
+    raw: block ? 'kind' in block ? block.call?.argsRaw ?? entry.draft?.argsRaw ?? '' : ('argsRaw' in block ? block.argsRaw : entry.draft?.argsRaw ?? '') : entry.draft?.argsRaw ?? '',
   };
 }
 
@@ -264,7 +264,7 @@ export function foldDiffHunks(steps: readonly { kind: string; entry?: ToolActivi
 
 export function activityPhase(entry: Pick<ToolActivityEntry, 'block' | 'draft'>, turnClosed = false): ToolPhase {
   if (!entry.block) return turnClosed ? 'interrupted' : 'preparing';
-  if (!('kind' in entry.block)) return turnClosed ? 'interrupted' : 'running';
+  if (!('kind' in entry.block)) return turnClosed ? 'interrupted' : entry.block.phase === 'preparing' ? 'preparing' : 'running';
   // RC1 publishes canonical cancellation as an error result with a typed code.
   if (entry.block.error?.code === 'ABORTED' || entry.block.error?.code === 'interrupted') return 'interrupted';
   const facts = executionFacts(entry.block);
