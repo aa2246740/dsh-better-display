@@ -558,6 +558,9 @@
 .flowCell[data-flow-summary], .closedProcessSummary { position: sticky; top: calc(max(var(--reader-toolbar-height, 40px), var(--reader-status-height, 40px)) + var(--reader-sticky-lane, 40px)); z-index: 5; overflow: visible; box-sizing: border-box; min-height: 40px; padding-block: 4px; background: var(--dsw-alias-bg-base); border-bottom: 0; }
 /* Keep the official CodeBlock banner's internal z-index inside its wrapper so Reader lanes stay above it. */
 .root :global(.md-code-block) { z-index: 0; }
+/* Keep native code actions below the pinned Reader lanes. */
+.turnStickyRegion:has(> .turnStickyLanes > .closedProcessSummary), .turnStickyRegion:has(.flowCell[data-flow-summary]) { --reader-code-summary-height: var(--reader-sticky-lane, 40px); }
+.root :global(.md-code-block > :has(+ [data-code-block-content])) { top: calc(max(var(--reader-toolbar-height, 40px), var(--reader-status-height, 0px)) + var(--reader-status-height, 0px) + var(--reader-code-summary-height, 0px)); }
 .flowCell[data-flow-summary] { box-shadow: 0 -16px 0 var(--dsw-alias-bg-base); }
 .closedProcessSummary { box-shadow: 0 -14px 0 var(--dsw-alias-bg-base); }
 .foldControl { display: inline-flex; align-items: center; gap: 0; padding: 2px; border-radius: 8px; background: var(--dsw-alias-bg-module-platform); }
@@ -604,6 +607,7 @@
   border-radius: 0;
 }
 .root[data-reader-glass] .turnStickyLanes { display: contents; position: static; top: auto; z-index: auto; }
+.root[data-reader-glass] .turnStickyRegion { --reader-code-summary-height: 0px; }
 .root[data-reader-glass] .turnStickyLanes .turnProcessSticky { position: sticky; top: max(var(--reader-toolbar-height, 40px), var(--reader-status-height, 40px)); z-index: 6; }
 /* User bubble becomes a sleek translucent frosted pill in skin mode */
 .root[data-reader-glass] .user {
