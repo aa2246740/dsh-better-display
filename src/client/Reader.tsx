@@ -2,12 +2,14 @@ import type {} from '@deepseek-ai/dsh-session-turn-outline/types';
 import type {} from '@deepseek-ai/dsh-agent/types';
 import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { ReactNode, RefObject } from 'react';
-import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
+import type { ChatConversationViewNode, ChatNode, ChatNodeKind, ChatNodeOwnerProps } from '@deepseek-ai/dsh-client-ui-chat/client';
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store';
 import { JsonBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives';
 import { BlockBoundary, Blocks, contentBlocks, CopyAnswer, UserMessageActions } from './Blocks.js';
 import { ReasoningCard } from './ReasoningCard.js';
 import { ToolActivity, ToolMedia } from './ToolActivity.js';
 import { OfficialActions, OfficialNode, OfficialTail } from './OfficialContent.js';
+import { OFFICIAL_SEATS } from './official-slots.js';
 import { preparingLabel, readerFlow } from './tool-activity.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelection, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
@@ -75,7 +77,7 @@ function cleanErrorMessage(raw: string | undefined): string {
 }
 
 type SeatProps = BlockRenderProps & Pick<ReaderProps, 'useChat'> & {
-  nodeKey: string; boundary: TurnBoundary; pinned?: boolean; processOpen?: boolean;
+  nodeKey: string; boundary: TurnBoundary; pinned?: boolean; processOpen?: boolean; sessionId?: string;
 };
 
 const CompactionDivider = memo(function CompactionDivider({ data }: {
@@ -214,8 +216,35 @@ const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, 
 
 const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, processOpen = false, ...render }: SeatProps) {
   const node = useChat(snapshot => snapshot.nodes.get(nodeKey));
+  const [disclosureReset] = useState(() => createSnapshotStore(0));
   if (!node || node.visibility === 'hidden') return null;
   if (isNode(node, 'user') || isNode(node, 'steering')) {
+    if (render.official) {
+      const turn = node.location.kind === 'turn' || node.location.kind === 'step' ? node.location.turn : undefined;
+      const owner: ChatNodeOwnerProps & { sessionId?: string; node: ChatConversationViewNode } = {
+        cwd: render.cwd,
+        openFile: render.openFile ?? (() => {}),
+        openSkill: () => {},
+        forkAt: render.forkAt ?? (() => {}),
+        inspectCall: callId => render.official!.openView('trajectory', callId),
+        loadImage: render.official!.officialImageLoader,
+        renderMessageImages: images => render.official!.renderSlot(OFFICIAL_SEATS.images, {
+          ...images, loadImage: render.official!.officialImageLoader,
+        }),
+        fileMentions: render.official!.officialFileMentions,
+        sessionId: render.sessionId,
+        node,
+      };
+      const renderNode = render.official.renderSlot as unknown as (key: string, owner: object, options: object) => ReactNode;
+      const rendered = renderNode(OFFICIAL_SEATS.nodes, owner, {
+        entryKey: node.kind,
+        hookContext: { turnData: turn?.data, disclosureReset },
+      });
+      if (rendered != null) {
+        return <div className={css.userCluster} data-reader-anchor data-reader-key={nodeKey} {...chatSeatProps(node.kind, nodeKey)}>{rendered}</div>;
+      }
+    }
+    // Fallback: the Reader's own user rendering (no official renderer for this kind).
     const blocks = contentBlocks(node.data.content);
     const imageBlocks = blocks.filter(b => b.kind === 'image');
     const otherBlocks = blocks.filter(b => b.kind !== 'image');
@@ -586,6 +615,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys,
     fileMentions,
     metrics,
     official,
+    sessionId: props.sessionId,
     cwd,
   };
   const terminal = terminalLabel(boundary.reason);
