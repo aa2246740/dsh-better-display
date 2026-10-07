@@ -22,6 +22,9 @@
 .textButton:hover, .iconButton:hover, .disclosureButton:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .root button:focus-visible, .root summary:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 3px; }
 .turn { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+/* Keep pinned process lanes inside the process/answer block, before turn-tail UI. */
+.turnStickyRegion { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.turnStickyLanes { position: sticky; top: max(var(--reader-toolbar-height, 40px), var(--reader-status-height, 40px)); z-index: 6; display: flex; flex-direction: column; min-width: 0; }
 .turn + .turn { margin-top: 12px; }
 .userCluster { display: flex; flex-direction: column; align-self: flex-end; align-items: flex-end; max-width: min(525px, 82%); gap: 8px; min-width: 0; margin-bottom: 4px; }
 .userImages { display: flex; flex-direction: column; align-items: flex-end; max-width: 100%; min-width: 0; }
@@ -550,6 +553,7 @@
    it too. The toolbar is z-index 7, above the lane's 6, so its buttons still
    render on top of the extension. */
 .turnProcessSticky { box-shadow: 0 -14px 0 var(--dsw-alias-bg-base), var(--reader-control-width, 148px) 0 0 var(--dsw-alias-bg-base); }
+.turnStickyLanes .turnProcessSticky, .turnStickyLanes .closedProcessSummary { position: static; top: auto; z-index: auto; }
 /* The same summary row stays in flow until it reaches the measured top lane. */
 .flowCell[data-flow-summary], .closedProcessSummary { position: sticky; top: calc(max(var(--reader-toolbar-height, 40px), var(--reader-status-height, 40px)) + var(--reader-sticky-lane, 40px)); z-index: 5; overflow: visible; box-sizing: border-box; min-height: 40px; padding-block: 4px; background: var(--dsw-alias-bg-base); border-bottom: 0; }
 /* Keep the official CodeBlock banner's internal z-index inside its wrapper so Reader lanes stay above it. */
@@ -599,6 +603,8 @@
   padding-left: 10px;
   border-radius: 0;
 }
+.root[data-reader-glass] .turnStickyLanes { position: static; top: auto; z-index: auto; gap: 14px; }
+.root[data-reader-glass] .turnStickyLanes .turnProcessSticky { position: sticky; top: max(var(--reader-toolbar-height, 40px), var(--reader-status-height, 40px)); z-index: 6; }
 /* User bubble becomes a sleek translucent frosted pill in skin mode */
 .root[data-reader-glass] .user {
   background: color-mix(in srgb, var(--dsw-specific-bubble, rgba(0,0,0,.08)) 25%, transparent);
