@@ -21,6 +21,7 @@ const HOST_FOOTER_Z = 7;
 
 /** Lanes a scroll can clamp into the footer band. */
 const CLAMPED_LANES = [
+  '.turnStickyLanes',
   '.turnProcessSticky',
   '.liveFoldContainer',
   '.flowCell[data-flow-summary]',

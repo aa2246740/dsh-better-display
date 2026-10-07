@@ -603,7 +603,7 @@
   padding-left: 10px;
   border-radius: 0;
 }
-.root[data-reader-glass] .turnStickyLanes { position: static; top: auto; z-index: auto; gap: 14px; }
+.root[data-reader-glass] .turnStickyLanes { display: contents; position: static; top: auto; z-index: auto; }
 .root[data-reader-glass] .turnStickyLanes .turnProcessSticky { position: sticky; top: max(var(--reader-toolbar-height, 40px), var(--reader-status-height, 40px)); z-index: 6; }
 /* User bubble becomes a sleek translucent frosted pill in skin mode */
 .root[data-reader-glass] .user {
