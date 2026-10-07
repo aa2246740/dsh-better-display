@@ -552,6 +552,8 @@
 .turnProcessSticky { box-shadow: 0 -14px 0 var(--dsw-alias-bg-base), var(--reader-control-width, 148px) 0 0 var(--dsw-alias-bg-base); }
 /* The same summary row stays in flow until it reaches the measured top lane. */
 .flowCell[data-flow-summary], .closedProcessSummary { position: sticky; top: calc(max(var(--reader-toolbar-height, 40px), var(--reader-status-height, 40px)) + var(--reader-sticky-lane, 40px)); z-index: 5; overflow: visible; box-sizing: border-box; min-height: 40px; padding-block: 4px; background: var(--dsw-alias-bg-base); border-bottom: 0; }
+/* Keep the official CodeBlock banner's internal z-index inside its wrapper so Reader lanes stay above it. */
+.root :global(.md-code-block) { z-index: 0; }
 .flowCell[data-flow-summary] { box-shadow: 0 -16px 0 var(--dsw-alias-bg-base); }
 .closedProcessSummary { box-shadow: 0 -14px 0 var(--dsw-alias-bg-base); }
 .foldControl { display: inline-flex; align-items: center; gap: 0; padding: 2px; border-radius: 8px; background: var(--dsw-alias-bg-module-platform); }

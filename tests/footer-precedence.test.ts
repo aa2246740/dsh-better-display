@@ -85,6 +85,13 @@ test('the top toolbar lane stays at 7 and pins to the scrollport top', () => {
   assert.equal(declarations.get('top'), '0');
 });
 
+test('official code block banners stay beneath Reader sticky lanes', () => {
+  const blockZ = Number(mergedDeclarations(css, '.root :global(.md-code-block)').get('z-index'));
+  const summaryZ = Number(mergedDeclarations(css, '.flowCell[data-flow-summary]').get('z-index'));
+  assert.ok(Number.isFinite(blockZ), 'Reader scopes official markdown code blocks into a stacking context');
+  assert.ok(blockZ < summaryZ, `code block banner context (${blockZ}) must stay below the summary lane (${summaryZ})`);
+});
+
 test('the live status lane pins below the toolbar lane instead of over it', () => {
   const declarations = mergedDeclarations(css, '.turnProcessSticky');
   assert.match(
