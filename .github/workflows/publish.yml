@@ -1,0 +1,76 @@
+name: Publish to npm
+
+# Push a tag like v1.2.3 (must match package.json version) to publish.
+# Auth is npm Trusted Publishing (OIDC) - no NPM_TOKEN needed.
+# Manual run with dry_run=true installs, builds, tests and packs only (nothing is published).
+# A version that is already on npm is skipped, so re-runs are safe.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (nothing is published)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
+      HARNESS_REF: dsh-v0.2.0-rc.2
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Check tag matches package.json version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          PKG=$(node -p "require('./package.json').version")
+          TAG=${GITHUB_REF_NAME#v}
+          if [ "$PKG" != "$TAG" ]; then echo "tag v$TAG != package.json $PKG"; exit 1; fi
+
+      # Build-time only: the dshx client bundler reads the public Harness source.
+      - name: Prepare DSH Harness source and dshx adapter
+        run: |
+          H="$RUNNER_TEMP/harness"
+          git clone --quiet --depth 1 --branch "$HARNESS_REF" https://github.com/deepseek-ai/deepseek-harness.git "$H"
+          git clone --quiet --depth 1 https://github.com/aa2246740/dsh-external-plugin-devkit.git "$H/tools/dshx"
+          npm ci --prefix "$H/tools/dshx" --ignore-scripts --no-audit --no-fund
+          echo "DSHX_HARNESS=$H" >> "$GITHUB_ENV"
+
+      - run: npm install --no-package-lock --no-audit --no-fund
+      - run: npm run build
+      - run: npm test
+
+      - name: Publish
+        run: |
+          npm install -g npm@latest
+          publish_dir() {
+            NAME=$(node -p "require('./$1/package.json').name")
+            VER=$(node -p "require('./$1/package.json').version")
+            if node -e "fetch('https://registry.npmjs.org/'+process.argv[1].replace('/','%2f')).then(r=>r.json()).then(j=>process.exit(j.versions&&j.versions[process.argv[2]]?0:1),()=>process.exit(1))" "$NAME" "$VER"; then
+              echo "$NAME@$VER is already on npm - not publishing"
+              if [ "$DRY_RUN" = "true" ]; then (cd "$1" && npm pack --dry-run); fi
+            elif [ "$DRY_RUN" = "true" ]; then
+              (cd "$1" && npm publish --access public --dry-run)
+            else
+              (cd "$1" && npm publish --access public)
+            fi
+          }
+          publish_dir .
