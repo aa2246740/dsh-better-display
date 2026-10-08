@@ -45,6 +45,9 @@ jobs:
           TAG=${GITHUB_REF_NAME#v}
           if [ "$PKG" != "$TAG" ]; then echo "tag v$TAG != package.json $PKG"; exit 1; fi
 
+      # scripts/check-harness-compat.mjs shells out to ripgrep.
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ripgrep
+
       # Build-time only: the dshx client bundler reads the public Harness source.
       - name: Prepare DSH Harness source and dshx adapter
         run: |
