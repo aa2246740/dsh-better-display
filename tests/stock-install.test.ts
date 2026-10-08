@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { test } from 'node:test';
@@ -61,6 +62,13 @@ test('commits compiled lib entries and does not require a prepare script', () =>
   assert.doesNotMatch(clientJs, /只折叠过程/);
   assert.match(clientJs, /\.dsh\/skills/);
   assert.doesNotMatch(clientJs, /submission\.images\.length/);
+});
+
+test('compiled host entry loads in Node without a TypeScript loader', () => {
+  const result = spawnSync(process.execPath, ['--input-type=module', '--eval',
+    "const plugin = await import('./lib/dsh-better-display.js'); if (plugin.name !== 'dsh-better-display' || typeof plugin.apply !== 'function') process.exit(1);",
+  ], { cwd: root, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr || String(result.error ?? 'host entry did not load'));
 });
 
 test('README leads with the official stock one-liner and names pnpm', () => {

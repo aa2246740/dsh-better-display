@@ -520,6 +520,8 @@ const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys,
     () => 'external',
   ));
   const hasProcess = flow.some(item => item.kind === 'tool' || hasProcessContent(nodes.get(item.nodeKey), boundary));
+  const showStatusLane = hasProcess && !isAwaitingModel;
+  const showClosedSummary = boundary.status === 'closed' && hasProcess && autoFold;
   // Only a real, still-active text selection delays folding. Merely clicking,
   // focusing or scrolling the live card does not create a permanent override.
   const holdingSelection = selectedProcessKeys.some(key =>
@@ -614,22 +616,26 @@ const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys,
   };
   return <section className={css.turn} data-reader-turn={group.turn ?? 'unresolved'} data-reader-turn-state={boundary.status} data-reader-turn-result={boundary.reason ?? undefined}>
     {startsWithUser && <BlockBoundary><MainNode {...shared} useChat={props.useChat} boundary={boundary} nodeKey={group.keys[0]} /></BlockBoundary>}
-    {hasProcess && !isAwaitingModel && <StickyLane kind="status" className={css.turnProcessSticky}>
-      <Disclosure open={expanded} onChange={setExpanded} controls={flowId} buttonRef={processButton}
-        label={<GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} pending={interaction} motion={motion} />} />
-    </StickyLane>}
-    {boundary.status === 'closed' && hasProcess && autoFold && <ClosedProcessSummary open={expanded} onChange={setExpanded} controls={flowId}
-      steps={steps.filter(step => {
-        if (step.kind === 'user') return false;
-        if (step.kind !== 'body') return true;
-        const node = nodes.get(step.nodeKey);
-        return !!node && isNode(node, 'assistant-step') && (isEarlierNarration(node.data, boundary)
-          || node.data.blocks.some(block => block.kind === 'tool-call')
-          || (boundary.latestStep > 0 && node.data.step < boundary.latestStep));
-      })} />}
-    <ChoreographedFlow id={flowId} frame={presentation} motion={motion} enabled={autoFold && boundary.status === 'open' && !holdingSelection}
-      urgent={hasTurnError || interaction !== undefined || !sessionRunning} open={foldOpenByKey} processOpen={expanded}
-      onOpenChange={(key, value) => { pinProcess(); setFoldOpenByKey(current => ({ ...current, [key]: value })); }} renderStep={renderStep} />
+    <div className={css.turnStickyRegion} data-reader-sticky-region>
+      {(showStatusLane || showClosedSummary) && <div className={css.turnStickyLanes}>
+        {showStatusLane && <StickyLane kind="status" className={css.turnProcessSticky}>
+          <Disclosure open={expanded} onChange={setExpanded} controls={flowId} buttonRef={processButton}
+            label={<GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} pending={interaction} motion={motion} />} />
+        </StickyLane>}
+        {showClosedSummary && <ClosedProcessSummary open={expanded} onChange={setExpanded} controls={flowId}
+          steps={steps.filter(step => {
+            if (step.kind === 'user') return false;
+            if (step.kind !== 'body') return true;
+            const node = nodes.get(step.nodeKey);
+            return !!node && isNode(node, 'assistant-step') && (isEarlierNarration(node.data, boundary)
+              || node.data.blocks.some(block => block.kind === 'tool-call')
+              || (boundary.latestStep > 0 && node.data.step < boundary.latestStep));
+          })} />}
+      </div>}
+      <ChoreographedFlow id={flowId} frame={presentation} motion={motion} enabled={autoFold && boundary.status === 'open' && !holdingSelection}
+        urgent={hasTurnError || interaction !== undefined || !sessionRunning} open={foldOpenByKey} processOpen={expanded}
+        onOpenChange={(key, value) => { pinProcess(); setFoldOpenByKey(current => ({ ...current, [key]: value })); }} renderStep={renderStep} />
+    </div>
     {/* 状态指示永远排在流程之后：AI 的响应永远出现在最新消息（含补充消息）的下方 */}
     {!hasProcess && boundary.status === 'open' && !isAwaitingModel && <div className={css.disclosure} data-reader-status-only>
       <GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} pending={interaction} motion={motion} />
