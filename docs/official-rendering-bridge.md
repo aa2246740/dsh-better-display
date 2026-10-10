@@ -36,6 +36,7 @@ RC2 的一个子插槽只能有一个声明者，只有声明它的组件能获�
 | 已修改文件快捷操作 | 保持原 Reader 的复制、定位和打开模式；仅从 Reader 的官方 tail 展示参数中排除重复的 produced chips，不改变官方源数据。未知匹配结构原样呈现。 |
 | 文件行号和正文文件链接 | 保留工具传来的行号；正文优先采用官方 file-mention 服务，现有路径匹配作为补充。 |
 | 本地 Markdown 图片 | 和 RC2 相同的同源文件 API，加载失败保留替代文本，危险协议不直接渲染。 |
+| 用户与 steering 消息 | 镜像 `conversation.chat.node` 的 keyed renderer，保留 `sessionId`、turn hook 和 Reader 跳转属性；未注册对应 key 时通过插槽 `fallback` 呈现 Reader 气泡。renderer 主动返回 `null` 时不补画气泡。 |
 | 命令、新节点类型 | 接入官方节点渲染及其子插槽；无可用渲染器时保留记录并提供“在对话中查看”。 |
 
 阅读布局、折叠、逐字动效、阅读速度、默认设置保持现版。移除了未被使用的全局 `body.dataset.readerFolding` 写入。
@@ -61,6 +62,17 @@ npm run test:auto-fold
 ## rewind 座位兼容
 
 Reader 的 user 与 steering 行会同时发布 `data-chat-anchor-key`、`data-chat-flow-key`、`data-chat-node-key` 和 `data-chat-flow-kind`，这些属性是 rewind 用来定位 durable 回退操作的官方 chat 座位契约。排队中的 inbox steering 也会渲染为 `data-pending-steering` 行，并按非文本内容块数量发布附件计数；本地 pending submission 与已落 durable 节点通过 source.rpcId 去重。纯图片消息仍不保证显示 durable 回退箭头，这是 rewind 文本匹配契约的边界。
+
+`dsh-easyrewrite@2.6.0` 在 `conversation.chat.node` 注册 `key: 'user', priority: -1` 的 `UserBubbleView`；撤回按钮是该组件内的 `data-dsh-easyrewrite="recall-key"`。chat 座位属性本身不会创建这个按钮，Reader 还需镜像此注册。它的快捷键使用 `data-chat-flow-kind="user"`，待定撤回的后续行隐藏使用 `data-chat-flow` 和 `data-chat-anchor-key`。
+
+`tests/reader-official-users.test.ts` 在固定的 headless Chromium 中运行真实 Reader 与官方 registry/renderer，覆盖 user/steering 镜像、唯一气泡与锚点、session/turn 注入、替换、卸载、空 key 回退和 renderer 主动隐藏。可将已下载的 npm 包传入，额外验证 easyrewrite 的真实气泡、撤回按钮和点击后的确认胶囊：
+
+```sh
+DSH_EASYREWRITE_CLIENT=/path/to/package/lib/client.js \
+  node --import tsx/esm --test tests/reader-official-users.test.ts
+```
+
+该 fixture 不执行撤回提交。完整验收仍需在独立测试会话中打开 Reader，确认每条 user 消息只有一个气泡与撤回按钮；点击撤回并确认后检查输入框回填、取消恢复、发送后的真实历史回退，再切换到原对话检查一致性。另需用 steering 消息和历史跳转检查补充消息与锚点。
 
 ## 后续仍需完成
 

@@ -76,8 +76,8 @@ function cleanErrorMessage(raw: string | undefined): string {
   return str;
 }
 
-type SeatProps = BlockRenderProps & Pick<ReaderProps, 'useChat'> & {
-  nodeKey: string; boundary: TurnBoundary; pinned?: boolean; processOpen?: boolean; sessionId?: string;
+type SeatProps = BlockRenderProps & Pick<ReaderProps, 'useChat' | 'sessionId'> & {
+  nodeKey: string; boundary: TurnBoundary; pinned?: boolean; processOpen?: boolean;
 };
 
 const CompactionDivider = memo(function CompactionDivider({ data }: {
@@ -219,38 +219,12 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
   const [disclosureReset] = useState(() => createSnapshotStore(0));
   if (!node || node.visibility === 'hidden') return null;
   if (isNode(node, 'user') || isNode(node, 'steering')) {
-    if (render.official) {
-      const turn = node.location.kind === 'turn' || node.location.kind === 'step' ? node.location.turn : undefined;
-      const owner: ChatNodeOwnerProps & { sessionId?: string; node: ChatConversationViewNode } = {
-        cwd: render.cwd,
-        openFile: render.openFile ?? (() => {}),
-        openSkill: () => {},
-        forkAt: render.forkAt ?? (() => {}),
-        inspectCall: callId => render.official!.openView('trajectory', callId),
-        loadImage: render.official!.officialImageLoader,
-        renderMessageImages: images => render.official!.renderSlot(OFFICIAL_SEATS.images, {
-          ...images, loadImage: render.official!.officialImageLoader,
-        }),
-        fileMentions: render.official!.officialFileMentions,
-        sessionId: render.sessionId,
-        node,
-      };
-      const renderNode = render.official.renderSlot as unknown as (key: string, owner: object, options: object) => ReactNode;
-      const rendered = renderNode(OFFICIAL_SEATS.nodes, owner, {
-        entryKey: node.kind,
-        hookContext: { turnData: turn?.data, disclosureReset },
-      });
-      if (rendered != null) {
-        return <div className={css.userCluster} data-reader-anchor data-reader-key={nodeKey} {...chatSeatProps(node.kind, nodeKey)}>{rendered}</div>;
-      }
-    }
-    // Fallback: the Reader's own user rendering (no official renderer for this kind).
     const blocks = contentBlocks(node.data.content);
     const imageBlocks = blocks.filter(b => b.kind === 'image');
     const otherBlocks = blocks.filter(b => b.kind !== 'image');
     const text = otherBlocks.filter((block): block is Extract<typeof block, { kind: 'text' }> => block.kind === 'text').map(block => block.text).join('\n\n');
     const time = node.data.time;
-    return <div className={css.userCluster} data-reader-anchor data-reader-key={nodeKey} {...chatSeatProps(node.kind, nodeKey)}>
+    const fallback = <>
       {node.kind === 'steering' && <p className={css.meta}>补充消息</p>}
       {imageBlocks.length > 0 && <div className={css.userImages}>
         <Blocks {...render} blocks={imageBlocks} source="user" />
@@ -259,7 +233,30 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
         <Blocks {...render} blocks={otherBlocks} source="user" />
       </div>}
       <UserMessageActions text={text} time={time} />
-    </div>;
+    </>;
+    const official = render.official;
+    let rendered: ReactNode = fallback;
+    if (official) {
+      const turn = node.location.kind === 'turn' || node.location.kind === 'step' ? node.location.turn : undefined;
+      const owner: ChatNodeOwnerProps & Pick<ReaderProps, 'sessionId'> = {
+        cwd: render.cwd,
+        openFile: render.openFile ?? (() => {}),
+        openSkill: () => {},
+        forkAt: render.forkAt ?? (() => {}),
+        inspectCall: callId => official.openView('trajectory', callId),
+        loadImage: official.officialImageLoader,
+        renderMessageImages: images => official.renderSlot(OFFICIAL_SEATS.images, {
+          ...images, loadImage: official.officialImageLoader,
+        }),
+        fileMentions: official.officialFileMentions,
+        sessionId: render.sessionId,
+      };
+      const options = { hookContext: { turnData: turn?.data, disclosureReset }, fallback };
+      rendered = node.kind === 'user'
+        ? official.renderSlot(OFFICIAL_SEATS.nodes, { ...owner, node }, { ...options, entryKey: 'user' })
+        : official.renderSlot(OFFICIAL_SEATS.nodes, { ...owner, node }, { ...options, entryKey: 'steering' });
+    }
+    return <div className={css.userCluster} data-reader-anchor data-reader-key={nodeKey} {...chatSeatProps(node.kind, nodeKey)}>{rendered}</div>;
   }
   if (isNode(node, 'assistant-step')) return null;
   if (isNode(node, 'tool-call')) return <ToolMedia {...render} block={node.data.root} />;
