@@ -1,6 +1,6 @@
 import type {} from '@deepseek-ai/dsh-session-turn-outline/types';
 import type {} from '@deepseek-ai/dsh-agent/types';
-import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { Fragment, memo, useCallback, useEffect, useId, useInsertionEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
 import { JsonBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives';
@@ -32,6 +32,7 @@ import type { BlockRenderProps, ReaderProps } from './types.js';
 import css from './Reader.module.css';
 import { markdownLabels, truncatedJsonLabel } from './primitive-labels.js';
 import { chatSeatProps } from './chat-seat.js';
+import { ensureStyles } from './styles.js';
 
 function isNode<K extends ChatNodeKind>(node: ChatConversationViewNode, kind: K): node is ChatNode<K> {
   return node.kind === kind;
@@ -641,6 +642,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys,
 });
 
 export function Reader(props: ReaderProps) {
+  useInsertionEffect(() => { ensureStyles(); }, []);
   const root = useRef<HTMLDivElement>(null);
   const activatedAt = useRef(Date.now());
   const order = props.useChat(snapshot => snapshot.order);

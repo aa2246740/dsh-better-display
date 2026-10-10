@@ -7,6 +7,7 @@ import { resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path';
 import * as workspacePathPkg from '@deepseek-ai/dsh-util-workspace-path';
 import { dirname } from './deliverables.js';
 import { isAbsoluteWorkspacePath } from '../workspace-path.js';
+import { ensureStyles } from './styles.js';
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client';
 import { Reader } from './Reader.js';
@@ -57,6 +58,9 @@ export type { ReaderBlockOwner } from './types.js';
 export { McpAppFrame } from './McpAppFrame.js';
 export const name = 'dsh-better-display-client';
 export const inject = ['slots', 'sessions', 'conversation', 'uiConversation', 'remote', 'remote.session'];
+
+// All CSS imports have injected their nodes before this module's body runs.
+ensureStyles();
 
 export function apply(ctx: Context): void {
   const store = createReaderStore();
