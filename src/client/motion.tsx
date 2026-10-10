@@ -191,7 +191,14 @@ export function RetiringContent({ visible, children }: { visible: boolean; child
     if (!enabled || from < 1) { setPresent(false); return; }
     const next = element.animate([{ height: `${from}px`, opacity: 1 }, { height: '0px', opacity: 0 }], { duration: 220, easing: EASING, fill: 'both' });
     animation.current = next;
-    next.onfinish = () => { if (animation.current === next) { animation.current = null; next.cancel(); setPresent(false); } };
+    const settle = () => { if (animation.current === next) { animation.current = null; next.cancel(); setPresent(false); } };
+    next.onfinish = settle;
+    const deadline = window.setTimeout(settle, 220 + 240);
+    return () => {
+      window.clearTimeout(deadline);
+      if (animation.current === next) animation.current = null;
+      next.cancel();
+    };
   }, [visible, enabled, focusHeld]);
   useEffect(() => () => animation.current?.cancel(), []);
   if (!visible && !present) return null;
