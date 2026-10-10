@@ -25,9 +25,8 @@ export type ReaderFlowEntry = ToolActivityEntry | {
 export declare function readerFlow(group: ReaderGroup, turn: TurnLocation | undefined, get: (key: string) => ChatConversationViewNode | undefined): ReaderFlowEntry[];
 export declare function objectValue(value: unknown): Record<string, unknown> | null;
 export declare function stringValue(record: Record<string, unknown> | null, ...keys: string[]): string | undefined;
-/** Read only top-level JSON string values, including an unfinished final string.
- * This never executes input or mistakes escaped/nested content for a path field. */
 export declare function inputFields(raw: string): Record<string, unknown>;
+/** Name and raw arguments of any call block, whether it has landed or is pending. */
 export declare function toolIdentity(entry: Pick<ToolActivityEntry, 'block' | 'draft'>): {
     name: string;
     raw: string;
@@ -102,6 +101,7 @@ export declare function activitySummary(entry: Pick<ToolActivityEntry, 'block' |
     name: string;
     raw: string;
     args: Record<string, unknown>;
+    argsState: "partial" | "complete";
     category: ToolCategory;
     title: string;
     target: string | undefined;
