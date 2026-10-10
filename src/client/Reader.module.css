@@ -591,27 +591,28 @@
   border-radius: 0;
   box-shadow: none;
 }
-/* Over a skin, any full-width pinned band reads as a slab across the artwork,
-   frosted or not, and the toolbar (full width) and status lane (width minus
-   the control group) leave a stepped edge. Pin nothing that needs a plate:
-   the status lane scrolls with its turn like the summary rows below, and the
-   toolbar stays pinned but only its controls carry a small pill. */
+/* Keep the skin visible between controls without changing the sticky lanes. */
+.root[data-reader-glass] .toolbar,
 .root[data-reader-glass] .turnProcessSticky {
-  position: static;
   backdrop-filter: none;
 }
 .root[data-reader-glass] .toolbar {
-  backdrop-filter: none;
   pointer-events: none;
 }
-.root[data-reader-glass] .toolbar > * {
+.root[data-reader-glass] .toolbar > .textButton,
+.root[data-reader-glass] .turnProcessSticky .disclosureButton {
   pointer-events: auto;
   padding: 2px 10px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, rgba(255, 255, 255, .7)) 80%, transparent);
   backdrop-filter: blur(12px);
 }
-.root[data-reader-glass] .toolbar > *:hover {
+.root[data-reader-glass] .turnProcessSticky .disclosureButton {
+  margin-left: 0;
+  max-width: 100%;
+}
+.root[data-reader-glass] .toolbar > .textButton:hover,
+.root[data-reader-glass] .turnProcessSticky .disclosureButton:hover {
   background: var(--dsw-alias-interactive-bg-hover);
 }
 /* The z-index ladder is mode-independent: skin mode only drops the plate, so
