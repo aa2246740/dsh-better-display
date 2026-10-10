@@ -109,6 +109,8 @@ function clientConfig(id, entry) {
         const { code, exports: cssExports } = transform({
           filename: fileId, code: source,
           cssModules: { pattern: '[hash]_[local]' }, minify: true,
+          // Emit the standard property for Chromium and the prefix for older Safari.
+          targets: { chrome: 120 << 16, safari: (16 << 16) | (4 << 8) },
         })
         const classMap = {}
         const exportEntries = Object.entries(cssExports ?? {})
