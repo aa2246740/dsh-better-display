@@ -2,12 +2,14 @@ import type {} from '@deepseek-ai/dsh-session-turn-outline/types';
 import type {} from '@deepseek-ai/dsh-agent/types';
 import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { ReactNode, RefObject } from 'react';
-import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
+import type { ChatConversationViewNode, ChatNode, ChatNodeKind, ChatNodeOwnerProps } from '@deepseek-ai/dsh-client-ui-chat/client';
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store';
 import { JsonBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives';
 import { BlockBoundary, Blocks, contentBlocks, CopyAnswer, UserMessageActions } from './Blocks.js';
 import { ReasoningCard } from './ReasoningCard.js';
 import { ToolActivity, ToolMedia } from './ToolActivity.js';
 import { OfficialActions, OfficialNode, OfficialTail } from './OfficialContent.js';
+import { OFFICIAL_SEATS } from './official-slots.js';
 import { preparingLabel, readerFlow } from './tool-activity.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelection, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
@@ -74,7 +76,7 @@ function cleanErrorMessage(raw: string | undefined): string {
   return str;
 }
 
-type SeatProps = BlockRenderProps & Pick<ReaderProps, 'useChat'> & {
+type SeatProps = BlockRenderProps & Pick<ReaderProps, 'useChat' | 'sessionId'> & {
   nodeKey: string; boundary: TurnBoundary; pinned?: boolean; processOpen?: boolean;
 };
 
@@ -214,6 +216,7 @@ const AssistantNode = memo(function AssistantNode({ useChat, nodeKey, boundary, 
 
 const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, processOpen = false, ...render }: SeatProps) {
   const node = useChat(snapshot => snapshot.nodes.get(nodeKey));
+  const [disclosureReset] = useState(() => createSnapshotStore(0));
   if (!node || node.visibility === 'hidden') return null;
   if (isNode(node, 'user') || isNode(node, 'steering')) {
     const blocks = contentBlocks(node.data.content);
@@ -221,7 +224,7 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
     const otherBlocks = blocks.filter(b => b.kind !== 'image');
     const text = otherBlocks.filter((block): block is Extract<typeof block, { kind: 'text' }> => block.kind === 'text').map(block => block.text).join('\n\n');
     const time = node.data.time;
-    return <div className={css.userCluster} data-reader-anchor data-reader-key={nodeKey} {...chatSeatProps(node.kind, nodeKey)}>
+    const fallback = <>
       {node.kind === 'steering' && <p className={css.meta}>补充消息</p>}
       {imageBlocks.length > 0 && <div className={css.userImages}>
         <Blocks {...render} blocks={imageBlocks} source="user" />
@@ -230,7 +233,30 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
         <Blocks {...render} blocks={otherBlocks} source="user" />
       </div>}
       <UserMessageActions text={text} time={time} />
-    </div>;
+    </>;
+    const official = render.official;
+    let rendered: ReactNode = fallback;
+    if (official) {
+      const turn = node.location.kind === 'turn' || node.location.kind === 'step' ? node.location.turn : undefined;
+      const owner: ChatNodeOwnerProps & Pick<ReaderProps, 'sessionId'> = {
+        cwd: render.cwd,
+        openFile: render.openFile ?? (() => {}),
+        openSkill: () => {},
+        forkAt: render.forkAt ?? (() => {}),
+        inspectCall: callId => official.openView('trajectory', callId),
+        loadImage: official.officialImageLoader,
+        renderMessageImages: images => official.renderSlot(OFFICIAL_SEATS.images, {
+          ...images, loadImage: official.officialImageLoader,
+        }),
+        fileMentions: official.officialFileMentions,
+        sessionId: render.sessionId,
+      };
+      const options = { hookContext: { turnData: turn?.data, disclosureReset }, fallback };
+      rendered = node.kind === 'user'
+        ? official.renderSlot(OFFICIAL_SEATS.nodes, { ...owner, node }, { ...options, entryKey: 'user' })
+        : official.renderSlot(OFFICIAL_SEATS.nodes, { ...owner, node }, { ...options, entryKey: 'steering' });
+    }
+    return <div className={css.userCluster} data-reader-anchor data-reader-key={nodeKey} {...chatSeatProps(node.kind, nodeKey)}>{rendered}</div>;
   }
   if (isNode(node, 'assistant-step')) return null;
   if (isNode(node, 'tool-call')) return <ToolMedia {...render} block={node.data.root} />;
@@ -586,6 +612,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys,
     fileMentions,
     metrics,
     official,
+    sessionId: props.sessionId,
     cwd,
   };
   const terminal = terminalLabel(boundary.reason);

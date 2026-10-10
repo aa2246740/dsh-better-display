@@ -57,8 +57,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 // Existing Reader presentations own these rows. All other node kinds, including
-// future registrations, reach the official renderer through the fallback seat.
-const READER_NODES = new Set(['user', 'steering', 'assistant-step', 'tool-call', 'turn-tail', 'turn-process']);
+// future registrations, reach the official renderer through the mirror seat.
+// 'user' and 'steering' are mirrored too, so third-party renderers registered
+// on the official node slot (e.g. message-recall buttons) keep working inside
+// the Reader instead of being silently dropped.
+const READER_OWNED_NODES = new Set(['assistant-step', 'tool-call', 'turn-tail', 'turn-process']);
 const EXPECTED: Record<OfficialFamily, Spec> = {
   actions: { kind: 'list', scope: 'session' },
   tools: { kind: 'keyed', scope: 'session' },
@@ -198,7 +201,7 @@ export function installOfficialSlots(ctx: Context): () => void {
           throw new Error(`Official slot contract changed: ${source}`);
         }
         return mirrorOfficialSlot(slots, source, target, `dsh-better-display.official.${family}`,
-          family === 'nodes' ? entry => !READER_NODES.has(entry.options.key ?? '') : undefined);
+          family === 'nodes' ? entry => !READER_OWNED_NODES.has(entry.options.key ?? '') : undefined);
       }));
     }
   } catch (error) {
