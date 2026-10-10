@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
@@ -7,16 +7,23 @@ import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 
-test('headless Reader users retain official renderers, anchors and empty-key fallback', async () => {
+// Needs the Harness source tree and a local pinned Chromium; CI (which builds the
+// release) has neither browser runtime, so the test skips there instead of failing.
+const harnessPointer = join(homedir(), '.config/dshx/harness');
+const harness = process.env.DSHX_HARNESS?.trim()
+  || (existsSync(harnessPointer) ? readFileSync(harnessPointer, 'utf8').trim() : '');
+const browserRuntime = join(homedir(), '.codex/playwright-runtime/runtime.mjs');
+const skip = !harness ? 'DSH Harness source not available'
+  : !existsSync(browserRuntime) ? 'pinned Chromium runtime not available' : false;
+
+test('headless Reader users retain official renderers, anchors and empty-key fallback', { skip }, async () => {
   const root = resolve(import.meta.dirname, '..');
-  const harness = process.env.DSHX_HARNESS?.trim()
-    || readFileSync(join(homedir(), '.config/dshx/harness'), 'utf8').trim();
   const require = createRequire(join(root, 'package.json'));
   const { build } = createRequire(require.resolve('tsx'))('esbuild');
   const webRequire = createRequire(join(harness, 'packages/client/web/package.json'));
   const out = mkdtempSync(join(tmpdir(), 'reader-official-users-'));
   try {
-    const { launchPinnedChromium } = await import(pathToFileURL(join(homedir(), '.codex/playwright-runtime/runtime.mjs')).href);
+    const { launchPinnedChromium } = await import(pathToFileURL(browserRuntime).href);
     await build({
       entryPoints: [join(root, 'tests/fixtures/reader-official-users.tsx')],
       outfile: join(out, 'fixture.js'), bundle: true, platform: 'browser', format: 'esm', jsx: 'automatic',
@@ -25,6 +32,9 @@ test('headless Reader users retain official renderers, anchors and empty-key fal
         '@fixture/renderer': join(harness, 'packages/client/ui-renderer/src/client/scoped-slots.tsx'),
         '@deepseek-ai/dsh-client-ui-primitives': join(harness, 'packages/client/ui-primitives/src/index.ts'),
         '@deepseek-ai/dsh-client-ui-slots': join(harness, 'packages/client/ui-slots/src/index.ts'),
+        // The published store lib leaves zustand/immer to the host; the source
+        // package resolves them from the Harness workspace.
+        '@deepseek-ai/dsh-client-store': join(harness, 'packages/client/store/src/index.ts'),
         react: dirname(require.resolve('react/package.json')),
         'react-dom': dirname(webRequire.resolve('react-dom/package.json')),
       },
