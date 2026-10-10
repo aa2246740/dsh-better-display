@@ -1,6 +1,6 @@
 # 官方能力接入说明
 
-`0.3.0` 在 `v0.2.1` 的阅读布局上接入官方内容和控件，经过试用验收后发布。当前验收目标是 Harness `0.1.7-rc.2`。`conversation.chat.turnTail` 仍是 `list`。`0.1.7-rc.2` 在这条 list 上新增 `schedule-created`，并新增 `schedule_update` 工具视图；Reader 继续镜像官方注册，不另写这两张卡片。开发者消息里的工具增减行用官方标题和计数，本地 Markdown 图片接受 Desktop 文件路由 `dsh-app://app/api/file`。后续仍需维护的自有展示逻辑和升级边界见下文。
+`0.3.0` 在 `v0.2.1` 的阅读布局上接入官方内容和控件，经过试用验收后发布。当前验收目标是 Harness `0.2.0-rc.2`（`dsh-v0.2.0-rc.2`，`639ed015397290b3745d163aafe02ffee4aa3f84`）。`conversation.chat.turnTail` 仍是 `list`。相对 `0.1.7-rc.2`，官方注册清单没有增减；`schedule-created` 和 `schedule_update` 继续走已有镜像座位，Reader 不另写这两张卡片。图标仍使用 `*Regular` 名称。开发者消息里的工具增减行用官方标题和计数，本地 Markdown 图片接受 Desktop 文件路由 `dsh-app://app/api/file`。`0.2.0-rc.2` 里官方对话的模型重试行增加了 `TextShimmer`，进行中的 `TurnProcessNodeView` 改为关闭后才渲染；阅读页本来就自己呈现这两行，所以阅读布局不跟着改。后续仍需维护的自有展示逻辑和升级边界见下文。
 
 ## 一个具体例子
 
@@ -57,6 +57,10 @@ npm run test:auto-fold
 `test:auto-fold` 使用真实 Reader 和独立的全局、会话 store，验证关闭后阅读再开启、此前步骤、设置同步、文本选择及连续切换；分别覆盖普通动画和减少动态效果。
 
 `build` 先检查兼容基线。Harness 版本、敏感接口、尚未收敛的官方实现或相关注册清单改变时，构建明确要求审查。审查差异并通过功能与视觉测试后，才可运行 `check-harness-compat.mjs --record` 记录新基线。记录本身不构成兼容证明。
+
+## rewind 座位兼容
+
+Reader 的 user 与 steering 行会同时发布 `data-chat-anchor-key`、`data-chat-flow-key`、`data-chat-node-key` 和 `data-chat-flow-kind`，这些属性是 rewind 用来定位 durable 回退操作的官方 chat 座位契约。排队中的 inbox steering 也会渲染为 `data-pending-steering` 行，并按非文本内容块数量发布附件计数；本地 pending submission 与已落 durable 节点通过 source.rpcId 去重。纯图片消息仍不保证显示 durable 回退箭头，这是 rewind 文本匹配契约的边界。
 
 ## 后续仍需完成
 

@@ -1,4 +1,5 @@
 import type {} from '@deepseek-ai/dsh-session-turn-outline/types';
+import type {} from '@deepseek-ai/dsh-agent/types';
 import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from '@deepseek-ai/dsh-client-ui-chat/client';
@@ -30,9 +31,31 @@ import type { ReaderGroup, TurnBoundary } from './projection.js';
 import type { BlockRenderProps, ReaderProps } from './types.js';
 import css from './Reader.module.css';
 import { markdownLabels, truncatedJsonLabel } from './primitive-labels.js';
+import { chatSeatProps } from './chat-seat.js';
 
 function isNode<K extends ChatNodeKind>(node: ChatConversationViewNode, kind: K): node is ChatNode<K> {
   return node.kind === kind;
+}
+
+function observedInputIds(order: readonly string[], getNode: (key: string) => ChatConversationViewNode | undefined): Set<string> {
+  const ids = new Set<string>();
+  for (const key of order) {
+    const node = getNode(key);
+    if (!node || (node.kind !== 'user' && node.kind !== 'steering' && node.kind !== 'turn-trigger')) continue;
+    const source = (node.data as { source?: { kind?: string; rpcId?: unknown } }).source;
+    if (source?.kind === 'user' && typeof source.rpcId === 'string') ids.add(source.rpcId);
+  }
+  return ids;
+}
+
+function inboxText(item: { content?: readonly unknown[] }): string {
+  return (item.content ?? []).filter((block): block is { type: 'text'; text: string } => {
+    return typeof block === 'object' && block !== null && (block as { type?: unknown }).type === 'text' && typeof (block as { text?: unknown }).text === 'string';
+  }).map(block => block.text).join('');
+}
+
+function inboxAttachmentCount(item: { content?: readonly unknown[] }): number {
+  return (item.content ?? []).filter(block => typeof block === 'object' && block !== null && (block as { type?: unknown }).type !== 'text').length;
 }
 
 function cleanErrorMessage(raw: string | undefined): string {
@@ -198,7 +221,7 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
     const otherBlocks = blocks.filter(b => b.kind !== 'image');
     const text = otherBlocks.filter((block): block is Extract<typeof block, { kind: 'text' }> => block.kind === 'text').map(block => block.text).join('\n\n');
     const time = node.data.time;
-    return <div className={css.userCluster} data-reader-anchor data-reader-key={nodeKey}>
+    return <div className={css.userCluster} data-reader-anchor data-reader-key={nodeKey} {...chatSeatProps(node.kind, nodeKey)}>
       {node.kind === 'steering' && <p className={css.meta}>补充消息</p>}
       {imageBlocks.length > 0 && <div className={css.userImages}>
         <Blocks {...render} blocks={imageBlocks} source="user" />
@@ -497,6 +520,8 @@ const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys,
     () => 'external',
   ));
   const hasProcess = flow.some(item => item.kind === 'tool' || hasProcessContent(nodes.get(item.nodeKey), boundary));
+  const showStatusLane = hasProcess && !isAwaitingModel;
+  const showClosedSummary = boundary.status === 'closed' && hasProcess && autoFold;
   // Only a real, still-active text selection delays folding. Merely clicking,
   // focusing or scrolling the live card does not create a permanent override.
   const holdingSelection = selectedProcessKeys.some(key =>
@@ -591,22 +616,26 @@ const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys,
   };
   return <section className={css.turn} data-reader-turn={group.turn ?? 'unresolved'} data-reader-turn-state={boundary.status} data-reader-turn-result={boundary.reason ?? undefined}>
     {startsWithUser && <BlockBoundary><MainNode {...shared} useChat={props.useChat} boundary={boundary} nodeKey={group.keys[0]} /></BlockBoundary>}
-    {hasProcess && !isAwaitingModel && <StickyLane kind="status" className={css.turnProcessSticky}>
-      <Disclosure open={expanded} onChange={setExpanded} controls={flowId} buttonRef={processButton}
-        label={<GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} pending={interaction} motion={motion} />} />
-    </StickyLane>}
-    {boundary.status === 'closed' && hasProcess && autoFold && <ClosedProcessSummary open={expanded} onChange={setExpanded} controls={flowId}
-      steps={steps.filter(step => {
-        if (step.kind === 'user') return false;
-        if (step.kind !== 'body') return true;
-        const node = nodes.get(step.nodeKey);
-        return !!node && isNode(node, 'assistant-step') && (isEarlierNarration(node.data, boundary)
-          || node.data.blocks.some(block => block.kind === 'tool-call')
-          || (boundary.latestStep > 0 && node.data.step < boundary.latestStep));
-      })} />}
-    <ChoreographedFlow id={flowId} frame={presentation} motion={motion} enabled={autoFold && boundary.status === 'open' && !holdingSelection}
-      urgent={hasTurnError || interaction !== undefined || !sessionRunning} open={foldOpenByKey} processOpen={expanded}
-      onOpenChange={(key, value) => { pinProcess(); setFoldOpenByKey(current => ({ ...current, [key]: value })); }} renderStep={renderStep} />
+    <div className={css.turnStickyRegion} data-reader-sticky-region>
+      {(showStatusLane || showClosedSummary) && <div className={css.turnStickyLanes}>
+        {showStatusLane && <StickyLane kind="status" className={css.turnProcessSticky}>
+          <Disclosure open={expanded} onChange={setExpanded} controls={flowId} buttonRef={processButton}
+            label={<GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} pending={interaction} motion={motion} />} />
+        </StickyLane>}
+        {showClosedSummary && <ClosedProcessSummary open={expanded} onChange={setExpanded} controls={flowId}
+          steps={steps.filter(step => {
+            if (step.kind === 'user') return false;
+            if (step.kind !== 'body') return true;
+            const node = nodes.get(step.nodeKey);
+            return !!node && isNode(node, 'assistant-step') && (isEarlierNarration(node.data, boundary)
+              || node.data.blocks.some(block => block.kind === 'tool-call')
+              || (boundary.latestStep > 0 && node.data.step < boundary.latestStep));
+          })} />}
+      </div>}
+      <ChoreographedFlow id={flowId} frame={presentation} motion={motion} enabled={autoFold && boundary.status === 'open' && !holdingSelection}
+        urgent={hasTurnError || interaction !== undefined || !sessionRunning} open={foldOpenByKey} processOpen={expanded}
+        onOpenChange={(key, value) => { pinProcess(); setFoldOpenByKey(current => ({ ...current, [key]: value })); }} renderStep={renderStep} />
+    </div>
     {/* 状态指示永远排在流程之后：AI 的响应永远出现在最新消息（含补充消息）的下方 */}
     {!hasProcess && boundary.status === 'open' && !isAwaitingModel && <div className={css.disclosure} data-reader-status-only>
       <GroupStatus group={group} sessionId={props.sessionId} useChat={props.useChat} pending={interaction} motion={motion} />
@@ -631,6 +660,25 @@ export function Reader(props: ReaderProps) {
   const loadingOlder = props.useSession(snapshot => snapshot.loadingOlder);
   const pendingSubmissions = props.useSession(snapshot => snapshot.pendingSubmissions);
   const pendingList = asReadonlyArray<PendingSubmissionEcho>(pendingSubmissions);
+  const inbox = props.useProjection?.('inbox');
+  type PendingInboxItem = { source?: { kind?: string; rpcId?: unknown }; content?: readonly unknown[] };
+  const inboxSteering = asReadonlyArray<PendingInboxItem>(inbox?.['next-step']).filter(item => item.source?.kind === 'user');
+  const observed = useMemo(() => observedInputIds(order, key => nodes.get(key)), [order, nodes]);
+  const visibleSubmissions = useMemo(() => pendingList.filter(sub => sub.placement !== 'queued' && !observed.has(sub.requestId)), [pendingList, observed]);
+  const pendingInputs = useMemo(() => {
+    const local = new Map<string, PendingSubmissionEcho>(visibleSubmissions.map(sub => [sub.requestId, sub]));
+    const localIds = new Set(pendingList.filter(sub => sub.placement !== 'queued').map(sub => sub.requestId));
+    const rows: Array<PendingSubmissionEcho | (typeof inboxSteering)[number]> = [];
+    for (const item of inboxSteering) {
+      const rpcId = typeof item.source?.rpcId === 'string' ? item.source.rpcId : undefined;
+      if (!rpcId) { rows.push(item); continue; }
+      const submission = local.get(rpcId);
+      if (submission) { local.delete(rpcId); rows.push(submission); }
+      else if (!localIds.has(rpcId)) rows.push(item);
+    }
+    rows.push(...local.values());
+    return rows;
+  }, [inboxSteering, pendingList, visibleSubmissions]);
   const waitAnchor = waitingAnchor(order, key => nodes.get(key), pendingList);
   const motionPreference = props.useStore(state => state.motion);
   const motion = useMotionAllowed(motionPreference);
@@ -808,14 +856,9 @@ export function Reader(props: ReaderProps) {
     }
   }, [lastKey, lastNode?.kind, lastSubmissionId, scroll]);
 
-  const visibleSubmissions = useMemo(() => {
-    if (pendingList.length === 0) return [];
-    return pendingList.filter(sub => sub.placement !== 'queued');
-  }, [pendingList]);
-
   // ChatView publishes data-chat-flow="" on its column. Skins treat a
   // scrollport without that hook as inspect-only and hide [data-composer-seat].
-  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} data-reader-build="0.3.3" data-dsh-better-display="0.3.3" data-reader-wait-clock-version="input-v1" data-reader-wait-start={waitAnchor.time ?? undefined} data-motion={motion ? 'on' : 'off'} data-reader-glass={frostedGlass || undefined} data-reader-auto-fold={autoFold ? 'on' : 'off'}>
+  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} data-reader-build="0.3.4" data-dsh-better-display="0.3.4" data-reader-wait-clock-version="input-v1" data-reader-wait-start={waitAnchor.time ?? undefined} data-motion={motion ? 'on' : 'off'} data-reader-glass={frostedGlass || undefined} data-reader-auto-fold={autoFold ? 'on' : 'off'}>
     <TimelineRail items={timelineItems} activeTurn={activeTurn} busyTurn={busyTurn} onNavigate={onNavigateTurn} />
     <div className={css.column} data-chat-flow="">
       <StickyLane kind="toolbar" className={css.toolbar}>
@@ -840,10 +883,14 @@ export function Reader(props: ReaderProps) {
       {openError && <div className={css.error} role="alert">会话暂时无法读取：{openError.message}</div>}
       {loading && groups.length === 0 && <p className={css.empty} role="status">正在读取会话…</p>}
       {groups.map(group => <TurnGroup key={group.key} {...props} group={group} motion={motion} autoFold={autoFold} pinnedKeys={pinnedKeys} selectedProcessKeys={selectedProcessKeys} isAwaitingModel={isAwaitingModel && group.key === groups.at(-1)?.key} />)}
-      {visibleSubmissions.map(submission => {
-        const images = pendingSubmissionImages(submission);
+      {pendingInputs.map((item, index) => {
+         const submission = 'requestId' in item ? item : undefined;
+         const text = submission?.text ?? inboxText(item as PendingInboxItem);
+         const images = submission ? pendingSubmissionImages(submission) : [];
+         const attachmentCount = images.length;
+        const requestId = submission?.requestId ?? `inbox-${index}`;
         return (
-        <div key={submission.requestId} className={css.userCluster} data-reader-pending-submission>
+        <div key={requestId} className={css.userCluster} data-reader-pending-submission data-pending-steering={submission ? undefined : ''} data-pending-attachment-count={attachmentCount}>
           {images.length > 0 && (
             <div className={css.userImages}>
               {images.map((item, idx) => (
@@ -855,12 +902,12 @@ export function Reader(props: ReaderProps) {
               ))}
             </div>
           )}
-          {submission.text ? (
+          {text ? (
             <div className={css.user}>
-              <div className={css.blocks}>{submission.text}</div>
+              <div className={css.blocks}>{text}</div>
             </div>
           ) : null}
-          <UserMessageActions text={submission.text ?? ''} time={submission.time} />
+          <UserMessageActions text={text} time={submission?.time} />
         </div>
         );
       })}

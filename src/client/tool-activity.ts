@@ -53,10 +53,15 @@ export function stringValue(record: Record<string, unknown> | null, ...keys: str
   return undefined;
 }
 
+/** Top-level fields from complete or in-flight JSON tool arguments. */
+type ParsedInputFields =
+  | { kind: 'complete'; fields: Record<string, unknown> }
+  | { kind: 'partial'; fields: Record<string, unknown> };
+
 /** Read only top-level JSON string values, including an unfinished final string.
  * This never executes input or mistakes escaped/nested content for a path field. */
-export function inputFields(raw: string): Record<string, unknown> {
-  try { return objectValue(JSON.parse(raw)) ?? {}; } catch { /* an in-flight argument is normally incomplete */ }
+function parseInputFields(raw: string): ParsedInputFields {
+  try { return { kind: 'complete', fields: objectValue(JSON.parse(raw)) ?? {} }; } catch { /* an in-flight argument is normally incomplete */ }
   const fields: Record<string, unknown> = Object.create(null);
   const prefix = raw.slice(0, 262144);
   let depth = 0;
@@ -88,14 +93,19 @@ export function inputFields(raw: string): Record<string, unknown> {
     if (closed && /^\s*:/.test(prefix.slice(index + 1))) key = value;
     else if (key !== undefined) { fields[key] = value; key = undefined; }
   }
-  return fields;
+  return { kind: 'partial', fields };
 }
 
+export function inputFields(raw: string): Record<string, unknown> {
+  return parseInputFields(raw).fields;
+}
+
+/** Name and raw arguments of any call block, whether it has landed or is pending. */
 export function toolIdentity(entry: Pick<ToolActivityEntry, 'block' | 'draft'>) {
   const block = entry.block;
   return {
     name: block ? 'kind' in block ? block.call?.name ?? entry.draft?.name ?? '工具调用' : block.name : entry.draft?.name ?? '工具调用',
-    raw: block ? 'kind' in block ? block.call?.argsRaw ?? entry.draft?.argsRaw ?? '' : ('argsRaw' in block ? block.argsRaw : '') : entry.draft?.argsRaw ?? '',
+    raw: block ? 'kind' in block ? block.call?.argsRaw ?? entry.draft?.argsRaw ?? '' : ('argsRaw' in block ? block.argsRaw : entry.draft?.argsRaw ?? '') : entry.draft?.argsRaw ?? '',
   };
 }
 
@@ -254,7 +264,7 @@ export function foldDiffHunks(steps: readonly { kind: string; entry?: ToolActivi
 
 export function activityPhase(entry: Pick<ToolActivityEntry, 'block' | 'draft'>, turnClosed = false): ToolPhase {
   if (!entry.block) return turnClosed ? 'interrupted' : 'preparing';
-  if (!('kind' in entry.block)) return turnClosed ? 'interrupted' : 'running';
+  if (!('kind' in entry.block)) return turnClosed ? 'interrupted' : entry.block.phase === 'preparing' ? 'preparing' : 'running';
   // RC1 publishes canonical cancellation as an error result with a typed code.
   if (entry.block.error?.code === 'ABORTED' || entry.block.error?.code === 'interrupted') return 'interrupted';
   const facts = executionFacts(entry.block);
@@ -264,9 +274,52 @@ export function activityPhase(entry: Pick<ToolActivityEntry, 'block' | 'draft'>,
   return 'returned';
 }
 
+/**
+ * First-seen time for calls the host has not stamped yet. A draft that
+ * precedes a landed call carries no timestamp, so without this memory the
+ * running clock would restart at zero on every remount — e.g. switching to
+ * another conversation and back while the call is still preparing. Keyed by
+ * call id, dropped when the call leaves the running phases.
+ */
+const clockFirstSeen = new Map<string, number>();
+const CLOCK_FIRST_SEEN_LIMIT = 512;
+
+/**
+ * Session-stamped start of a call, or null while only a draft exists.
+ * A settled result carries `callTime`, the paired tool/call event's time; a
+ * still-running call head stamps the same instant in its own `time` field.
+ */
+export function callStartTime(entry: Pick<ToolActivityEntry, 'block'>): number | null {
+  const block = entry.block;
+  if (!block) return null;
+  return 'kind' in block ? block.callTime : block.time;
+}
+
+/**
+ * The instant a still-running call's elapsed clock counts from. The stamped
+ * time wins so a remounted view keeps counting from the real start; an
+ * un-stamped draft falls back to when this view first saw that call id, which
+ * survives remounts for the same reason.
+ */
+export function runningClockBase(callId: string, block: ToolCallBlock | undefined, now = Date.now()): number {
+  const stamped = callStartTime({ block });
+  if (stamped != null) return stamped;
+  const seen = clockFirstSeen.get(callId);
+  if (seen !== undefined) return seen;
+  if (clockFirstSeen.size >= CLOCK_FIRST_SEEN_LIMIT) clockFirstSeen.delete(clockFirstSeen.keys().next().value!);
+  clockFirstSeen.set(callId, now);
+  return now;
+}
+
+/** Forget a call's first-seen time once its clock is no longer live. */
+export function forgetCallClock(callId: string): void {
+  clockFirstSeen.delete(callId);
+}
+
 export function activitySummary(entry: Pick<ToolActivityEntry, 'block' | 'draft'>) {
   const { name, raw } = toolIdentity(entry);
-  const args = inputFields(raw);
+  const parsed = parseInputFields(raw);
+  const args = parsed.fields;
   const target = stringValue(args, 'file_path', 'path', 'filename', 'filePath');
   const command = stringValue(args, 'command', 'cmd', 'script');
   const description = stringValue(args, 'description');
@@ -289,7 +342,7 @@ export function activitySummary(entry: Pick<ToolActivityEntry, 'block' | 'draft'
     : category === 'web' ? name === 'web_search' ? '搜索网页' : '读取网页'
     : category === 'code' ? (description || '运行代码')
     : name;
-  return { name, raw, args, category, title, target: target ?? command ?? stringValue(args, 'query', 'pattern', 'url'), command,
+  return { name, raw, args, argsState: parsed.kind, category, title, target: target ?? command ?? stringValue(args, 'query', 'pattern', 'url'), command,
     cwd: stringValue(args, 'workdir', 'cwd'), content: stringValue(args, 'content', 'new_string', 'newText', 'file_text') };
 }
 

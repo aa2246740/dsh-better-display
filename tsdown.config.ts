@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import type { TsdownPlugin, UserConfig } from 'tsdown';
 
@@ -41,6 +41,13 @@ const portableOutput: TsdownPlugin = {
 };
 
 export default bundle.map((config) => {
+  if (config.name === 'dsh-better-display') {
+    const { external: _external, ...hostConfig } = config;
+    return {
+      ...hostConfig,
+      deps: { ...hostConfig.deps, neverBundle: (specifier: string) => !specifier.startsWith('.') && !isAbsolute(specifier) },
+    };
+  }
   if (config.name !== 'dsh-better-display/client') return config;
   const plugins = Array.isArray(config.plugins)
     ? config.plugins

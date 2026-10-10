@@ -6,7 +6,7 @@ import { DiffBlock, DisclosureRow, JsonTree, ReadBlock, SearchBlock, TerminalBlo
 import { Blocks, contentBlocks } from './Blocks.js';
 import { OfficialTool } from './OfficialContent.js';
 import { ProcessFragment } from './motion.js';
-import { activityPhase, activitySummary, callDiffHunks, diffTotals, executionFacts, objectValue, toolIdentity } from './tool-activity.js';
+import { activityPhase, activitySummary, callDiffHunks, diffTotals, executionFacts, forgetCallClock, objectValue, runningClockBase, toolIdentity } from './tool-activity.js';
 import type { ToolActivityEntry, ToolCategory, ToolPhase } from './tool-activity.js';
 import type { BlockRenderProps } from './types.js';
 import { classifyTool, toolRowModel, VARIANT_TITLES } from './native/tool-call-model.js';
@@ -17,6 +17,7 @@ import css from './Reader.module.css';
 const LABEL: Record<ToolPhase, string> = { preparing: '输入生成中', running: '执行中', returned: '已返回', succeeded: '已完成', failed: '失败', interrupted: '已中断' };
 const ICONS = { write: IconEditOutlineRegular, read: IconBrowseOutlineRegular, terminal: IconApiOutlineRegular, search: IconSearchOutlineRegular, web: IconSearchOutlineRegular, code: IconApiOutlineRegular, other: IconSparkleRegular } satisfies Record<ToolCategory, unknown>;
 const number = new Intl.NumberFormat('zh-CN');
+const preparingTerminalLabels = { ...terminalBlockLabels, running: '正在生成命令' };
 const language = (path: string | undefined) => path?.split('.').at(-1);
 const duration = (ms: number) => ms < 1000 ? `${Math.round(ms)} 毫秒` : `${(ms / 1000).toFixed(ms < 10000 ? 1 : 0)} 秒`;
 
@@ -28,14 +29,17 @@ function generatedInput(content: string, target: string | undefined, preparing: 
   </div>;
 }
 
-function InputView({ model, preparing, fillComposer }: { model: ReturnType<typeof activitySummary>; preparing: boolean; fillComposer: BlockRenderProps['fillComposer'] }) {
+function InputView({ model, phase, fillComposer }: { model: ReturnType<typeof activitySummary>; phase: ToolPhase; fillComposer: BlockRenderProps['fillComposer'] }) {
+  const preparing = phase === 'preparing';
+  const inProgress = preparing || phase === 'running';
   if ((model.name === 'render_ui' || model.name === 'show_widget') && typeof model.args?.html === 'string') {
     return preparing
       ? <StreamingMcpAppPlaceholder title={typeof model.args.title === 'string' ? (model.args.title as string) : undefined} />
       : <McpAppFrame html={model.args.html as string} title={typeof model.args.title === 'string' ? (model.args.title as string) : undefined} fillComposer={fillComposer} />;
   }
   if (model.content) return generatedInput(model.content, model.target, preparing);
-  if (model.command) return <div data-reader-tool-terminal><p className={css.toolDetailNote}>{preparing ? '正在生成命令 · 尚未执行' : '提交的命令'}</p><TerminalBlock command={model.command} cwd={model.cwd} labels={terminalBlockLabels} /></div>;
+  if (model.command) return <div data-reader-tool-terminal><p className={css.toolDetailNote}>{preparing ? '正在生成命令 · 尚未执行' : '提交的命令'}</p><TerminalBlock command={model.command} cwd={model.cwd} running={inProgress} labels={preparing ? preparingTerminalLabels : terminalBlockLabels} /></div>;
+  if (model.category === 'terminal' && preparing && model.argsState === 'partial') return <p className={css.toolDetailNote} data-reader-tool-command-pending>命令仍在生成，收到可识别的命令文本后会显示预览。</p>;
   return <JsonTree data={model.args} label={preparing ? '已收到的输入字段' : '工具输入'} labels={jsonTreeLabels} />;
 }
 
@@ -95,11 +99,11 @@ function ResultFallback({ entry, model, phase, ...render }: BlockRenderProps & {
   const block = entry.block;
   if (!block || !('kind' in block)) return <>
     <p className={css.toolDetailNote}>{phase === 'interrupted' ? '已中断，没有工具结果。已生成的输入仍可查看。' : phase === 'preparing' ? '模型正在生成工具输入，工具还未开始执行。' : '工具已开始执行，正在等待结果。'}</p>
-    <InputView model={model} preparing={phase === 'preparing'} fillComposer={render.fillComposer} />
+    <InputView model={model} phase={phase} fillComposer={render.fillComposer} />
   </>;
   const meta = objectValue(block.meta);
   const text = block.content.filter(item => item.type === 'text').map(item => item.text).join('\n');
-  if (phase === 'interrupted') return <><p className={css.toolDetailNote}>工具已取消，未正常完成。输入和原始返回记录仍可查看。</p><InputView model={model} preparing={false} fillComposer={render.fillComposer} /><pre className={css.toolRaw}>{text}</pre></>;
+  if (phase === 'interrupted') return <><p className={css.toolDetailNote}>工具已取消，未正常完成。输入和原始返回记录仍可查看。</p><InputView model={model} phase={phase} fillComposer={render.fillComposer} /><pre className={css.toolRaw}>{text}</pre></>;
 
   if (model.category === 'terminal') {
     const facts = executionFacts(block);
@@ -194,19 +198,19 @@ export const ToolActivity = memo(function ToolActivityView({ entry, motion, turn
   const showState = phase === 'preparing' || phase === 'running' || phase === 'failed' || phase === 'interrupted';
   const running = phase === 'preparing' || phase === 'running';
   // A step that has not returned yet counts its own seconds, so a long command
-  // reads as progress rather than as a stall. The clock is idle-rendered off the
-  // row's own call time, and disappears the moment the result arrives.
+  // reads as progress rather than as a stall. The clock counts from the call's
+  // stamped start — a session event time, not the moment this view mounted —
+  // so switching conversations and back keeps it running instead of resetting
+  // it to zero, and it disappears the moment the result arrives.
   const [liveMs, setLiveMs] = useState<number | null>(null);
-  const openedAt = useRef<number | null>(null);
   useEffect(() => {
-    if (!running) { openedAt.current = null; setLiveMs(null); return; }
-    const stamped = block && 'kind' in block && block.callTime != null ? block.callTime : null;
-    const base = stamped ?? (openedAt.current ??= Date.now());
+    if (!running) { forgetCallClock(entry.callId); setLiveMs(null); return; }
+    const base = runningClockBase(entry.callId, block);
     const tick = () => setLiveMs(Math.max(0, Date.now() - base));
     tick();
     const timer = setInterval(tick, 200);
     return () => clearInterval(timer);
-  }, [running, block]);
+  }, [running, block, entry.callId]);
   const elapsed = block && 'kind' in block && block.callTime != null ? Math.max(0, block.time - block.callTime) : null;
   // A step that ran long keeps showing how long it took after it returns: the
   // number is the point of the readout. A fast step shows nothing once it is done.
@@ -247,7 +251,7 @@ export const ToolActivity = memo(function ToolActivityView({ entry, motion, turn
         <div ref={panel} id={`${detailId}-panel`} className={css.toolPanel} role="tabpanel" aria-labelledby={`${detailId}-${tab}`} tabIndex={0}>
           {selected && <p className={css.toolDetailNote}>为保留选区，预览暂停更新；当前状态见卡片标题。</p>}
           {tab === 'result' && <ResultView {...render} {...preview} />}
-          {tab === 'input' && <><InputView model={preview.model} preparing={preview.phase === 'preparing'} fillComposer={render.fillComposer} /><details className={css.detail}><summary>全部输入字段</summary><JsonTree data={preview.model.args} label="输入字段" labels={jsonTreeLabels} /></details></>}
+          {tab === 'input' && <><InputView model={preview.model} phase={preview.phase} fillComposer={render.fillComposer} /><details className={css.detail}><summary>全部输入字段</summary><JsonTree data={preview.model.args} label="输入字段" labels={jsonTreeLabels} /></details></>}
           {tab === 'raw' && <><p className={css.toolDetailNote}>完整记录 · 只读 · 不执行其中的代码</p><h4 className={css.toolRawLabel}>工具输入</h4><pre className={css.toolRaw}>{preview.model.raw || '输入尚未到达'}</pre>{rawResult && <><h4 className={css.toolRawLabel}>工具结果</h4><pre className={css.toolRaw}>{rawResult}</pre></>}</>}
         </div>
       </div>

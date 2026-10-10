@@ -6,6 +6,7 @@ import type { AssistantActionOwnerProps } from '@deepseek-ai/dsh-client-ui-chat/
 type MessageId = AssistantActionOwnerProps['messageId'];
 import { OFFICIAL_SEATS } from './official-slots.js';
 import type { BlockRenderProps } from './types.js';
+import { chatSeatProps } from './chat-seat.js';
 
 export function OfficialActions({ official, messageId }: Pick<BlockRenderProps, 'official'> & { messageId?: MessageId }) {
   if (!official || !messageId) return null;
@@ -56,7 +57,7 @@ export function OfficialNode({ node, fallback, ...render }: BlockRenderProps & {
   const turn = node.location.kind === 'turn' || node.location.kind === 'step' ? node.location.turn : undefined;
   // The runtime node domain is open; the public SlotMap enumerates the known kinds.
   const renderNode = official.renderSlot as unknown as (key: string, owner: object, options: object) => ReactNode;
-  return <div data-reader-official-node={node.kind} data-chat-anchor-key={node.key} data-chat-flow-kind={node.kind}>
+  return <div data-reader-official-node={node.kind} {...(node.kind === 'user' || node.kind === 'steering' ? chatSeatProps(node.kind, node.key) : {})}>
     {renderNode(OFFICIAL_SEATS.nodes, { ...owner, node }, { entryKey: node.kind, hookContext: { turnData: turn?.data, disclosureReset }, fallback })}
   </div>;
 }

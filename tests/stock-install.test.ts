@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import semver from 'semver';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as {
@@ -11,7 +13,23 @@ const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as {
   exports: Record<string, { default?: string } | string>;
   files: string[];
   dsh: { bundle?: { patch?: string } };
+  peerDependencies: Record<string, string>;
 };
+
+const HARNESS_PEER = '>=0.2.0-rc.1 <0.2.1';
+
+test('Harness 0.2.0 peer range accepts the rc.1 and stable releases', () => {
+  const peers = Object.entries(pkg.peerDependencies).filter(([name]) => name.startsWith('@deepseek-ai/dsh-'));
+  assert.ok(peers.length >= 12);
+  for (const [name, range] of peers) {
+    assert.equal(range, HARNESS_PEER, name);
+    assert.equal(semver.satisfies('0.2.0-rc.2', range), true, name);
+    assert.equal(semver.satisfies('0.2.0', range), true, name);
+    assert.equal(semver.satisfies('0.2.0-alpha.1', range), false, name);
+    assert.equal(semver.satisfies('0.2.0-alpha', range), false, name);
+    assert.equal(semver.satisfies('0.1.7-rc.2', range), false, name);
+  }
+});
 
 test('declares dsh.bundle.patch so official add joins the profile layer stack', () => {
   assert.equal(pkg.dsh.bundle?.patch, './cordis.patch.yml');
@@ -44,6 +62,13 @@ test('commits compiled lib entries and does not require a prepare script', () =>
   assert.doesNotMatch(clientJs, /只折叠过程/);
   assert.match(clientJs, /\.dsh\/skills/);
   assert.doesNotMatch(clientJs, /submission\.images\.length/);
+});
+
+test('compiled host entry loads in Node without a TypeScript loader', () => {
+  const result = spawnSync(process.execPath, ['--input-type=module', '--eval',
+    "const plugin = await import('./lib/dsh-better-display.js'); if (plugin.name !== 'dsh-better-display' || typeof plugin.apply !== 'function') process.exit(1);",
+  ], { cwd: root, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr || String(result.error ?? 'host entry did not load'));
 });
 
 test('README leads with the official stock one-liner and names pnpm', () => {

@@ -45,6 +45,19 @@ test('committed client bundle publishes data-chat-flow for git installs', () => 
   assert.match(compiled, /"data-chat-flow":\s*""/);
 });
 
+test('Reader exposes rewind chat seats and pending steering markers', () => {
+  const source = readFileSync(resolve(root, 'src/client/Reader.tsx'), 'utf8');
+  const seat = readFileSync(resolve(root, 'src/client/chat-seat.ts'), 'utf8');
+  assert.match(seat, /data-chat-anchor-key/);
+  assert.match(seat, /data-chat-flow-key/);
+  assert.match(seat, /data-chat-node-key/);
+  assert.match(source, /data-pending-steering/);
+  assert.match(source, /data-pending-attachment-count/);
+  const client = readFileSync(resolve(root, 'lib/client.js'), 'utf8');
+  assert.match(client, /data-chat-anchor-key/);
+  assert.match(client, /data-pending-steering/);
+});
+
 test('skin empty-state hide stays off when Reader mounts inside the scrollport', () => {
   const inspectOnly: AttrNode = {
     attrs: { 'data-conversation-scroll': '' },

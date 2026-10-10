@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+- Restore the official chat seat attributes on Better Display user and steering rows so rewind actions can find durable messages.
+- Render pending inbox steering rows and deduplicate them against observed local submissions.
+
+## 0.3.6 — 2026-10-05
+
+- Keep a running tool's elapsed clock counting from the call's stamped start instead of the moment the row mounted. Switching sessions and back — or even reloading the page mid-run — now continues the count rather than restarting it at zero; draft-only calls remember their first-seen time per call id until they settle.
+
+## 0.3.5 — 2026-10-04
+
+- Release finished expand animations so process rows return to their natural height. Content changes after expanding no longer leave blank space or clip steps until a page refresh.
+- Preserve the collapse animation until React removes the content, avoiding a one-frame flash.
+- Restore plain CSS handling in the motion fixture builder and add browser regression coverage for content resize, repeated disclosures, instant collapse, disabled motion, and rapid reversal.
+
+## 0.3.4 — 2026-09-28
+
+- Accept Harness `0.2.0-rc.1` (`dsh-v0.2.0-rc.1`, `4878cdabd87d4041bdaff61d04c966883b9fd07a`). Peer range is `>=0.2.0-rc.1 <0.2.1`. That range accepts `0.2.0-rc.1` and stable `0.2.0`, rejects `0.2.0` alphas, and rejects `0.1.7-rc.2`.
+- `conversation.chat.turnTail` stays a list slot. Icon imports stay on the `*Regular` names. Official registrations are unchanged from `0.1.7-rc.2`.
+- Stock chat `MessageItem` wraps an active model-retry line in `TextShimmer`, and `TurnProcessNodeView` renders only after the turn closes. Reader already owns those rows, so the reading layout is unchanged. `compat/harness-rc2.json` is re-recorded against this tag after that review.
+
 ## 0.3.3 — 2026-09-24
 
 - Accept Harness `0.1.7-rc.2` (`dsh-v0.1.7-rc.2`, `477b4f420553e8a52c2fbccc464d7561b239c443`). Peer range stays `>=0.1.7-rc.1 <0.1.8`.
@@ -207,6 +228,7 @@
   step-and-hold: it used to advance two lines every ~1.3 seconds no matter how
   fast the text arrived, which is what made the pane look like it was lagging
   behind a fast model.
+
 ### Host DOM hooks
 
 - Keep ChatView's `data-chat-flow=""` hook on the Reader column so skins that hide `[data-composer-seat]` when the scrollport has no chat-flow (maid-atelier, phoebe-atelier, and others) still show the composer in reading view.
