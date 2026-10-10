@@ -23,6 +23,7 @@ export function basename(path: string): string {
 export function dirname(path: string): string {
   const normalized = path.replace(/[/\\]+$/, '');
   const at = Math.max(normalized.lastIndexOf('/'), normalized.lastIndexOf('\\'));
+  if (at === 0 || (at === 2 && /^[A-Za-z]:/.test(normalized))) return normalized.slice(0, at + 1);
   return at === -1 ? '.' : normalized.slice(0, at) || '.';
 }
 

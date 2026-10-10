@@ -1,3 +1,5 @@
+import { isAbsoluteWorkspacePath } from '../workspace-path.js';
+
 export type DeliverableOpenMode = 'external' | 'sidebar';
 
 export interface OpenModeSnapshot {
@@ -20,14 +22,6 @@ export function modeFromSnapshot(store: OpenModeSnapshot | undefined): Deliverab
 /** Workspace-folder affordances stay on the OS opener, not the Sidebar switch. */
 export function isFolderOpenPath(path: string): boolean {
   return path === '.' || path === '';
-}
-
-function isWindowsStylePath(value: string): boolean {
-  return /^[A-Za-z]:[/\\]/.test(value) || value.startsWith('\\\\');
-}
-
-function isAbsoluteWorkspacePath(path: string): boolean {
-  return path.startsWith('/') || isWindowsStylePath(path);
 }
 
 function encodeSegment(segment: string): string {

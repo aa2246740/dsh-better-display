@@ -6,6 +6,8 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types';
 import { resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path';
 import * as workspacePathPkg from '@deepseek-ai/dsh-util-workspace-path';
 import { dirname } from './deliverables.js';
+import { isAbsoluteWorkspacePath } from '../workspace-path.js';
+import { ensureStyles } from './styles.js';
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client';
 import { Reader } from './Reader.js';
@@ -56,6 +58,9 @@ export type { ReaderBlockOwner } from './types.js';
 export { McpAppFrame } from './McpAppFrame.js';
 export const name = 'dsh-better-display-client';
 export const inject = ['slots', 'sessions', 'conversation', 'uiConversation', 'remote', 'remote.session'];
+
+// All CSS imports have injected their nodes before this module's body runs.
+ensureStyles();
 
 export function apply(ctx: Context): void {
   const store = createReaderStore();
@@ -138,7 +143,7 @@ export function apply(ctx: Context): void {
               const res = await fetch('/better-display/reveal', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path: targetPath }),
+                body: JSON.stringify({ path: targetPath, sessionId }),
               });
               if (res.ok) {
                 const data = await res.json();
@@ -150,6 +155,10 @@ export function apply(ctx: Context): void {
 
             // 2. Fallback to official opener with parent directory
             const parentDir = dirname(targetPath);
+            if (!isAbsoluteWorkspacePath(parentDir)) {
+              console.warn('[dsh-better-display] reveal failed; refusing to open a relative parent:', targetPath);
+              return;
+            }
             const remote = ctx.remote as unknown as { session?: { openWorkspacePath: (arg: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }> } } | undefined;
             const remoteSession = remote?.session
               ?? (ctx.get?.('remote.session') as unknown as { openWorkspacePath: (arg: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }> } | undefined);
