@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import css from './Reader.module.css';
 import { StreamMotionContext } from './streaming.js';
@@ -170,12 +170,16 @@ export function ProcessFragment({ open, motion, onRead, returnFocusTo, nodeKey, 
 }
 
 /** Retire only narration that was actually visible; historical rows stay folded. */
-export function RetiringContent({ visible, children }: { visible: boolean; children: ReactNode }) {
+export function RetiringContent({ visible, children, onRetired }: { visible: boolean; children: ReactNode; onRetired?: () => void }) {
   const { enabled } = useContext(StreamMotionContext);
   const root = useRef<HTMLDivElement>(null);
   const animation = useRef<Animation | null>(null);
   const [present, setPresent] = useState(visible);
   const [focusHeld, setFocusHeld] = useState(false);
+  // Held in a ref so a caller passing an inline closure does not restart the
+  // collapse every render, and so the settle path always sees the latest one.
+  const retired = useRef(onRetired);
+  retired.current = onRetired;
   useLayoutEffect(() => {
     const element = root.current;
     if (visible) {
@@ -188,10 +192,10 @@ export function RetiringContent({ visible, children }: { visible: boolean; child
     if (focusHeld) return;
     const from = element.getBoundingClientRect().height;
     animation.current?.cancel(); animation.current = null;
-    if (!enabled || from < 1) { setPresent(false); return; }
+    if (!enabled || from < 1) { setPresent(false); retired.current?.(); return; }
     const next = element.animate([{ height: `${from}px`, opacity: 1 }, { height: '0px', opacity: 0 }], { duration: 220, easing: EASING, fill: 'both' });
     animation.current = next;
-    const settle = () => { if (animation.current === next) { animation.current = null; next.cancel(); setPresent(false); } };
+    const settle = () => { if (animation.current === next) { animation.current = null; next.cancel(); setPresent(false); retired.current?.(); } };
     next.onfinish = settle;
     const deadline = window.setTimeout(settle, 220 + 240);
     return () => {
@@ -206,6 +210,70 @@ export function RetiringContent({ visible, children }: { visible: boolean; child
     onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setFocusHeld(false); }}>
     {children}
   </div>;
+}
+
+/** One turn lane: `live` while it is still in the visible order. */
+interface TurnSlot<T> {
+  readonly group: T;
+  readonly live: boolean;
+}
+
+/**
+ * Keeps a departing turn mounted for the length of its own collapse.
+ *
+ * A rewind removes turns from the visible order, and unmounting them outright
+ * snapped the transcript: every withdrawn row disappeared in one frame with
+ * nothing to scroll. Instead each departing turn is retained, rendered with
+ * `visible={false}` so it animates to zero height, and released only once the
+ * collapse has settled — so the reader watches the rows fold away and the rows
+ * below glide up into their place.
+ *
+ * Slots keep their previous index, so a collapsing turn stays exactly where the
+ * reader last saw it; appending it would jump it to the bottom for the length
+ * of the animation. Retention is bounded by the animation itself: `onRetired`
+ * drops the slot, so a departing turn lives for one collapse and no longer —
+ * and a key that comes back later is re-added as a live slot.
+ */
+export function RetiringTurns<T extends { readonly key: string }>({ groups, render }: {
+  groups: readonly T[];
+  render: (group: T) => ReactNode;
+}) {
+  const [slots, setSlots] = useState<readonly TurnSlot<T>[]>(() =>
+    groups.map((group) => ({ group, live: true })),
+  );
+  // Reconcile after every commit rather than during render: a key that left the
+  // order becomes `live: false` and keeps its index, which is what lets the
+  // collapse play in place instead of jumping the turn to the bottom.
+  useLayoutEffect(() => {
+    setSlots((current) => {
+      const incoming = new Map(groups.map((group) => [group.key, group]));
+      const next: TurnSlot<T>[] = [];
+      for (const slot of current) {
+        const stillLive = incoming.get(slot.group.key);
+        if (stillLive === undefined) { next.push({ group: slot.group, live: false }); continue; }
+        incoming.delete(slot.group.key);
+        next.push({ group: stillLive, live: true });
+      }
+      for (const group of groups) if (incoming.has(group.key)) next.push({ group, live: true });
+      const same = next.length === current.length && next.every((slot, index) =>
+        slot.live === current[index]!.live && slot.group === current[index]!.group);
+      return same ? current : next;
+    });
+  }, [groups]);
+  return (
+    <>
+      {slots.map((slot) => (
+        <RetiringContent
+          key={slot.group.key}
+          visible={slot.live}
+          onRetired={() => setSlots((current) => current.filter((candidate) =>
+            candidate.live || candidate.group.key !== slot.group.key))}
+        >
+          {render(slot.group)}
+        </RetiringContent>
+      ))}
+    </>
+  );
 }
 
 // DOM-only behavior: the native Session remains the sole source of business data.
