@@ -1,5 +1,5 @@
-import { useCallback, useState, useSyncExternalStore, type ReactNode } from 'react';
-import type { ChatConversationViewNode, ChatNodeOwnerProps, TurnTailOwnerProps, UseDisclosure } from '@deepseek-ai/dsh-client-ui-chat/client';
+import { useCallback, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from 'react';
+import type { ChatConversationViewNode, ChatNodeOwnerProps, TurnTailOwnerProps, UseDisclosure, UseGroupAction } from '@deepseek-ai/dsh-client-ui-chat/client';
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store';
 import type { ToolCallBlock } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type { AssistantActionOwnerProps } from '@deepseek-ai/dsh-client-ui-chat/client';
@@ -7,6 +7,11 @@ type MessageId = AssistantActionOwnerProps['messageId'];
 import { OFFICIAL_SEATS } from './official-slots.js';
 import type { BlockRenderProps } from './types.js';
 import { chatSeatProps } from './chat-seat.js';
+
+/** Reader owns process folding; official mirrored nodes still require the 0.2.1 group-action hook. */
+export function useReaderGroupAction(_hidden: boolean, _reveal: () => void): RefObject<HTMLDivElement> {
+  return useRef<HTMLDivElement>(null!);
+}
 
 export function OfficialActions({ official, messageId }: Pick<BlockRenderProps, 'official'> & { messageId?: MessageId }) {
   if (!official || !messageId) return null;
@@ -45,20 +50,16 @@ export function OfficialNode({ node, fallback, ...render }: BlockRenderProps & {
   const owner: ChatNodeOwnerProps = {
     cwd: render.cwd,
     openFile: render.openFile ?? (() => {}),
-    openSkill: () => {},
     forkAt: render.forkAt ?? (() => {}),
     inspectCall: callId => official.openView('trajectory', callId),
     loadImage: official.officialImageLoader,
-    renderMessageImages: images => official.renderSlot(OFFICIAL_SEATS.images, {
-      ...images, loadImage: official.officialImageLoader,
-    }),
     fileMentions: official.officialFileMentions,
   };
   const turn = node.location.kind === 'turn' || node.location.kind === 'step' ? node.location.turn : undefined;
   // The runtime node domain is open; the public SlotMap enumerates the known kinds.
   const renderNode = official.renderSlot as unknown as (key: string, owner: object, options: object) => ReactNode;
   return <div data-reader-official-node={node.kind} {...(node.kind === 'user' || node.kind === 'steering' ? chatSeatProps(node.kind, node.key) : {})}>
-    {renderNode(OFFICIAL_SEATS.nodes, { ...owner, node }, { entryKey: node.kind, hookContext: { turnData: turn?.data, disclosureReset }, fallback })}
+    {renderNode(OFFICIAL_SEATS.nodes, { ...owner, node }, { entryKey: node.kind, hookContext: { turnData: turn?.data, disclosureReset, useGroupAction: useReaderGroupAction as UseGroupAction }, fallback })}
   </div>;
 }
 

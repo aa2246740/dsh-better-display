@@ -1,9 +1,11 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, type RefObject } from 'react';
 import type { ChatConversationViewNode, TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-chat/client';
 import type { ToolCallBlock } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type { AssistantActionOwnerProps } from '@deepseek-ai/dsh-client-ui-chat/client';
 type MessageId = AssistantActionOwnerProps['messageId'];
 import type { BlockRenderProps } from './types.js';
+/** Reader owns process folding; official mirrored nodes still require the 0.2.1 group-action hook. */
+export declare function useReaderGroupAction(_hidden: boolean, _reveal: () => void): RefObject<HTMLDivElement>;
 export declare function OfficialActions({ official, messageId }: Pick<BlockRenderProps, 'official'> & {
     messageId?: MessageId;
 }): import("react").JSX.Element | null;

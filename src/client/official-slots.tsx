@@ -18,7 +18,9 @@ export const OFFICIAL_SLOTS = {
   tools: 'tool.call.toolview',
   tail: 'conversation.chat.turnTail',
   nodes: 'conversation.chat.node',
-  images: 'conversation.message.images',
+  // 0.2.1 split the single conversation.message.images seat into message vs user.
+  messageImages: 'conversation.chat.message.images',
+  userImages: 'conversation.chat.user.images',
 } as const;
 export type OfficialFamily = keyof typeof OFFICIAL_SLOTS;
 export const OFFICIAL_SEATS = {
@@ -26,7 +28,8 @@ export const OFFICIAL_SEATS = {
   tools: 'dsh-better-display.official.tools/tool.call.toolview',
   tail: 'dsh-better-display.official.tail/conversation.chat.turnTail',
   nodes: 'dsh-better-display.official.nodes/conversation.chat.node',
-  images: 'dsh-better-display.official.images/conversation.message.images',
+  messageImages: 'dsh-better-display.official.messageImages/conversation.chat.message.images',
+  userImages: 'dsh-better-display.official.userImages/conversation.chat.user.images',
 } as const;
 export type OfficialSeat = typeof OFFICIAL_SEATS[OfficialFamily];
 export const officialSeat = (family: OfficialFamily, source: string = OFFICIAL_SLOTS[family]) =>
@@ -52,7 +55,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'dsh-better-display.official.tools/tool.call.toolview': SlotMap['tool.call.toolview'];
     'dsh-better-display.official.tail/conversation.chat.turnTail': SlotMap['conversation.chat.turnTail'];
     'dsh-better-display.official.nodes/conversation.chat.node': SlotMap['conversation.chat.node'];
-    'dsh-better-display.official.images/conversation.message.images': SlotMap['conversation.message.images'];
+    'dsh-better-display.official.messageImages/conversation.chat.message.images': SlotMap['conversation.chat.message.images'];
+    'dsh-better-display.official.userImages/conversation.chat.user.images': SlotMap['conversation.chat.user.images'];
   }
 }
 
@@ -67,7 +71,8 @@ const EXPECTED: Record<OfficialFamily, Spec> = {
   tools: { kind: 'keyed', scope: 'session' },
   tail: { kind: 'list', scope: 'session' },
   nodes: { kind: 'keyed', scope: 'session' },
-  images: { kind: 'single', scope: 'session' },
+  messageImages: { kind: 'single', scope: 'session' },
+  userImages: { kind: 'single', scope: 'session' },
 };
 
 /**
