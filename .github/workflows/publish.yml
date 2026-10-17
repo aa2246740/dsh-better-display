@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 30
     env:
       DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
-      HARNESS_REF: dsh-v0.2.0-rc.2
+      HARNESS_REF: dsh-v0.2.1-rc.2
     steps:
       - uses: actions/checkout@v4
 

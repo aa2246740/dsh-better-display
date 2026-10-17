@@ -14,21 +14,26 @@ const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as {
   files: string[];
   dsh: { bundle?: { patch?: string } };
   peerDependencies: Record<string, string>;
+  engines: { node?: string; dsh?: string };
 };
 
-const HARNESS_PEER = '>=0.2.0-rc.1 <0.2.1';
+const HARNESS_PEER = '>=0.2.1-rc.1 <0.2.2';
+const HARNESS_ENGINES = '>=0.2.1-rc.1 <0.2.2';
 
-test('Harness 0.2.0 peer range accepts the rc.1 and stable releases', () => {
+test('Harness 0.2.1 peer and engines.dsh accept rc.1/rc.2 and stable, reject alphas and 0.2.0', () => {
   const peers = Object.entries(pkg.peerDependencies).filter(([name]) => name.startsWith('@deepseek-ai/dsh-'));
   assert.ok(peers.length >= 12);
   for (const [name, range] of peers) {
     assert.equal(range, HARNESS_PEER, name);
-    assert.equal(semver.satisfies('0.2.0-rc.2', range), true, name);
-    assert.equal(semver.satisfies('0.2.0', range), true, name);
-    assert.equal(semver.satisfies('0.2.0-alpha.1', range), false, name);
-    assert.equal(semver.satisfies('0.2.0-alpha', range), false, name);
-    assert.equal(semver.satisfies('0.1.7-rc.2', range), false, name);
+    assert.equal(semver.satisfies('0.2.1-rc.1', range), true, name);
+    assert.equal(semver.satisfies('0.2.1-rc.2', range), true, name);
+    assert.equal(semver.satisfies('0.2.1', range), true, name);
+    assert.equal(semver.satisfies('0.2.1-alpha.5', range), false, name);
+    assert.equal(semver.satisfies('0.2.0-rc.2', range), false, name);
   }
+  assert.equal(pkg.engines?.dsh, HARNESS_ENGINES);
+  assert.equal(semver.satisfies('0.2.1-rc.2', pkg.engines.dsh), true);
+  assert.equal(semver.satisfies('0.2.0-rc.2', pkg.engines.dsh), false);
 });
 
 test('declares dsh.bundle.patch so official add joins the profile layer stack', () => {

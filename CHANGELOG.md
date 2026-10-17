@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.9 — 2026-10-17
+
+- Accept Harness `0.2.1-rc.2` (`dsh-v0.2.1-rc.2`, `687f282e8625c6b8d11ff58211a90524be2e4317`). Peer range and `engines.dsh` are `>=0.2.1-rc.1 <0.2.2`. That range accepts `0.2.1-rc.1`, `0.2.1-rc.2`, and stable `0.2.1`; rejects `0.2.1` alphas and `0.2.0-rc.*`.
+- Follow the 0.2.1 image-slot split: mirror `conversation.chat.message.images` and `conversation.chat.user.images` instead of the removed `conversation.message.images`, and stop passing the removed `renderMessageImages` / `openSkill` Chat node owner fields.
+- Supply the new required `useGroupAction` Chat node hook context (Reader still owns folding) and the new `commandLine` terminal label.
+
 ## 0.3.8 — 2026-10-13
 
 - Fix host entry bundling in tsdown: stop externalising relative host imports and add a portable output build guard to prevent missing bundled modules (`ERR_MODULE_NOT_FOUND ./skill-roots.ts`, #58, #59, #61).

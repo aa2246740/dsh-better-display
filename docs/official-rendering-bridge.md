@@ -1,6 +1,6 @@
 # 官方能力接入说明
 
-`0.3.0` 在 `v0.2.1` 的阅读布局上接入官方内容和控件，经过试用验收后发布。当前验收目标是 Harness `0.2.0-rc.2`（`dsh-v0.2.0-rc.2`，`639ed015397290b3745d163aafe02ffee4aa3f84`）。`conversation.chat.turnTail` 仍是 `list`。相对 `0.1.7-rc.2`，官方注册清单没有增减；`schedule-created` 和 `schedule_update` 继续走已有镜像座位，Reader 不另写这两张卡片。图标仍使用 `*Regular` 名称。开发者消息里的工具增减行用官方标题和计数，本地 Markdown 图片接受 Desktop 文件路由 `dsh-app://app/api/file`。`0.2.0-rc.2` 里官方对话的模型重试行增加了 `TextShimmer`，进行中的 `TurnProcessNodeView` 改为关闭后才渲染；阅读页本来就自己呈现这两行，所以阅读布局不跟着改。后续仍需维护的自有展示逻辑和升级边界见下文。
+`0.3.0` 在 `v0.2.1` 的阅读布局上接入官方内容和控件，经过试用验收后发布。当前验收目标是 Harness `0.2.1-rc.2`（`dsh-v0.2.1-rc.2`，`687f282e8625c6b8d11ff58211a90524be2e4317`）。`conversation.chat.turnTail` 仍是 `list`。相对 `0.2.0-rc.2`，官方注册清单在记录基线时再核对；`schedule-created` 和 `schedule_update` 继续走已有镜像座位，Reader 不另写这两张卡片。图标仍使用 `*Regular` 名称。开发者消息里的工具增减行用官方标题和计数，本地 Markdown 图片接受 Desktop 文件路由 `dsh-app://app/api/file`。`0.2.0-rc.2` 起官方对话的模型重试行增加了 `TextShimmer`，进行中的 `TurnProcessNodeView` 改为关闭后才渲染；阅读页本来就自己呈现这两行，所以阅读布局不跟着改。Peer 与 `engines.dsh` 为 `>=0.2.1-rc.1 <0.2.2`。后续仍需维护的自有展示逻辑和升级边界见下文。
 
 ## 一个具体例子
 

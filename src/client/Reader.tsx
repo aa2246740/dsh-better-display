@@ -2,13 +2,13 @@ import type {} from '@deepseek-ai/dsh-session-turn-outline/types';
 import type {} from '@deepseek-ai/dsh-agent/types';
 import { Fragment, memo, useCallback, useEffect, useId, useInsertionEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { ReactNode, RefObject } from 'react';
-import type { ChatConversationViewNode, ChatNode, ChatNodeKind, ChatNodeOwnerProps } from '@deepseek-ai/dsh-client-ui-chat/client';
+import type { ChatConversationViewNode, ChatNode, ChatNodeKind, ChatNodeOwnerProps, UseGroupAction } from '@deepseek-ai/dsh-client-ui-chat/client';
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store';
 import { JsonBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives';
 import { BlockBoundary, Blocks, contentBlocks, CopyAnswer, UserMessageActions } from './Blocks.js';
 import { ReasoningCard } from './ReasoningCard.js';
 import { ToolActivity, ToolMedia } from './ToolActivity.js';
-import { OfficialActions, OfficialNode, OfficialTail } from './OfficialContent.js';
+import { OfficialActions, OfficialNode, OfficialTail, useReaderGroupAction } from './OfficialContent.js';
 import { OFFICIAL_SEATS } from './official-slots.js';
 import { preparingLabel, readerFlow } from './tool-activity.js';
 import { Disclosure, ProcessFragment, RetiringContent, StatusText, useMotionAllowed, usePinnedSelection, useReadingScroll } from './motion.js';
@@ -242,17 +242,13 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
       const owner: ChatNodeOwnerProps & Pick<ReaderProps, 'sessionId'> = {
         cwd: render.cwd,
         openFile: render.openFile ?? (() => {}),
-        openSkill: () => {},
         forkAt: render.forkAt ?? (() => {}),
         inspectCall: callId => official.openView('trajectory', callId),
         loadImage: official.officialImageLoader,
-        renderMessageImages: images => official.renderSlot(OFFICIAL_SEATS.images, {
-          ...images, loadImage: official.officialImageLoader,
-        }),
         fileMentions: official.officialFileMentions,
         sessionId: render.sessionId,
       };
-      const options = { hookContext: { turnData: turn?.data, disclosureReset }, fallback };
+      const options = { hookContext: { turnData: turn?.data, disclosureReset, useGroupAction: useReaderGroupAction as UseGroupAction }, fallback };
       rendered = node.kind === 'user'
         ? official.renderSlot(OFFICIAL_SEATS.nodes, { ...owner, node }, { ...options, entryKey: 'user' })
         : official.renderSlot(OFFICIAL_SEATS.nodes, { ...owner, node }, { ...options, entryKey: 'steering' });
@@ -887,7 +883,7 @@ export function Reader(props: ReaderProps) {
 
   // ChatView publishes data-chat-flow="" on its column. Skins treat a
   // scrollport without that hook as inspect-only and hide [data-composer-seat].
-  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} data-reader-build="0.3.4" data-dsh-better-display="0.3.4" data-reader-wait-clock-version="input-v1" data-reader-wait-start={waitAnchor.time ?? undefined} data-motion={motion ? 'on' : 'off'} data-reader-glass={frostedGlass || undefined} data-reader-auto-fold={autoFold ? 'on' : 'off'}>
+  return <StreamMotionContext.Provider value={streamMotion}><div ref={root} className={css.root} data-reader-build="0.3.9" data-dsh-better-display="0.3.9" data-reader-wait-clock-version="input-v1" data-reader-wait-start={waitAnchor.time ?? undefined} data-motion={motion ? 'on' : 'off'} data-reader-glass={frostedGlass || undefined} data-reader-auto-fold={autoFold ? 'on' : 'off'}>
     <TimelineRail items={timelineItems} activeTurn={activeTurn} busyTurn={busyTurn} onNavigate={onNavigateTurn} />
     <div className={css.column} data-chat-flow="">
       <StickyLane kind="toolbar" className={css.toolbar}>
