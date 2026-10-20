@@ -40,13 +40,17 @@ export function foldSummary(steps: readonly LiveStep[]): string {
   return parts.join(' · ') || '此前步骤';
 }
 
-/** One chain: fold only when a new reasoning step has prior body/tool/reasoning. */
+/**
+ * One chain of foldable process steps: fold only when a new reasoning step has
+ * prior reasoning/tool/record steps. Narration is never passed here — it is a
+ * chain boundary in {@link presentLiveTurn} and stays visible in place.
+ */
 export function splitChain(chain: readonly LiveStep[]): { fold: readonly LiveStep[] | null; open: readonly LiveStep[] } {
   const lastReasoning = chain.findLastIndex(step => step.kind === 'reasoning');
   if (lastReasoning < 0) return { fold: null, open: chain };
   const prior = chain.slice(0, lastReasoning);
   if (!prior.length) return { fold: null, open: chain };
-  const trigger = prior.some(step => step.kind === 'reasoning' || step.kind === 'body' || step.kind === 'tool');
+  const trigger = prior.some(step => step.kind === 'reasoning' || step.kind === 'tool');
   if (!trigger) return { fold: null, open: chain };
   return { fold: prior, open: chain.slice(lastReasoning) };
 }
@@ -189,9 +193,18 @@ export function presentLiveTurn(steps: readonly LiveStep[], boundary: TurnBounda
     if (step.kind === 'user') {
       flush();
       items.push({ kind: 'user', key: step.key, step });
-    } else {
-      chain.push(step);
+      continue;
     }
+    // Assistant narration is never folded. It ends the current fold chain and
+    // always publishes as its own open row, so a later thinking step can only
+    // collapse the reasoning/tool rows on the same side of the narration.
+    if (step.kind === 'body') {
+      if (!live) { chain.push(step); continue; }
+      flush();
+      items.push({ kind: 'open', key: step.key, step });
+      continue;
+    }
+    chain.push(step);
   }
   flush();
   return items;

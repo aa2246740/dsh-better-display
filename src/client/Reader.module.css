@@ -109,7 +109,20 @@
    rail width, same gutter, so a column of nested rows reads as one line. */
 .processContents { display: flow-root; border-left: 1px solid var(--dsw-alias-border-l2); padding: 3px 0 2px var(--reader-gutter, 16px); margin: 0 0 0 var(--reader-rail, 6px); color: var(--dsw-alias-label-secondary); font-size: 14px; line-height: 24px; }
 .processContents > :last-child { margin-bottom: 0; }
-.processCommentary { color: var(--dsw-alias-label-secondary); font-size: 14px; line-height: 24px; margin: 4px 0 8px var(--reader-rail, 6px); padding-left: var(--reader-gutter, 16px); border-left: 1px solid var(--dsw-alias-border-l2); }
+/* Narration stays ordinary body text (the `.answer` typography) and carries no
+   left rule of its own. When collapsed reasoning/tool rows sat between two
+   narration blocks, the gap carries a compact folded-process summary in the
+   process-chain language: a 1px left rail plus the familiar `思考×N · 工具×K`
+   label with its chevron. The preceding narration cell drops its outer bottom
+   gap so the seam row owns exactly that space. */
+.processSeamRow {
+  display: flex; align-items: center; min-height: 40px;
+  margin-left: var(--reader-rail, 6px); padding-left: var(--reader-gutter, 16px);
+  border-left: 1px solid var(--dsw-alias-border-l2); box-sizing: border-box;
+}
+.processSeamRow > .disclosure { display: flex; align-items: center; min-height: 24px; }
+.processSeamRow .disclosureButton { min-height: 24px; padding-block: 2px; font-size: 12px; line-height: 20px; color: var(--dsw-alias-label-tertiary); }
+.flowCell:has(> .flowCellInner > [data-reader-seam-after]) > .flowCellInner { padding-bottom: 0; }
 .processFrame { min-width: 0; }
 .toolActivity { min-width: 0; color: var(--dsw-alias-label-secondary); }
 .nativeToolRow { min-width: 0; }

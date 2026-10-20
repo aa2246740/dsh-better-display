@@ -33,6 +33,13 @@ export function boundaryOf(turn: TurnLocation | undefined): TurnBoundary {
   };
 }
 
+/**
+ * A settled body step before the closing step of a successful turn.
+ *
+ * This is presentation classification only: narration is never process content
+ * and never folds. It only chooses the calmer commentary style for text that is
+ * no longer the turn's final answer.
+ */
 export function isEarlierNarration(data: AssistantChatData, boundary: TurnBoundary): boolean {
   // New body text, a tool call, or a settled step is not a completed turn.
   if (data.status !== 'settled' || boundary.status !== 'closed' || boundary.reason !== 'completed') return false;
@@ -49,13 +56,18 @@ export function processChoiceKey(groupKey: string, boundary: TurnBoundary): stri
   return `${groupKey}:${boundary.status}:${boundary.reason ?? 'pending'}`;
 }
 
-/** A body-only assistant step is not a thinking/process disclosure. */
-export function hasProcessContent(node: ChatConversationViewNode | undefined, boundary: TurnBoundary): boolean {
+/**
+ * A body-only assistant step is not a thinking/process disclosure.
+ *
+ * Narration (text/image/other blocks) is always visible, so it never counts as
+ * foldable process content; only literal reasoning does. Tool calls arrive as
+ * their own flow entries and are checked separately by the reader.
+ */
+export function hasProcessContent(node: ChatConversationViewNode | undefined, _boundary: TurnBoundary): boolean {
   if (!node || node.visibility === 'hidden') return false;
   if (node.kind === 'assistant-step') {
     const data = node.data as AssistantChatData;
-    return data.blocks.some(block => block.kind === 'reasoning' && block.text.trim() !== '')
-      || (isEarlierNarration(data, boundary) && hasVisibleBody(data.blocks));
+    return data.blocks.some(block => block.kind === 'reasoning' && block.text.trim() !== '');
   }
   return node.kind === 'context' || node.kind === 'model-retry' || node.kind === 'system-prompt' || node.kind === 'turn-process'
     || node.kind === 'command' || node.kind === 'manual-compaction' || node.kind === 'compaction';

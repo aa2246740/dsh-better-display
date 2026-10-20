@@ -16,7 +16,19 @@ Keep native DeepSeek Harness process information readable while separating the f
 
 During a turn, show its real process in chronological order. Starting body output, preparing tool input, finishing one tool, or entering another step is not whole-turn completion.
 
-Only a successful public turn-close boundary folds process and intermediate commentary, leaving the final answer in place. Failures, interruptions, unknown terminal states and approval requests remain visible. A live text selection defers folding until the selection is released. A historical turn can always be reopened.
+Only a successful public turn-close boundary folds process, leaving the final answer in place. Failures, interruptions, unknown terminal states and approval requests remain visible. A live text selection defers folding until the selection is released. A historical turn can always be reopened.
+
+## Narration is never folded (2026-10-20)
+
+Assistant narration — the body segments a step emits between reasoning and tool calls, including text, images and future block kinds — is display content, not process detail. It is ordinary body prose, never annotation chrome. It is always rendered in source order:
+
+- Collapsing process hides reasoning cards, tool calls, context rows and other process records; it never hides, truncates or dims narration.
+- Expanding process inserts those records back between the narration segments exactly where they occurred. Narration does not move, duplicate or become an answer card.
+- Narration uses the normal body typography and keeps no left rule of its own. When collapsed process sat between two narration blocks, a compact process-chain summary (1px rail on the shared `--reader-rail` edge + `思考×N · 工具×K` label + chevron, 12px tertiary) occupies the gap; it counts only the rows folded between those blocks and expands them in place when clicked.
+- A step that carries body blocks no longer advertises process content on that basis; only literal reasoning does.
+- Fold summaries count thinking, tools and records; narration is not counted as `输出×N` and never appears inside a fold box.
+- During a live turn, narration is a fold-chain boundary: a new reasoning step may collapse the reasoning/tool run on its side of the narration, never the narration itself.
+- Auto-fold off, failure, interruption, unknown terminals and selection protection keep their existing behavior.
 
 While a turn is still open, a later reasoning step may collapse earlier steps of the same chain into one disclosure (`思考×N`). Body or tool alone never triggers that live fold. A mid-turn user insert or steering message resets the chain. This is presentation-only and does not change the successful-turn final-answer fold.
 

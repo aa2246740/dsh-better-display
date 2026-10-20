@@ -70,14 +70,15 @@ test('reading during a run does not keep the completed process open; reopening a
   assert.equal(processExpanded(choices[processChoiceKey('turn:2', completed)], completed), false);
 });
 
-test('body-only steps do not advertise empty thinking, while real reasoning and earlier progress remain accessible', () => {
+test('body-only steps never advertise process content, even when they are earlier narration', () => {
   const node = (data: AssistantChatData) => ({ kind: 'assistant-step', visibility: 'visible', data }) as ChatConversationViewNode;
   const closing = node(assistant({ step: 2 }));
   assert.equal(hasProcessContent(closing, active), false);
   assert.equal(hasProcessContent(closing, completed), false);
   assert.equal(hasProcessContent(node(assistant({ step: 2, blocks: [{ kind: 'reasoning', text: '' }, text] })), completed), false);
   assert.equal(hasProcessContent(node(assistant({ step: 2, blocks: [{ kind: 'reasoning', text: '真实思考' }, text] })), active), true);
-  assert.equal(hasProcessContent(node(assistant({ step: 1 })), completed), true);
+  // Earlier narration stays visible, so it is not a thinking/process disclosure.
+  assert.equal(hasProcessContent(node(assistant({ step: 1 })), completed), false);
   assert.equal(hasProcessContent({ ...closing, visibility: 'hidden' }, completed), false);
 });
 

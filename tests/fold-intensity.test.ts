@@ -57,17 +57,21 @@ test('fold slider maps 0/1/2 and migrates older persist flags', () => {
   assert.equal(processOnlyFromIntensity(2), true);
 });
 
-test('autoFold false keeps every step open; autoFold true is current-main fold-on-next-reasoning', () => {
+test('autoFold false keeps every step open; autoFold true folds only thinking/tool runs', () => {
   const steps = [reasoning(1), body, tool, reasoning(2)];
   const none = presentLiveTurn(steps, open, false);
   assert.equal(none.some(item => item.kind === 'fold'), false);
   assert.deepEqual(none.map(item => item.key), ['r1', 'b1', 't1', 'r2']);
 
+  // Narration is a chain boundary: the fold before it stays open with the text,
+  // and only the tool call on the other side of the narration joins the box.
   const standard = presentLiveTurn(steps, open, true);
-  assert.equal(standard[0]?.kind, 'fold');
-  if (standard[0]?.kind !== 'fold') throw new Error('expected standard fold');
-  assert.deepEqual(standard[0].steps.map(step => step.key), ['r1', 'b1', 't1']);
-  assert.deepEqual(standard.filter(item => item.kind === 'open').map(item => item.key), ['r2']);
+  assert.deepEqual(standard.map(item => item.kind), ['open', 'open', 'fold', 'open']);
+  assert.deepEqual(standard.filter(item => item.kind === 'open').map(item => item.key), ['r1', 'b1', 'r2']);
+  const fold = standard[2];
+  if (fold?.kind !== 'fold') throw new Error('expected standard fold');
+  assert.deepEqual(fold.steps.map(step => step.key), ['t1']);
+  assert.equal(fold.steps.some(step => step.kind === 'body'), false);
 });
 
 test('root reader store persists glass off and standard fold on dsh.reader.v1', () => {

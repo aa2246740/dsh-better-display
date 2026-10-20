@@ -89,7 +89,7 @@ export function StatusText({ text, motion, shimmer = false }: { text: string; mo
 
 export function Disclosure({ open, onChange, label, controls, buttonRef, ariaLabel }: {
   open: boolean; onChange: (value: boolean) => void; label: ReactNode;
-  controls?: string; buttonRef: RefObject<HTMLButtonElement>;
+  controls?: string; buttonRef?: RefObject<HTMLButtonElement>;
   ariaLabel?: string;
 }) {
   const name = ariaLabel ?? '思考与过程';
