@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.10 — 2026-10-20
+
+- Keep every assistant narration paragraph visible. Collapsing the process now hides only reasoning cards, tool calls and process records; intermediate reports, explanations and body text no longer disappear with the thinking chain after a turn closes or when a live fold triggers.
+- Narration is ordinary body prose: normal 16px primary typography, no annotation color, indent or per-block left rule. Only the final answer keeps copy/fork actions.
+- When collapsed reasoning/tool rows sat between two body blocks, a compact process-chain summary occupies the gap between them: a 1px `--reader-rail` rule plus the familiar `思考×N · 工具×K · 记录×M` label and chevron. It counts only the rows folded between those body blocks and expands the real process rows in place when clicked.
+- Live folding collapses earlier reasoning/tool runs even when narration sits between them: once a later reasoning step exists, each prior run folds in its own position and the latest thinking stays open, so a running turn never expands every past thinking card. Narration always stays open in place, and fold boxes contain only reasoning/tool/record steps whose summaries never count narration as `输出×N`.
+- `hasProcessContent` no longer treats earlier body steps as process content, so body-only turns do not advertise an empty thinking disclosure.
+- Tests: projection/live-turn/fold-choreography contracts updated; a real-Reader browser fixture (`tests/browser-commentary.tsx`, `scripts/verify-commentary-visible.mjs`) covers red/green behavior for collapsed, expanded, live, failed and interrupted turns plus the between-paragraph seam geometry and interaction.
+- Built on the Harness 0.2.1-rc.2 adaptation branch (`>=0.2.1-rc.1 <0.2.2` peer range).
+
 ## 0.3.9 — 2026-10-17
 
 - Accept Harness `0.2.1-rc.2` (`dsh-v0.2.1-rc.2`, `687f282e8625c6b8d11ff58211a90524be2e4317`). Peer range and `engines.dsh` are `>=0.2.1-rc.1 <0.2.2`. That range accepts `0.2.1-rc.1`, `0.2.1-rc.2`, and stable `0.2.1`; rejects `0.2.1` alphas and `0.2.0-rc.*`.

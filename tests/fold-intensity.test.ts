@@ -57,17 +57,22 @@ test('fold slider maps 0/1/2 and migrates older persist flags', () => {
   assert.equal(processOnlyFromIntensity(2), true);
 });
 
-test('autoFold false keeps every step open; autoFold true is current-main fold-on-next-reasoning', () => {
+test('autoFold false keeps every step open; autoFold true folds only thinking/tool runs', () => {
   const steps = [reasoning(1), body, tool, reasoning(2)];
   const none = presentLiveTurn(steps, open, false);
   assert.equal(none.some(item => item.kind === 'fold'), false);
   assert.deepEqual(none.map(item => item.key), ['r1', 'b1', 't1', 'r2']);
 
+  // Narration stays open; each prior reasoning/tool run folds in its own place.
   const standard = presentLiveTurn(steps, open, true);
-  assert.equal(standard[0]?.kind, 'fold');
-  if (standard[0]?.kind !== 'fold') throw new Error('expected standard fold');
-  assert.deepEqual(standard[0].steps.map(step => step.key), ['r1', 'b1', 't1']);
-  assert.deepEqual(standard.filter(item => item.kind === 'open').map(item => item.key), ['r2']);
+  assert.deepEqual(standard.map(item => item.kind), ['fold', 'open', 'fold', 'open']);
+  assert.deepEqual(standard.filter(item => item.kind === 'open').map(item => item.key), ['b1', 'r2']);
+  const folds = standard.filter(item => item.kind === 'fold');
+  assert.equal(folds.length, 2);
+  if (folds[0]?.kind !== 'fold' || folds[1]?.kind !== 'fold') throw new Error('expected standard folds');
+  assert.deepEqual(folds[0].steps.map(step => step.key), ['r1']);
+  assert.deepEqual(folds[1].steps.map(step => step.key), ['t1']);
+  assert.equal(standard.some(item => item.kind === 'fold' && item.steps.some(step => step.kind === 'body')), false);
 });
 
 test('root reader store persists glass off and standard fold on dsh.reader.v1', () => {

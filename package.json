@@ -1,6 +1,6 @@
 {
   "name": "dsh-better-display",
-  "version": "0.3.9",
+  "version": "0.3.10",
   "description": "A calmer reading view for DeepSeek Harness: native process details, live reasoning, and clean final answers.",
   "type": "module",
   "license": "MIT",
@@ -59,6 +59,7 @@
     "react": "^18.2.0"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-agent": "0.2.1-rc.2",
     "@deepseek-ai/dsh-api-remotes": "0.2.1-rc.2",
     "@deepseek-ai/dsh-api-session-controller": "0.2.1-rc.2",
     "@deepseek-ai/dsh-client-connection": "0.2.1-rc.2",
@@ -67,10 +68,10 @@
     "@types/node": "^22.20.0",
     "@types/react": "~18.3.1",
     "lightningcss": "^1.33.0",
+    "semver": "^7.7.2",
     "tsdown": "^0.22.2",
     "tsx": "^4.22.4",
-    "typescript": "^6.0.3",
-    "semver": "^7.7.2"
+    "typescript": "^6.0.3"
   },
   "dependencies": {
     "clsx": "^2.0.0",
