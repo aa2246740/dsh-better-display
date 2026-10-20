@@ -44,5 +44,7 @@ test('CSS is cached after module injection and restored before mount layout effe
   const index = readFileSync(new URL('../src/client/index.tsx', import.meta.url), 'utf8');
   const reader = readFileSync(new URL('../src/client/Reader.tsx', import.meta.url), 'utf8');
   assert.match(index, /\nensureStyles\(\);/);
-  assert.match(reader, /useInsertionEffect\(\(\) => \{ ensureStyles\(\); \}, \[\]\)/);
+  // Whitespace-tolerant: the source is formatted by the project's own toolchain,
+  // which may break the effect body onto its own line.
+  assert.match(reader, /useInsertionEffect\(\(\) => \{[\s\S]{0,40}?ensureStyles\(\);[\s\S]{0,20}?\}, \[\]\)/);
 });

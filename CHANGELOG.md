@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Make rewind actually roll the Reader back. The Reader now applies the official surface-replacement contract itself (`src/client/rewind-cut.ts`): a successful `/rewind` command node names the shadowed range through `outcome.sourceEventSeq` plus the `@<seq>` target in its args, and every row in that range — the withdrawn answer, the tool rows, and the command row itself — stops rendering. Previously the transcript relied on `dsh-rewind-plugin` hiding seats by DOM, which only reached the user and steering bubbles the Reader republishes, so a rewind looked like a recorded command instead of a rollback. Two rewinds keep separate ranges (no `[min,max]` collapse), and a pure-image target now rewinds too since the range no longer depends on matching message text.
+- Fix the two ways that rule silently computed to nothing in a live session: the command node carries the plugin's registered id `rewind-plugin`, not the `rewind` spelling the session log records, and synthetic rows are anchored at fractional offsets (`turn-process` at `controlAnchorSeq - 0.1`, `turn-tail` at `seq + 0.1`), which an integer-only read skipped — leaving one lone process cell from the withdrawn turn on screen. A successful rewind now rolls the transcript all the way back and returns the withdrawn text to the composer.
+- Make a rewind `useChat`-visible. A rewind upserts the existing command row in place, so `snapshot.order` and `snapshot.nodes` keep their identity and a selector on either never fires — the recomputed row set was memoized forever. The Reader now subscribes to `visibleChatSignature`, a string of the visible keys, which the hook's `Object.is` comparison can detect.
+- Collapse withdrawn rows instead of deleting them. Every turn renders through a retiring lane (`RetiringTurns` in `src/client/motion.tsx`) that keeps a departed turn mounted at its old index for the length of its own 220ms height-and-opacity collapse, so the rows below glide up rather than snapping; the lane releases the slot when the animation settles. A withdrawn turn keeps its place and the between-turn spacing is preserved.
+
 ## 0.3.8 — 2026-10-13
 
 - Fix host entry bundling in tsdown: stop externalising relative host imports and add a portable output build guard to prevent missing bundled modules (`ERR_MODULE_NOT_FOUND ./skill-roots.ts`, #58, #59, #61).
