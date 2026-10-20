@@ -40,21 +40,6 @@ export function foldSummary(steps: readonly LiveStep[]): string {
   return parts.join(' · ') || '此前步骤';
 }
 
-/**
- * One chain of foldable process steps: fold only when a new reasoning step has
- * prior reasoning/tool/record steps. Narration is never passed here — it is a
- * chain boundary in {@link presentLiveTurn} and stays visible in place.
- */
-export function splitChain(chain: readonly LiveStep[]): { fold: readonly LiveStep[] | null; open: readonly LiveStep[] } {
-  const lastReasoning = chain.findLastIndex(step => step.kind === 'reasoning');
-  if (lastReasoning < 0) return { fold: null, open: chain };
-  const prior = chain.slice(0, lastReasoning);
-  if (!prior.length) return { fold: null, open: chain };
-  const trigger = prior.some(step => step.kind === 'reasoning' || step.kind === 'tool');
-  if (!trigger) return { fold: null, open: chain };
-  return { fold: prior, open: chain.slice(lastReasoning) };
-}
-
 function skipReasoning(part: { kind: string; blocks: AssistantBlock[] }): boolean {
   return part.kind === 'reasoning' && !part.blocks.some(block => block.kind === 'reasoning' && block.text.trim() !== '');
 }
@@ -171,41 +156,74 @@ function toolSummary(entry: ToolActivityEntry): string {
   }
 }
 
+/** Only a run that contains real thinking/tool work is worth folding. */
+function foldableRun(run: readonly LiveStep[]): boolean {
+  return run.some(step => step.kind === 'reasoning' || step.kind === 'tool');
+}
+
+/**
+ * One live chain: narration stays visible, while every earlier reasoning/tool
+ * run collapses into its own box at its original position.
+ */
 export function presentLiveTurn(steps: readonly LiveStep[], boundary: TurnBoundary, autoFold = true): LiveTurnItem[] {
   const live = autoFold && liveFoldEnabled(boundary);
   const items: LiveTurnItem[] = [];
-  let chain: LiveStep[] = [];
-  const flush = () => {
-    if (!chain.length) return;
-    if (!live) {
-      for (const step of chain) items.push({ kind: 'open', key: step.key, step });
-      chain = [];
-      return;
+  const open = (step: LiveStep) => items.push({ kind: 'open', key: step.key, step });
+  const fold = (run: readonly LiveStep[]) => {
+    if (!run.length) return;
+    if (live && foldableRun(run)) {
+      items.push({ kind: 'fold', key: `live-fold:${run[0]!.key}`, steps: run, summary: foldSummary(run) });
+    } else {
+      for (const step of run) open(step);
     }
-    const { fold, open } = splitChain(chain);
-    if (fold?.length) {
-      items.push({ kind: 'fold', key: `live-fold:${chain[0]!.key}`, steps: fold, summary: foldSummary(fold) });
-    }
-    for (const step of open) items.push({ kind: 'open', key: step.key, step });
-    chain = [];
   };
+  let run: LiveStep[] = [];
+  const flush = () => { fold(run); run = []; };
+
+  // A user insert resets the chain: steps before it are never folded by
+  // reasoning after it. Split into user-delimited segments and walk each one.
+  const segments: LiveStep[][] = [];
+  let segment: LiveStep[] = [];
   for (const step of steps) {
     if (step.kind === 'user') {
-      flush();
-      items.push({ kind: 'user', key: step.key, step });
-      continue;
+      segments.push(segment); segments.push([step]); segment = [];
+    } else {
+      segment.push(step);
     }
-    // Assistant narration is never folded. It ends the current fold chain and
-    // always publishes as its own open row, so a later thinking step can only
-    // collapse the reasoning/tool rows on the same side of the narration.
-    if (step.kind === 'body') {
-      if (!live) { chain.push(step); continue; }
-      flush();
-      items.push({ kind: 'open', key: step.key, step });
-      continue;
-    }
-    chain.push(step);
   }
-  flush();
+  segments.push(segment);
+
+  for (const part of segments) {
+    if (!part.length) continue;
+    const first = part[0]!;
+    if (part.length === 1 && first.kind === 'user') {
+      items.push({ kind: 'user', key: first.key, step: first });
+      continue;
+    }
+    if (!live) {
+      for (const step of part) open(step);
+      continue;
+    }
+    // Narration is never folded. Once a later reasoning step exists, every
+    // reasoning/tool run before it folds at its own position, so the latest
+    // thinking and everything after it stay open while earlier steps collapse —
+    // even across narration blocks, which the reader still renders in place.
+    const lastReasoning = part.findLastIndex(step => step.kind === 'reasoning');
+    if (lastReasoning <= 0) {
+      for (const step of part) open(step);
+      continue;
+    }
+    for (let index = 0; index < part.length; index++) {
+      const step = part[index]!;
+      if (index < lastReasoning) {
+        if (step.kind === 'body') { flush(); open(step); }
+        else run.push(step);
+      } else {
+        if (index === lastReasoning) flush();
+        open(step);
+      }
+    }
+    flush();
+  }
   return items;
 }

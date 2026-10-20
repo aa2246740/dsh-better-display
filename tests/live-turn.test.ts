@@ -4,7 +4,7 @@ import type { AssistantChatData, ChatConversationViewNode } from '@deepseek-ai/d
 import type { AssistantBlock, TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import { assistantSegments, processExpanded } from '../src/client/projection.ts';
 import type { TurnBoundary } from '../src/client/projection.ts';
-import { foldSummary, presentLiveTurn, segmentLiveTurn, splitChain } from '../src/client/live-turn.ts';
+import { presentLiveTurn, segmentLiveTurn } from '../src/client/live-turn.ts';
 import type { LiveStep } from '../src/client/live-turn.ts';
 import { readerFlow } from '../src/client/tool-activity.ts';
 
@@ -23,31 +23,28 @@ function tool(id: string): LiveStep {
 function user(id: string): LiveStep {
   return { kind: 'user', key: id, nodeKey: id };
 }
-function other(id: string): LiveStep {
-  return { kind: 'other', key: id, nodeKey: id };
-}
 
 function kinds(items: ReturnType<typeof presentLiveTurn>) {
   return items.map(item => item.kind === 'fold' ? ['fold', item.summary, item.steps.map(step => step.key)] : [item.kind, item.key]);
 }
 
-test('narration is never foldable: body text stays open and ends the fold chain', () => {
-  // splitChain only ever receives the foldable run (reasoning/tool/record); the
-  // commentary itself is a chain boundary in presentLiveTurn.
-  assert.equal(splitChain([reasoning('1')]).fold, null);
-  assert.equal(splitChain([reasoning('1'), tool('2')]).fold, null);
-  assert.equal(splitChain([other('ctx'), reasoning('1')]).fold, null);
-  assert.deepEqual(splitChain([reasoning('1'), tool('2'), reasoning('3')]).fold?.map(step => step.key), ['1', '2']);
-
+test('narration is never folded; earlier process runs collapse even across narration', () => {
   const beforeSecondReasoning = presentLiveTurn([reasoning('1'), body('2')], open);
   assert.deepEqual(kinds(beforeSecondReasoning), [['open', '1'], ['open', '2']]);
 
+  // The first reasoning run folds in place before the narration; the narration
+  // itself stays open, and the latest reasoning stays open.
   const afterSecondReasoning = presentLiveTurn([reasoning('1'), body('2'), reasoning('3')], open);
-  assert.deepEqual(kinds(afterSecondReasoning), [['open', '1'], ['open', '2'], ['open', '3']]);
+  assert.deepEqual(kinds(afterSecondReasoning), [
+    ['fold', '思考×1', ['1']],
+    ['open', '2'],
+    ['open', '3'],
+  ]);
 
   const mixed = presentLiveTurn([reasoning('1'), tool('2'), body('3'), reasoning('4'), tool('5'), reasoning('6')], open);
   assert.deepEqual(kinds(mixed), [
-    ['open', '1'], ['open', '2'], ['open', '3'],
+    ['fold', '思考×1 · 工具×1', ['1', '2']],
+    ['open', '3'],
     ['fold', '思考×1 · 工具×1', ['4', '5']],
     ['open', '6'],
   ]);
@@ -76,7 +73,8 @@ test('a second reasoning folds the foldable run before it, never narration', () 
 
   const narrationBetween = presentLiveTurn([reasoning('1'), body('2'), reasoning('3'), tool('4'), reasoning('5')], open);
   assert.deepEqual(kinds(narrationBetween), [
-    ['open', '1'], ['open', '2'],
+    ['fold', '思考×1', ['1']],
+    ['open', '2'],
     ['fold', '思考×1 · 工具×1', ['3', '4']],
     ['open', '5'],
   ]);
@@ -110,11 +108,11 @@ test('presentLiveTurn keeps one fold box per foldable run and never hides narrat
 
   const withNarration = presentLiveTurn([reasoning('1'), tool('2'), body('3'), reasoning('4'), tool('5'), reasoning('6')], open);
   const narratedFolds = withNarration.filter(item => item.kind === 'fold');
-  assert.equal(narratedFolds.length, 1);
-  assert.deepEqual(withNarration.filter(item => item.kind === 'open').map(item => item.key), ['1', '2', '3', '6']);
+  assert.equal(narratedFolds.length, 2);
+  assert.deepEqual(withNarration.filter(item => item.kind === 'open').map(item => item.key), ['3', '6']);
+  assert.deepEqual(narratedFolds.map(fold => fold.kind === 'fold' ? fold.steps.map(step => step.key) : []), [['1', '2'], ['4', '5']]);
   for (const fold of narratedFolds) {
     if (fold.kind !== 'fold') continue;
-    assert.deepEqual(fold.steps.map(step => step.key), ['4', '5']);
     assert.equal(fold.steps.some(step => step.kind === 'body'), false);
   }
 });
@@ -141,7 +139,7 @@ test('mid-turn user insert resets the chain; narration stays open across the res
   assert.ok(!folds[0].steps.some(step => ['1', '2', '3', '4', 'insert'].includes(step.key)));
 });
 
-test('each chain has at most one fold box; narration starts a new chain', () => {
+test('every prior process run folds in its own place; narration stays open between runs', () => {
   const items = presentLiveTurn([
     reasoning('1'), tool('2'), reasoning('3'),
     body('4'),
@@ -149,12 +147,12 @@ test('each chain has at most one fold box; narration starts a new chain', () => 
   ], open);
   const folds = items.filter(item => item.kind === 'fold');
   assert.equal(folds.length, 2);
-  if (folds[0]?.kind !== 'fold' || folds[1]?.kind !== 'fold') throw new Error('expected one box per chain');
-  assert.deepEqual(folds[0].steps.map(step => step.key), ['1', '2']);
+  if (folds[0]?.kind !== 'fold' || folds[1]?.kind !== 'fold') throw new Error('expected one box per run');
+  assert.deepEqual(folds[0].steps.map(step => step.key), ['1', '2', '3']);
   assert.deepEqual(folds[1].steps.map(step => step.key), ['5', '6', '7']);
-  assert.equal(folds[0].summary, '思考×1 · 工具×1');
+  assert.equal(folds[0].summary, '思考×2 · 工具×1');
   assert.equal(folds[1].summary, '思考×1 · 工具×2');
-  assert.deepEqual(items.filter(item => item.kind === 'open').map(item => item.key), ['3', '4', '8']);
+  assert.deepEqual(items.filter(item => item.kind === 'open').map(item => item.key), ['4', '8']);
 });
 
 test('successful turn close disables live fold so the existing final-answer rules still apply', () => {

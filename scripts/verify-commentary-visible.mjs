@@ -456,7 +456,7 @@ try {
       shots.push(await screenshot('green-completed-collapsed-again', turn1));
     });
 
-    await check('b1 open turn: 正文C not hidden by the live fold when the 2nd reasoning arrives', async () => {
+    await check('b1 open turn: 正文C visible while the earlier reasoning folds across it', async () => {
       await expectVisible(bodyC(), '进行中汇报正文C');
       await expectCount(bodyC(), 1, '进行中汇报正文C');
       await expectVisible(reasonC1(), '第二轮思考');
@@ -464,6 +464,13 @@ try {
       const folds = turn2.locator('[data-reader-live-fold]');
       const foldCount = await folds.count();
       result.snapshots.openTurnFoldCount = foldCount;
+      // The earlier reasoning run must fold even though narration sits between
+      // it and the latest reasoning; otherwise a live turn expands every past
+      // thinking card (the reported regression).
+      assert.equal(foldCount, 1, `live turn should fold the prior reasoning run across narration, got ${foldCount}`);
+      await expectHidden(reasonC0(), '第一轮思考 while collapsed');
+      const liveSummary = await folds.first().getAttribute('data-reader-live-fold-summary');
+      assert.equal(liveSummary, '思考×1', `live fold summary: ${liveSummary}`);
       if (foldCount > 0) {
         const summary = await folds.first().getAttribute('data-reader-live-fold-summary');
         assert.ok(!/输出/u.test(summary ?? '') && !/正文/u.test(summary ?? ''), `live fold must not fold body: ${summary}`);

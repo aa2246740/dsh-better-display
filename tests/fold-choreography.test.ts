@@ -43,7 +43,9 @@ test('narration never enters a fold cell, so choreography never retires it', () 
 
   const after = presentLiveTurn([reasoning(1), body, tool, reasoning(2)], open);
   assert.equal(after.some(item => item.kind === 'fold' && item.steps.some(step => step.kind === 'body')), false);
-  assert.deepEqual(retiringKeys(withNarration, after, {}), []);
+  // The prior reasoning run folds (r1 retires), but narration itself never does.
+  assert.deepEqual(retiringKeys(withNarration, after, {}), ['r1']);
+  assert.ok(!retiringKeys(withNarration, after, {}).includes('b1'));
 });
 test('user admission bypasses buffered choreography and preserves source ordering', () => {
   const before = presentLiveTurn([reasoning(1)], open);
