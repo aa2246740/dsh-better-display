@@ -77,7 +77,7 @@
     "@deepseek-ai/dsh-session-turn-outline": "0.2.0-rc.2",
     "@types/mdast": "^4.0.4",
     "@types/node": "^22.20.0",
-    "@types/react": "~18.3.1",
+    "@types/react": "~19.3.0",
     "lightningcss": "^1.33.0",
     "tsdown": "^0.22.2",
     "tsx": "^4.22.4",
