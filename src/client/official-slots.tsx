@@ -1,5 +1,6 @@
-import { createElement, memo, useMemo, type ComponentType, type ReactNode } from 'react';
+import { createElement, memo, useEffect, useLayoutEffect, useMemo, useRef, type ComponentType, type ReactNode, type RefObject } from 'react';
 import type { Context } from '@deepseek-ai/cordis';
+import type { UseGroupAction } from '@deepseek-ai/dsh-client-ui-chat/client';
 import type { SlotEntryDef, SlotMap, SlotSpec, StoredEntry } from '@deepseek-ai/dsh-client-ui-slots';
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client';
 
@@ -18,7 +19,8 @@ export const OFFICIAL_SLOTS = {
   tools: 'tool.call.toolview',
   tail: 'conversation.chat.turnTail',
   nodes: 'conversation.chat.node',
-  images: 'conversation.message.images',
+  messageImages: 'conversation.chat.message.images',
+  userImages: 'conversation.chat.user.images',
 } as const;
 export type OfficialFamily = keyof typeof OFFICIAL_SLOTS;
 export const OFFICIAL_SEATS = {
@@ -26,7 +28,8 @@ export const OFFICIAL_SEATS = {
   tools: 'dsh-better-display.official.tools/tool.call.toolview',
   tail: 'dsh-better-display.official.tail/conversation.chat.turnTail',
   nodes: 'dsh-better-display.official.nodes/conversation.chat.node',
-  images: 'dsh-better-display.official.images/conversation.message.images',
+  messageImages: 'dsh-better-display.official.messageImages/conversation.chat.message.images',
+  userImages: 'dsh-better-display.official.userImages/conversation.chat.user.images',
 } as const;
 export type OfficialSeat = typeof OFFICIAL_SEATS[OfficialFamily];
 export const officialSeat = (family: OfficialFamily, source: string = OFFICIAL_SLOTS[family]) =>
@@ -52,9 +55,38 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'dsh-better-display.official.tools/tool.call.toolview': SlotMap['tool.call.toolview'];
     'dsh-better-display.official.tail/conversation.chat.turnTail': SlotMap['conversation.chat.turnTail'];
     'dsh-better-display.official.nodes/conversation.chat.node': SlotMap['conversation.chat.node'];
-    'dsh-better-display.official.images/conversation.message.images': SlotMap['conversation.message.images'];
+    'dsh-better-display.official.messageImages/conversation.chat.message.images': SlotMap['conversation.chat.message.images'];
+    'dsh-better-display.official.userImages/conversation.chat.user.images': SlotMap['conversation.chat.user.images'];
   }
 }
+
+/**
+ * Searchable hide for official nodes drawn outside the Chat flow viewport.
+ * The flow's own `useGroupAction` is not in scope here; this keeps the same
+ * `hidden="until-found"` contract so browser find can still reveal the row.
+ */
+export function useReaderGroupAction(hidden: boolean, reveal: () => void): RefObject<HTMLDivElement> {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (element === null) return;
+    if (hidden && element.contains(element.ownerDocument.activeElement)) {
+      reveal();
+      return;
+    }
+    if (hidden) element.setAttribute('hidden', 'until-found');
+    else element.removeAttribute('hidden');
+  }, [hidden, reveal]);
+  useEffect(() => {
+    const element = ref.current;
+    if (element === null) return;
+    element.addEventListener('beforematch', reveal);
+    return () => { element.removeEventListener('beforematch', reveal); };
+  }, [reveal]);
+  return ref;
+}
+
+export const readerGroupAction: UseGroupAction = useReaderGroupAction;
 
 // Reader draws these rows itself. Everything else, including future kinds, is
 // mirrored so the official renderer still runs inside the reading view.
@@ -83,7 +115,8 @@ const EXPECTED: Record<OfficialFamily, Spec> = {
   tools: { kind: 'keyed', scope: 'session' },
   tail: { kind: 'list', scope: 'session' },
   nodes: { kind: 'keyed', scope: 'session' },
-  images: { kind: 'single', scope: 'session' },
+  messageImages: { kind: 'single', scope: 'session' },
+  userImages: { kind: 'single', scope: 'session' },
 };
 
 /**

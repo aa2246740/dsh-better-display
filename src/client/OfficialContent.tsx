@@ -3,7 +3,7 @@ import type { AssistantActionOwnerProps, ChatConversationViewNode, ChatNode, Cha
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store';
 import type { AssistantBlock, ToolCallBlock } from '@deepseek-ai/dsh-client-ui-conversation/client';
 type MessageId = AssistantActionOwnerProps['messageId'];
-import { OFFICIAL_SEATS } from './official-slots.js';
+import { OFFICIAL_SEATS, readerGroupAction } from './official-slots.js';
 import type { BlockRenderProps } from './types.js';
 import { chatSeatProps } from './chat-seat.js';
 import { Blocks } from './Blocks.js';
@@ -42,15 +42,15 @@ function chatNodeOwner(render: BlockRenderProps, official: NonNullable<BlockRend
   return {
     cwd: render.cwd,
     openFile: render.openFile ?? (() => {}),
-    openSkill: () => {},
     forkAt: render.forkAt ?? (() => {}),
     inspectCall: callId => official.openView('trajectory', callId),
     loadImage: official.officialImageLoader,
-    renderMessageImages: images => official.renderSlot(OFFICIAL_SEATS.images, {
-      ...images, loadImage: official.officialImageLoader,
-    }),
     fileMentions: official.officialFileMentions,
   };
+}
+
+function nodeHookContext(turnData: unknown, disclosureReset: ReturnType<typeof createSnapshotStore<number>>) {
+  return { turnData, disclosureReset, useGroupAction: readerGroupAction };
 }
 
 export function OfficialNode({ node, fallback, ...render }: BlockRenderProps & { node: ChatConversationViewNode; fallback: ReactNode }) {
@@ -61,7 +61,7 @@ export function OfficialNode({ node, fallback, ...render }: BlockRenderProps & {
   // The runtime node domain is open; the public SlotMap enumerates the known kinds.
   const renderNode = official.renderSlot as unknown as (key: string, owner: object, options: object) => ReactNode;
   return <div data-reader-official-node={node.kind} {...(node.kind === 'user' || node.kind === 'steering' ? chatSeatProps(node.kind, node.key) : {})}>
-    {renderNode(OFFICIAL_SEATS.nodes, { ...chatNodeOwner(render, official), node }, { entryKey: node.kind, hookContext: { turnData: turn?.data, disclosureReset }, fallback })}
+    {renderNode(OFFICIAL_SEATS.nodes, { ...chatNodeOwner(render, official), node }, { entryKey: node.kind, hookContext: nodeHookContext(turn?.data, disclosureReset), fallback })}
   </div>;
 }
 
@@ -95,7 +95,7 @@ export function OfficialAssistantBody({
   // slice is what a replacement that ignores groupPart actually receives.
   return renderNode(OFFICIAL_SEATS.nodes, { ...chatNodeOwner(render, official), node: view, groupPart: 'response' }, {
     entryKey: 'assistant-step',
-    hookContext: { turnData: turn?.data, disclosureReset },
+    hookContext: nodeHookContext(turn?.data, disclosureReset),
     fallback,
   });
 }

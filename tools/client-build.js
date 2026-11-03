@@ -9,9 +9,19 @@ import { createRequire } from 'node:module'
 
 const PLATFORM_MODULES = [
   'react', 'react/jsx-runtime', 'react-dom', 'react-dom/client', '@deepseek-ai/cordis',
+  'zod', '@tanstack/react-virtual',
   '@deepseek-ai/dsh-client-store', '@deepseek-ai/dsh-client-ui-slots',
   '@deepseek-ai/dsh-client-ui-primitives', '@deepseek-ai/dsh-client-ui-dockkit',
 ]
+
+function clientBuildValueDefines(environment) {
+  const values = {}
+  for (const [name, value] of Object.entries(environment)) {
+    if (!name.startsWith('DSH_CLIENT_') || value === undefined) continue
+    values[`process.env.${name}`] = JSON.stringify(value)
+  }
+  return values
+}
 
 const CSS_VIRTUAL_PREFIX = '\0dshx-css-module:'
 // Official packages/client/tsdown.client.ts INLINE_SAFE at dsh-v0.2.0-rc.2.
@@ -83,6 +93,7 @@ function clientConfig(id, entry) {
       'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV ?? 'production'),
       'import.meta.env.MODE': JSON.stringify(process.env.NODE_ENV ?? 'production'),
       'import.meta.env': JSON.stringify({ MODE: process.env.NODE_ENV ?? 'production' }),
+      ...clientBuildValueDefines(process.env),
     },
     plugins: [{
       name: 'dshx-client-bundle-purity',
@@ -141,6 +152,7 @@ export function externalClientBundle(id, entries, { clientEntry } = {}) {
     sourcemap: false,
     clean: false,
     dts: false,
+    define: clientBuildValueDefines(process.env),
     deps: {
       neverBundle: (specifier) => !/^[./]/.test(specifier),
       alwaysBundle: (specifier) => /^[./]/.test(specifier),

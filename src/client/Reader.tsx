@@ -9,7 +9,7 @@ import { BlockBoundary, Blocks, contentBlocks, UserMessageActions } from './Bloc
 import { AssistantNode } from './AssistantNode.js';
 import { ToolActivity, ToolMedia } from './ToolActivity.js';
 import { OfficialNode, OfficialTail } from './OfficialContent.js';
-import { OFFICIAL_SEATS } from './official-slots.js';
+import { OFFICIAL_SEATS, readerGroupAction } from './official-slots.js';
 import { preparingLabel, readerFlow } from './tool-activity.js';
 import { Disclosure, ProcessFragment, RetiringTurns, StatusText, useMotionAllowed, usePinnedSelection, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
@@ -198,17 +198,13 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
       const owner: ChatNodeOwnerProps & Pick<ReaderProps, 'sessionId'> = {
         cwd: render.cwd,
         openFile: render.openFile ?? (() => {}),
-        openSkill: () => {},
         forkAt: render.forkAt ?? (() => {}),
         inspectCall: callId => official.openView('trajectory', callId),
         loadImage: official.officialImageLoader,
-        renderMessageImages: images => official.renderSlot(OFFICIAL_SEATS.images, {
-          ...images, loadImage: official.officialImageLoader,
-        }),
         fileMentions: official.officialFileMentions,
         sessionId: render.sessionId,
       };
-      const options = { hookContext: { turnData: turn?.data, disclosureReset }, fallback };
+      const options = { hookContext: { turnData: turn?.data, disclosureReset, useGroupAction: readerGroupAction }, fallback };
       rendered = node.kind === 'user'
         ? official.renderSlot(OFFICIAL_SEATS.nodes, { ...owner, node }, { ...options, entryKey: 'user' })
         : official.renderSlot(OFFICIAL_SEATS.nodes, { ...owner, node }, { ...options, entryKey: 'steering' });

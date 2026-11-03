@@ -48,6 +48,7 @@ test('reader user and steering bubbles match the host column cap', { skip, timeo
         '@fixture/registry': join(harness, 'packages/client/ui-renderer/src/client/registry.ts'),
         '@fixture/renderer': join(harness, 'packages/client/ui-renderer/src/client/scoped-slots.tsx'),
         '@fixture/user-message': join(harness, 'packages/client/ui-chat/src/client/chat/MessageItem.tsx'),
+        '@fixture/user-content': join(harness, 'packages/client/ui-chat/src/client/chat/UserContent.tsx'),
         '@deepseek-ai/dsh-client-ui-primitives': join(harness, 'packages/client/ui-primitives/src/index.ts'),
         '@deepseek-ai/dsh-client-ui-slots': join(harness, 'packages/client/ui-slots/src/index.ts'),
         '@deepseek-ai/dsh-client-store': join(harness, 'packages/client/store/src/index.ts'),

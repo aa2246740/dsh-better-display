@@ -1,4 +1,6 @@
+import { type RefObject } from 'react';
 import type { Context } from '@deepseek-ai/cordis';
+import type { UseGroupAction } from '@deepseek-ai/dsh-client-ui-chat/client';
 import type { SlotEntryDef, SlotMap, SlotSpec, StoredEntry } from '@deepseek-ai/dsh-client-ui-slots';
 /**
  * RC2 composition adapter. Only public registry operations are used. We lend
@@ -15,7 +17,8 @@ export declare const OFFICIAL_SLOTS: {
     readonly tools: "tool.call.toolview";
     readonly tail: "conversation.chat.turnTail";
     readonly nodes: "conversation.chat.node";
-    readonly images: "conversation.message.images";
+    readonly messageImages: "conversation.chat.message.images";
+    readonly userImages: "conversation.chat.user.images";
 };
 export type OfficialFamily = keyof typeof OFFICIAL_SLOTS;
 export declare const OFFICIAL_SEATS: {
@@ -23,7 +26,8 @@ export declare const OFFICIAL_SEATS: {
     readonly tools: "dsh-better-display.official.tools/tool.call.toolview";
     readonly tail: "dsh-better-display.official.tail/conversation.chat.turnTail";
     readonly nodes: "dsh-better-display.official.nodes/conversation.chat.node";
-    readonly images: "dsh-better-display.official.images/conversation.message.images";
+    readonly messageImages: "dsh-better-display.official.messageImages/conversation.chat.message.images";
+    readonly userImages: "dsh-better-display.official.userImages/conversation.chat.user.images";
 };
 export type OfficialSeat = typeof OFFICIAL_SEATS[OfficialFamily];
 export declare const officialSeat: (family: OfficialFamily, source?: string) => string;
@@ -45,9 +49,17 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
         'dsh-better-display.official.tools/tool.call.toolview': SlotMap['tool.call.toolview'];
         'dsh-better-display.official.tail/conversation.chat.turnTail': SlotMap['conversation.chat.turnTail'];
         'dsh-better-display.official.nodes/conversation.chat.node': SlotMap['conversation.chat.node'];
-        'dsh-better-display.official.images/conversation.message.images': SlotMap['conversation.message.images'];
+        'dsh-better-display.official.messageImages/conversation.chat.message.images': SlotMap['conversation.chat.message.images'];
+        'dsh-better-display.official.userImages/conversation.chat.user.images': SlotMap['conversation.chat.user.images'];
     }
 }
+/**
+ * Searchable hide for official nodes drawn outside the Chat flow viewport.
+ * The flow's own `useGroupAction` is not in scope here; this keeps the same
+ * `hidden="until-found"` contract so browser find can still reveal the row.
+ */
+export declare function useReaderGroupAction(hidden: boolean, reveal: () => void): RefObject<HTMLDivElement>;
+export declare const readerGroupAction: UseGroupAction;
 /** Official `AssistantNodeView` registers at priority 0. Lower wins. */
 export declare const OFFICIAL_ASSISTANT_PRIORITY = 0;
 /**

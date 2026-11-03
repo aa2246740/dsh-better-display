@@ -51,8 +51,10 @@ for (const path of execFileSync('rg', ['--files', 'packages/client', '-g', '*.ts
   visit(file);
 }
 registrations.sort();
+const harnessCommit = execFileSync('git', ['-C', harness, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 const current = {
   harnessVersion: JSON.parse(readFileSync(join(harness, 'packages/client/ui-chat/package.json'), 'utf8')).version,
+  harnessCommit,
   hashes, registrations,
 };
 if (process.argv.includes('--record')) {
@@ -63,8 +65,8 @@ if (process.argv.includes('--record')) {
   const changed = files.filter(file => current.hashes[file] !== baseline.hashes[file]);
   const added = registrations.filter(row => !baseline.registrations.includes(row));
   const removed = baseline.registrations.filter(row => !registrations.includes(row));
-  if (current.harnessVersion !== baseline.harnessVersion || changed.length || added.length || removed.length) {
-    console.error(JSON.stringify({ compatible: 'review-required', target: current.harnessVersion, changedContractsOrForkSources: changed, addedRegistrations: added, removedRegistrations: removed }, null, 2));
+  if (current.harnessVersion !== baseline.harnessVersion || current.harnessCommit !== baseline.harnessCommit || changed.length || added.length || removed.length) {
+    console.error(JSON.stringify({ compatible: 'review-required', target: current.harnessVersion, commit: current.harnessCommit, baselineCommit: baseline.harnessCommit, changedContractsOrForkSources: changed, addedRegistrations: added, removedRegistrations: removed }, null, 2));
     console.error('Review the differences and run the official bridge/visual tests. --record alone is not compatibility proof.');
     process.exitCode = 1;
   } else console.log(`Harness compatibility baseline passed (${current.harnessVersion}; ${registrations.length} official registrations).`);

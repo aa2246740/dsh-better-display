@@ -4,6 +4,7 @@ import { flushSync } from 'react-dom';
 import { SlotRegistry } from '@fixture/registry';
 import { createSlotRenderer } from '@fixture/renderer';
 import { UserMessageNodeView } from '@fixture/user-message';
+import { UserContent } from '@fixture/user-content';
 import { Reader } from '../../src/client/Reader.js';
 import { createReaderStore } from '../../src/client/store.js';
 import { OFFICIAL_SEATS, OFFICIAL_SLOTS, installOfficialSlots, officialChildren } from '../../src/client/official-slots.js';
@@ -81,16 +82,20 @@ function NativeColumn({ renderSlot, kind, text }: {
 }) {
   const node = messageNode(kind, text);
   const owner = {
-    cwd: '/fixture', openFile: () => {}, openSkill: () => {}, forkAt: () => {},
+    cwd: '/fixture', openFile: () => {}, forkAt: () => {},
     inspectCall: () => {}, loadImage: async () => null,
-    renderMessageImages: () => null, fileMentions: () => undefined, node,
+    fileMentions: () => undefined, node,
   };
   return (
     <div data-native={kind} style={{ width: '100%', maxWidth: 'var(--dsh-chat-content-width, 748px)', display: 'flex', flexDirection: 'column' }}>
       <div style={{ minWidth: 0 }}>
         {renderSlot(OFFICIAL_SLOTS.nodes, owner, {
           entryKey: kind,
-          hookContext: { turnData: node.location.turn.data, disclosureReset: { getSnapshot: () => 0, subscribe: () => () => {}, set: () => {} } },
+          hookContext: {
+            turnData: node.location.turn.data,
+            disclosureReset: { getSnapshot: () => 0, subscribe: () => () => {}, set: () => {} },
+            useGroupAction: () => ({ current: null }),
+          },
           fallback: null,
         })}
       </div>
@@ -98,22 +103,33 @@ function NativeColumn({ renderSlot, kind, text }: {
   );
 }
 
+function paddedTextBox(scope: ParentNode | null): Element | null {
+  if (!scope) return null;
+  const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    if (!node.textContent?.trim()) continue;
+    const parent = node.parentElement;
+    if (!parent || parent.closest('button')) continue;
+    let element: HTMLElement | null = parent;
+    while (element && element !== scope) {
+      if (parseFloat(getComputedStyle(element).paddingTop) > 0) return element;
+      element = element.parentElement;
+    }
+    return parent;
+  }
+  return null;
+}
+
 function boxOf(root: ParentNode | null, kind: 'user' | 'steering' | 'pending') {
   const scope = kind === 'pending'
     ? root?.querySelector('[data-reader-pending-submission]')
     : root?.querySelector(`[data-reader-key="${kind}-key"]`);
-  if (!scope) return null;
-  if (kind === 'pending') {
-    return [...scope.children].find(element => element instanceof HTMLElement && element.querySelector('button') === null) ?? null;
-  }
-  const slot = scope.querySelector('[data-slot]');
-  return slot?.firstElementChild?.firstElementChild?.firstElementChild ?? null;
+  return paddedTextBox(scope ?? null);
 }
 
 function nativeBox(frame: ParentNode, kind: 'user' | 'steering') {
-  const column = frame.querySelector(`[data-native="${kind}"]`);
-  const slot = column?.querySelector('[data-slot]');
-  return slot?.firstElementChild?.firstElementChild?.firstElementChild ?? null;
+  return paddedTextBox(frame.querySelector(`[data-native="${kind}"]`));
 }
 
 function measure(element: Element | null) {
@@ -146,16 +162,15 @@ async function verify() {
         {...props as never}
         t={(props.t as ((key: string) => string) | undefined) ?? ((key: string) => key)}
         openFile={(props.openFile as (() => void) | undefined) ?? (() => {})}
-        openSkill={(props.openSkill as (() => void) | undefined) ?? (() => {})}
-        renderMessageImages={(props.renderMessageImages as (() => null) | undefined) ?? (() => null)}
       />
     );
     slots.register({ name: 'root', children: {
       'conversation.chat.node': { kind: 'keyed', scope: 'session', inject: { hooks: {
         turnData: (_: unknown, context: { turnData?: unknown }) => () => context.turnData,
         disclosure: (_: unknown, context: { disclosureReset?: { getSnapshot(): number } }) => () => context.disclosureReset,
+        groupAction: (_: unknown, context: { useGroupAction?: unknown }) => context.useGroupAction,
       } } },
-      'conversation.message.images': { kind: 'single', scope: 'session' },
+      'conversation.chat.message.images': { kind: 'single', scope: 'session' },
       'fixture.reader': { kind: 'single', scope: 'session' },
     } }, ({ SessionProvider, renderSlot }: any) => (
       <SessionProvider>
@@ -182,6 +197,13 @@ async function verify() {
         ))}
       </>
     ));
+    slots.registerFactory({
+      name: 'conversation.chat.user.content', scope: 'session', locale: 'chat',
+      children: { 'conversation.chat.user.images': { kind: 'single', scope: 'session' } },
+    }, UserContent);
+    slots.registerFactory({
+      name: 'conversation.user.text', scope: 'session', locale: 'chat',
+    }, ({ text }: { text: string }) => <>{text}</>);
     slots.register({ name: 'conversation.chat.node', key: 'user', locale: 'chat' }, HostUser);
     slots.register({ name: 'conversation.chat.node', key: 'steering', locale: 'chat' }, HostUser);
     const stopMirror = installOfficialSlots(ctx);

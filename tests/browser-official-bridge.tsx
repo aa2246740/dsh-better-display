@@ -78,7 +78,8 @@ slots.register({ name: 'root', children: {
   'tool.call.toolview': { kind: 'keyed', scope: 'session' },
   'conversation.chat.turnTail': { kind: 'list', scope: 'session' },
   'conversation.chat.node': { kind: 'keyed', scope: 'session', inject: { hooks: { turnData: (_s: any, value: any) => () => value } } },
-  'conversation.message.images': { kind: 'single', scope: 'session' },
+  'conversation.chat.message.images': { kind: 'single', scope: 'session' },
+  'conversation.chat.user.images': { kind: 'single', scope: 'session' },
   'conversation.input.overlay': { kind: 'list', scope: 'session' },
   'fixture.reader': { kind: 'single', scope: 'session' },
 } }, ({ SessionProvider, renderSlot }: any) => <SessionProvider>

@@ -1,6 +1,6 @@
 # 官方能力接入说明
 
-`0.3.0` 在 `v0.2.1` 的阅读布局上接入官方内容和控件，经过试用验收后发布。当前验收目标是 Harness `0.2.0-rc.2`（`dsh-v0.2.0-rc.2`，`639ed015397290b3745d163aafe02ffee4aa3f84`）。`conversation.chat.turnTail` 仍是 `list`。相对 `0.1.7-rc.2`，官方注册清单没有增减；`schedule-created` 和 `schedule_update` 继续走已有镜像座位，Reader 不另写这两张卡片。图标仍使用 `*Regular` 名称。开发者消息里的工具增减行用官方标题和计数，本地 Markdown 图片接受 Desktop 文件路由 `dsh-app://app/api/file`。`0.2.0-rc.2` 里官方对话的模型重试行增加了 `TextShimmer`，进行中的 `TurnProcessNodeView` 改为关闭后才渲染；阅读页本来就自己呈现这两行，所以阅读布局不跟着改。后续仍需维护的自有展示逻辑和升级边界见下文。
+`0.3.0` 在阅读布局上接入官方内容和控件。当前验收目标是 Harness `0.2.1-rc.5`（`dsh-v0.2.1-rc.5`，`b830ec950faba0a46dda564be3e2d854afed94f1`）。`conversation.chat.turnTail` 仍是 `list`。`conversation.message.images` 已拆成 `conversation.chat.message.images` 与 `conversation.chat.user.images`，Reader 分别镜像这两条 single/session 槽。`ChatNodeOwnerProps` 不再带 `openSkill` / `renderMessageImages`；`conversation.chat.node` 的 `hookContext` 需要 `useGroupAction`。`schedule-created` 和 `schedule_update` 继续走已有镜像座位，Reader 不另写这两张卡片。图标仍使用 `*Regular` 名称。开发者消息里的工具增减行用官方标题和计数，本地 Markdown 图片接受 Desktop 文件路由 `dsh-app://app/api/file`。阅读页自己呈现模型重试和进行中的过程行，所以这两处官方视图变化不改阅读布局。后续仍需维护的自有展示逻辑和升级边界见下文。
 
 ## 一个具体例子
 

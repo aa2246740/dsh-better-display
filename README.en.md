@@ -28,7 +28,7 @@ Another plugin can rewrite reasoning and answer text for display only, for examp
 
 A ````mcp-app` fence in the final answer mounts as an interactive card in the reading view, inside `<iframe sandbox="allow-scripts allow-forms">` without `allow-same-origin`. The card can fill the next prompt via JSON-RPC. The skill pack is [`skills/generative-mcpapps/`](skills/generative-mcpapps/). Settings → **Better Display** can preview deliverables in the right Sidebar (system app remains the default), turn on translucent frosted glass (off by default), toggle process auto-folding (On is the default), and reports whether that skill is installed in a harness skill root.
 
-Targets DeepSeek Harness **0.2.0-rc.2** (`dsh-v0.2.0-rc.2`). Display only. It does not change Agent execution, the SDK, or credentials. Node.js `^22.19.0 || >=24`. New sessions default to reading. The `@deepseek-ai/dsh-*` peer range is `>=0.2.0-rc.1 <0.2.1`: it accepts `0.2.0-rc.2` and stable `0.2.0`, rejects `0.2.0` alphas, and rejects `0.1.7-rc.2`.
+Targets DeepSeek Harness **0.2.1-rc.5** (`dsh-v0.2.1-rc.5`, `b830ec950faba0a46dda564be3e2d854afed94f1`). Display only. It does not change Agent execution, the SDK, or credentials. Node.js `^22.19.0 || >=24`. New sessions default to reading. The `@deepseek-ai/dsh-*` peer range and `engines.dsh` are `>=0.2.1-rc.1 <0.2.2`: they accept `0.2.1-rc.5` and stable `0.2.1`, reject `0.2.1` alphas, and reject the `0.2.0` series.
 
 **0.3.0** keeps the existing reading layout, folding, and motion while using official feedback, tool details, file cards, and file links. It also fixes process content staying expanded after auto-folding is re-enabled. See the [official integration notes](docs/official-rendering-bridge.md) for coverage and upgrade checks.
 
