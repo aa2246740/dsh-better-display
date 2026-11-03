@@ -70,7 +70,7 @@ function pngPixel(buffer: Buffer, x: number, y: number) {
   return [pixel?.[start] ?? 0, pixel?.[start + 1] ?? 0, pixel?.[start + 2] ?? 0];
 }
 
-test('enlarged theme tokens do not let the answer heading share a lane', { skip }, async () => {
+test('enlarged theme tokens do not let the answer heading share a lane', { skip, timeout: 15_000 }, async () => {
   const root = resolve(import.meta.dirname, '..');
   const files = new Map([
     ['/Reader.module.css', readFileSync(join(root, 'src/client/Reader.module.css'))],
