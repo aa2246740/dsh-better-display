@@ -144,6 +144,34 @@ function publish(blockKey: string, text: string, final: boolean) {
 
 `publish` after each batch. Extend the previous cached string when the fade should continue.
 
+### 接官方思考翻译（`cotTranslation`）
+
+官方「思考过程机器翻译」组合包（`@deepseek-ai/dsh-experimental-cot-translation-bundle`）把译文注册在 `conversation.chat.reasoning.body` 插槽上，而阅读页用自己的卡片渲染思考，那个插槽不会渲染——装了翻译包，在阅读页看起来像没翻译。用这条缝接它：
+
+```ts
+const cot = ctx.get('cotTranslation') as {
+  limits(signal: AbortSignal): Promise<{
+    maxTextChars: number;
+    preferences: { provider: string; targetLanguage: string };
+  }>;
+  translate(
+    request: { text: string; targetLanguage: string; provider?: string },
+    signal: AbortSignal,
+  ): Promise<string>;
+} | undefined;
+```
+
+先调 `limits()` 拿目标语言与单次上限（这一步不发送文本），再按 `maxTextChars` 切出**已完成**段落逐段 `translate()`。四个容易踩的点：
+
+- `read` 必须同步：返回缓存或 `undefined`（保留原文），把请求排进 `queueMicrotask`，完成后用 `subscribe` 通知重绘；
+- 流式中的末段不发，否则会把半句话送去翻译；
+- 结果按 `blockKey` 缓存，源文本变长时只请求新增段落；
+- 失败返回 `undefined`，阅读页保留原文；不要抛错，也不要写回 block。
+
+组合包没挂载时 `ctx.get('cotTranslation')` 返回 `undefined`，此时直接返回 `undefined` 即可，界面与未安装插件完全一致。
+
+完整可运行版本（分片、缓存、失败回退、卸载中止）见 [`examples/cot-translation-reader/`](../examples/cot-translation-reader/)。
+
 ## `dsh-better-display.block`
 
 Chain slot, `scope: 'session'`. The reader calls `renderSlotChain` once per block. The first selector that returns non-null draws the block. All-null renders the reader fallback, which is the path that keeps reveal, follow-scroll, and fold.

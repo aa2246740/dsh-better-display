@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Docs: add a worked adapter that shows the official COT translation in the reading view through the text-transform seam ([`docs/extension-points.md`](docs/extension-points.md), [`examples/cot-translation-reader/`](examples/cot-translation-reader/)). The official bundle registers its translation on `conversation.chat.reasoning.body`, which the reading view replaces, so that bundle alone cannot paint there.
+
 ## 0.3.9 — 2026-10-27
 
 - Keep assistant narration visible. Collapsing process hides reasoning, tool calls and process records, and a compact seam between body blocks summarises the folded run (`思考×N · 工具×K · 记录×M`) and expands those rows in place. During a live turn, a later reasoning step folds each earlier reasoning/tool run in its own position, including across narration, without counting narration as `输出×N`. Thanks @Adamaik (#68).

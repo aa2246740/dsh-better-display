@@ -1,0 +1,14 @@
+{
+  "name": "dsh-cot-translation-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Reference adapter: register the official COT translation on the reading view's text-transform seam.",
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": { "platform": "web" }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1"
+  }
+}
