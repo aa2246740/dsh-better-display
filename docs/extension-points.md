@@ -60,6 +60,14 @@ import { TEXT_TRANSFORM_SERVICE } from 'dsh-better-display/client';
 
 `createTextTransformRegistry()` builds a private registry for a unit test. A plugin that wants the reader to paint its text must register on the service the reader provides, not on a registry it constructed itself.
 
+### Reasoning DOM marker
+
+The reader fallback's reasoning text root (`[data-reader-text-kind="reasoning"]`) exposes `data-reader-reasoning-block-key`. Its value is the same opaque `blockKey` sent in that block's reasoning `DisplayTextRequest`. The marker is present with or without a reasoning transformer, including when a transformer returns `undefined` to keep the original text. It stays stable while that block remains mounted, including streaming growth and display-text changes; do not parse it or persist it as a session identifier.
+
+A `ReasoningCard` can group multiple reasoning blocks. For a per-card original/translated toggle, collect **all descendant** `[data-reader-reasoning-block-key]` values and apply the display override to those exact keys through the text-transform registry. Do not assume one key per card, infer ownership from card/block order, or match original or translated text: distinct blocks may have identical text. Treat the values as opaque identifiers, not CSS selector fragments.
+
+This marker only associates the existing reasoning display roots with transform requests. It does not change text, rendering identity, source blocks, transcript records, or the native conversation view. A foreign block-chain renderer replaces the fallback and is not guaranteed to provide this marker.
+
 ### Minimal translation-shaped plugin
 
 This one only uppercases. A real translator keeps the same `read` / `subscribe` shape, stores each batch on `blockKey`, and returns a string that extends the previous display string when it wants the fade to continue. It leaves `source === 'tool'` alone unless tool prose should change too.

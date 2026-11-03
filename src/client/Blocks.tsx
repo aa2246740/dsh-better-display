@@ -120,11 +120,11 @@ function ReadingMarkdown({ blockKey, source, ...props }: MarkdownStreamProps & {
   return <MarkdownStream {...props} />;
 }
 
-type ReasoningStreamProps = { text: string; streaming: boolean; holdFormatting: boolean; transformed?: boolean } & TextPresentation;
+type ReasoningStreamProps = { blockKey: string; text: string; streaming: boolean; holdFormatting: boolean; transformed?: boolean } & TextPresentation;
 
-function ReasoningStream({ text, streaming, holdFormatting, startedAt, interrupted = false, liveText = false, transformed = false }: ReasoningStreamProps) {
+function ReasoningStream({ blockKey, text, streaming, holdFormatting, startedAt, interrupted = false, liveText = false, transformed = false }: ReasoningStreamProps) {
   const presentation = useStreamingText(text, streaming, { startedAt, interrupted: interrupted || !liveText, selected: holdFormatting });
-  return <div className={css.readingText} data-reader-text data-reader-text-kind="reasoning" data-received-length={text.length} data-shown-length={presentation.text.length}
+  return <div className={css.readingText} data-reader-text data-reader-text-kind="reasoning" data-reader-reasoning-block-key={blockKey} data-received-length={text.length} data-shown-length={presentation.text.length}
     data-presentation-pending={presentation.pending || undefined} data-motion-style="opacity-blur" data-ud-motion="reader-text-arrival" data-ud-motion-type="reveal" data-ud-motion-no-flash="true"
     data-text-transform={transformed ? (streaming ? 'live' : 'final') : undefined}>
     <MotionPlainText text={presentation.text} enabled={liveText && presentation.reveal} revision={presentation.revision} />
@@ -133,13 +133,13 @@ function ReasoningStream({ text, streaming, holdFormatting, startedAt, interrupt
 
 function TransformedReasoning({ registry, blockKey, source, text, streaming, ...props }: ReasoningStreamProps & { registry: TextTransformRegistry; blockKey: string; source: ReaderBlockOwner['source'] }) {
   const shown = useDisplayText(registry, { text, streaming, blockKey, kind: 'reasoning', source });
-  return <ReasoningStream {...props} text={shown.text} streaming={displayStreaming(streaming, shown, true)} transformed />;
+  return <ReasoningStream {...props} blockKey={blockKey} text={shown.text} streaming={displayStreaming(streaming, shown, true)} transformed />;
 }
 
 function ReadingReasoning({ blockKey, source, ...props }: ReasoningStreamProps & { blockKey: string; source: ReaderBlockOwner['source'] }) {
   const registry = activeTextTransform();
   if (registry?.has('reasoning')) return <TransformedReasoning registry={registry} blockKey={blockKey} source={source} {...props} />;
-  return <ReasoningStream {...props} />;
+  return <ReasoningStream {...props} blockKey={blockKey} />;
 }
 
 function fallback(block: AssistantBlock, streaming: boolean, source: ReaderBlockOwner['source'], loadImage: BlockRenderProps['loadImage'], fillComposer: BlockRenderProps['fillComposer'], holdFormatting: boolean, presentation: TextPresentation, blockKey: string, fileMentions?: BlockRenderProps['fileMentions']): ReactNode {
