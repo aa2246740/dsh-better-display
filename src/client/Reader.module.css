@@ -752,3 +752,14 @@
   background: var(--dsw-alias-bg-module-platform, rgba(127, 127, 127, .1));
   border-color: var(--dsw-alias-border-l2, rgba(127, 127, 127, .28));
 }
+
+/* Host rc.5 keeps [data-composer-seat] mounted on every conversation tab and
+   pins it to the scrollport. dsh-claude-style 0.19.x hides that seat whenever
+   the first tab is not 对话 (`display: none !important` under
+   [data-dsh-claude-composer-hidden]). This rule wins only while the reader
+   root is mounted, so opening on 阅读 can type immediately. Switching to
+   轨迹 unmounts the reader and the skin's rule applies again. The seat's own
+   display is flex. Keep this selector in sync with READER_COMPOSER_RESTORE. */
+:global(html body[data-dsh-claude-style][data-dsh-claude-composer-active] [data-dsh-claude-composer-hidden]:has([data-dsh-better-display]) [data-composer-seat]) {
+  display: flex !important;
+}
