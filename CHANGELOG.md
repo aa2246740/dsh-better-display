@@ -1,8 +1,19 @@
 # Changelog
 
-## Unreleased
+## 0.3.12 — 2026-11-03
 
-- Docs: add a worked adapter that shows the official COT translation in the reading view through the text-transform seam ([`docs/extension-points.md`](docs/extension-points.md), [`examples/cot-translation-reader/`](examples/cot-translation-reader/)). The official bundle registers its translation on `conversation.chat.reasoning.body`, which the reading view replaces, so that bundle alone cannot paint there.
+- Bump KaTeX from 0.16.47 to 0.19.1 (`^0.19.1`, lockfile 0.19.1). Reader still renders with the host's KaTeX CSS and does not vendor private fonts (#78).
+- Bump the jscpd duplicate check to 5.4.2 (package range `^5.4.1`, lockfile 5.4.2) (#81).
+
+## 0.3.11 — 2026-11-03
+
+- Keep the host composer visible on the reading tab when `dsh-claude-style` hides `[data-composer-seat]` off the first conversation tab. The override applies only while the reader root is mounted, so other tabs keep the skin's hide rule (#83).
+- Stamp each reasoning block with `data-reader-reasoning-block-key` so another plugin can target one card. The key stays put across source growth, translation, the original-text fallback, and settling (#82).
+- Docs: add a worked adapter that shows the official COT translation in the reading view through the text-transform seam ([`docs/extension-points.md`](docs/extension-points.md), [`examples/cot-translation-reader/`](examples/cot-translation-reader/)). The official bundle registers its translation on `conversation.chat.reasoning.body`, which the reading view replaces, so that bundle alone cannot paint there (#75).
+
+## 0.3.10 — 2026-11-03
+
+- Accept DeepSeek Harness 0.2.1-rc.5 (`dsh-v0.2.1-rc.5`, `b830ec950faba0a46dda564be3e2d854afed94f1`). The peer range and `engines.dsh` are `>=0.2.1-rc.1 <0.2.2`. This is the latest tagged release; later main commits are not tagged and are not published to npm.
 
 ## 0.3.9 — 2026-10-27
 

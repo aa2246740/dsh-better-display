@@ -3,7 +3,7 @@
 // the emitted bundle recipe so plugins can run `npm run build` against a public clone.
 import { readFile } from 'node:fs/promises'
 import { readFileSync } from 'node:fs'
-import { basename, dirname, isAbsolute, join } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { createRequire } from 'node:module'
 
@@ -24,6 +24,24 @@ function clientBuildValueDefines(environment) {
 }
 
 const CSS_VIRTUAL_PREFIX = '\0dshx-css-module:'
+
+// Lightning CSS mixes `filename` into the CSS-module hash, and the bundler prints
+// the virtual id into lib/client.js. Both have to be package-relative POSIX paths,
+// or two checkouts of the same commit emit different class names and comments.
+function packageRelativePosix(fileId) {
+  const absolute = isAbsolute(fileId) ? fileId : join(process.cwd(), ...String(fileId).split('/'))
+  const rel = relative(process.cwd(), absolute)
+  if (rel === '' || rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
+    throw new Error(`CSS module is outside the package root: ${fileId}`)
+  }
+  return rel.split(sep).join('/')
+}
+
+function cssModuleFile(fileRef) {
+  const absolute = isAbsolute(fileRef) ? fileRef : join(process.cwd(), ...String(fileRef).split('/'))
+  return { absolute, logical: packageRelativePosix(absolute) }
+}
+
 // Official packages/client/tsdown.client.ts INLINE_SAFE at dsh-v0.2.0-rc.2.
 // Same expression as dsh-v0.1.7-rc.2, including default-workspace.
 const INLINE_SAFE = /^(?:@deepseek-ai\/dsh-(?:file-reference|session|llm|tools|brand|deque|output-retention|typert-protocol|util-crypto|util-values|util-workspace-path)(?:\/|$)|@deepseek-ai\/dsh-token-meter\/client$|@deepseek-ai\/dsh-native-command\/types$|@deepseek-ai\/dsh-host-open-in-app\/shared$|@deepseek-ai\/dsh-plugin-manager\/registry$|@deepseek-ai\/dsh-agent-preset-registry\/display$|@deepseek-ai\/dsh-api-workspace-controller\/default-workspace$|@deepseek-ai\/dsh-spill-policy\/notice$)/
@@ -109,16 +127,17 @@ function clientConfig(id, entry) {
       resolveId(source, importer) {
         if (!source.endsWith('.module.css')) return null
         const abs = importer !== undefined && !isAbsolute(source) ? join(dirname(importer), source) : source
-        return CSS_VIRTUAL_PREFIX + abs + '.mjs'
+        return CSS_VIRTUAL_PREFIX + packageRelativePosix(abs) + '.mjs'
       },
       async load(virtualId) {
         if (!virtualId.startsWith(CSS_VIRTUAL_PREFIX)) return null
-        const fileId = virtualId.slice(CSS_VIRTUAL_PREFIX.length, -'.mjs'.length)
+        const fileRef = virtualId.slice(CSS_VIRTUAL_PREFIX.length, -'.mjs'.length)
+        const { absolute: fileId, logical } = cssModuleFile(fileRef)
         this.addWatchFile?.(fileId)
         const source = await readFile(fileId)
         const { transform } = await lightning()
         const { code, exports: cssExports } = transform({
-          filename: fileId, code: source,
+          filename: logical, code: source,
           cssModules: { pattern: '[hash]_[local]' }, minify: true,
           // Emit the standard property for Chromium and the prefix for older Safari.
           targets: { chrome: 120 << 16, safari: (16 << 16) | (4 << 8) },

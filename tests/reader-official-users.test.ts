@@ -26,7 +26,7 @@ test('official user output stays inside the cluster that carries the host width'
   assert.doesNotMatch(css, /\[data-slot="conversation\.chat\.node"\]/);
 });
 
-test('headless Reader users retain official renderers, anchors and empty-key fallback', { skip }, async () => {
+test('headless Reader users retain official renderers, anchors and empty-key fallback', { skip, timeout: 15_000 }, async () => {
   const root = resolve(import.meta.dirname, '..');
   const require = createRequire(join(root, 'package.json'));
   const { build } = createRequire(require.resolve('tsx'))('esbuild');

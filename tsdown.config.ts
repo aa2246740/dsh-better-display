@@ -30,11 +30,20 @@ const portableOutput: TsdownPlugin = {
   generateBundle(_options, output) {
     const client = output['client.js'];
     if (client?.type !== 'chunk') this.error('client.js was not emitted');
+    const root = resolve('.').replaceAll('\\', '/').replace(/\/$/u, '');
+    // Rolldown prints `// \0dshx-css-module:<id>`. Older builds used `//#region`.
+    // Rewrite either spelling to a package-relative POSIX path before the
+    // absolute-path guard, so a checkout path cannot survive into lib/client.js.
     client.code = client.code.replace(
-      /^([ \t]*\/\/#region \\0dshx-css-module:).*[\\/]([^/\\\r\n]+\.module\.css\.mjs)(\r?)$/gmu,
-      '$1$2$3',
+      /^([ \t]*\/\/(?:#region )? ?)\\0dshx-css-module:([^\r\n]*?)(\r?)$/gmu,
+      (_match, prefix: string, rawPath: string, ending: string) => {
+        let cssPath = rawPath.replaceAll('\\', '/');
+        const rootPrefix = `${root}/`;
+        if (cssPath.startsWith(rootPrefix)) cssPath = cssPath.slice(rootPrefix.length);
+        return `${prefix}\\0dshx-css-module:${cssPath}${ending}`;
+      },
     );
-    if (/^.*\/\/#region \\0dshx-css-module:.*[\\/].*$/mu.test(client.code)) {
+    if (/^[ \t]*\/\/(?:#region )? ?\\0dshx-css-module:(?:\/|[A-Za-z]:[\\/])/mu.test(client.code)) {
       this.error('client.js contains a non-portable CSS module path');
     }
   },
