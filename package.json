@@ -81,7 +81,7 @@
     "lightningcss": "^1.33.0",
     "tsdown": "^0.23.2",
     "tsx": "^4.22.4",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "semver": "^7.7.2",
     "@eslint/js": "^10.0.1",
     "eslint": "^10.13.0",
