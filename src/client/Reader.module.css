@@ -554,6 +554,78 @@
 @media (pointer: coarse) { .disclosureButton { min-height: 44px; } }
 @media (max-width: 600px) { .root { padding-inline: 20px; } .column { gap: 18px; } .toolbar { font-size: 11px; } }
 
+/* ---- the turn clock row ---------------------------------------------------
+   One row, two placements, chosen by where it renders rather than by a CSS
+   switch.
+
+   Running: drawn into the Host's `conversation.input.dock`, inside
+   `[data-composer-seat]`. The Host positions that seat itself, so the row is not
+   part of the transcript's scroll flow and a scroll cannot move it. It is plain
+   text on the composer surface — no plate, no shadow, no radius — spanning the
+   composer card width so it centres on the input card.
+   Done: back in the transcript under the last message, in flow, so it scrolls
+   away with the answer it belongs to. */
+
+/* The dock wrapper: the Host already places the seat, so this must not position
+   itself. Zero vertical padding leaves exactly the composer stack's own gap
+   above (to the 任务 card) and below (to the input card) — 6px and 6px. */
+.turnClockPin {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: none;
+  width: calc(
+    100% - var(--dsh-composer-side-clearance, 16px) - var(--dsh-composer-side-clearance, 16px)
+      - var(--dsh-composer-dock-inset, 8px) - var(--dsh-composer-dock-inset, 8px)
+      - var(--dsh-composer-dock-inset, 8px) - var(--dsh-composer-dock-inset, 8px)
+  );
+  max-width: calc(
+    var(--dsh-composer-card-max-width, 100%) - var(--dsh-composer-dock-inset, 8px)
+      - var(--dsh-composer-dock-inset, 8px) - var(--dsh-composer-dock-inset, 8px)
+      - var(--dsh-composer-dock-inset, 8px)
+  );
+  margin: 0 auto;
+  padding: 0 12px;
+}
+/* Inside the dock the row is centred, and its transcript margins are dead space
+   between the row and the input card. */
+.turnClockPin .turnStatus { margin: 0; padding: 0; align-self: center; }
+/* In the transcript the finished row stays in flow, directly under the answer. */
+.turnClockDock { display: flex; flex-direction: column; align-self: stretch; padding: 8px 0 2px; margin-top: 10px;
+  border-top: 1px solid var(--dsw-alias-border-l1, transparent); }
+
+/* The row keeps its fields on one baseline; the separators are the quiet part. */
+.turnStatusSep { color: var(--dsw-alias-label-quaternary, #4a4d55); margin: 0 9px; font-size: 12px; }
+.turnStatusField { display: inline-flex; align-items: baseline; }
+.turnStatusKey { color: var(--dsw-alias-label-tertiary, #7f828a); font-size: 13px; }
+.turnStatusValue { margin-left: 5px; color: var(--dsw-alias-label-secondary, #b3b5bb); font-size: 13px;
+  font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+.turnStatusValue b { font-weight: 600; color: var(--dsw-alias-label-primary, #e8e9ec); }
+.clockTime { display: inline-flex; align-items: baseline; color: var(--dsw-alias-label-secondary, #b3b5bb);
+  font-size: 13px; line-height: 22px; font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+/* A rolling field reserves its widest value in flow, so a digit roll never
+   reflows the fields to its right. */
+.clockField { position: relative; display: inline-flex; justify-content: center; min-width: 2ch;
+  height: 22px; overflow: hidden; vertical-align: baseline; }
+.clockFieldSizer { visibility: hidden; user-select: none; pointer-events: none; }
+.clockFieldDigit { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.clockFieldEnter { animation: clockFieldIn 260ms cubic-bezier(.16,1,.3,1); }
+@keyframes clockFieldIn { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+[data-motion=off] .clockFieldDigit { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { .clockFieldDigit { animation: none !important; } }
+
+/* Done: the status word stops shimmering and gains a success dot. It stays the
+   same width class of colour, just quieter, because the turn is history now. */
+.turnStatusLabelDone { display: inline-flex; align-items: baseline; gap: 6px; animation: none;
+  background: none; color: var(--dsw-alias-label-secondary, #b3b5bb);
+  -webkit-text-fill-color: var(--dsw-alias-label-secondary, #b3b5bb); }
+.turnStatusDot { width: 6px; height: 6px; flex: none; align-self: center; border-radius: 50%;
+  background: var(--dsw-alias-state-success-primary, #3fb950);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-state-success-primary, #3fb950) 16%, transparent); }
+[data-motion=off] .turnStatusLabelDone { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { .turnStatusLabelDone { animation: none !important; } }
+
 /* Measured flow owns geometry; steps never change React parents when folded. */
 .choreographedFlow { display: flex; flex-direction: column; min-width: 0; overflow-anchor: none; }
 .flowCell { min-width: 0; overflow: clip; display: flow-root; }

@@ -18,6 +18,8 @@ import { basename, createProducedFileMentions, dirname, getTurnDeliverables, sho
 import { deliverableOpenModeOf, type DeliverableOpenMode } from './open-file.js';
 import { asReadonlyArray, pendingSubmissionImages, type PendingSubmissionEcho } from './pending-submission.js';
 import { WaitingStatus } from './WaitingStatus.js';
+import { TurnClock } from './TurnClock.js';
+import { pinnedInDock, rowVisible, turnPhase } from './turn-clock.js';
 import { handsBackToModel, waitingAnchor } from './waiting-clock.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
@@ -717,6 +719,25 @@ export function Reader(props: ReaderProps) {
     const turn = lastGroup?.turn === null || lastGroup?.turn === undefined ? undefined : timeline.turns.get(lastGroup.turn);
     return turn?.status !== 'closed';
   }, [running, pendingList, renderKeys, nodes, groups, timeline]);
+  // The turn clock row. Its placement follows the phase: while the turn runs it
+  // is drawn by the Host's composer dock (no scroll can move it), and once the
+  // turn closes it returns to the transcript under that turn's last message.
+  const lastTurn = useMemo(() => {
+    const lastGroup = groups.at(-1);
+    return lastGroup?.turn === null || lastGroup?.turn === undefined
+      ? undefined
+      : timeline.turns.get(lastGroup.turn);
+  }, [groups, timeline]);
+  const clockVisible = rowVisible(lastTurn?.status, isAwaitingModel);
+  const clockPhase = turnPhase(lastTurn?.status);
+  const clockPinned = pinnedInDock(clockVisible, clockPhase);
+  const clockStart = lastTurn?.start?.time ?? null;
+  const clockEnd = lastTurn?.end?.time ?? null;
+  const clockLane = props.clockLane;
+  useLayoutEffect(() => {
+    clockLane?.publish({ visible: clockPinned, startTime: clockStart, fallbackStart: waitAnchor.time ?? null });
+  }, [clockLane, clockPinned, clockStart, waitAnchor.time]);
+  const clockInTranscript = clockVisible && !clockPinned;
   const scroll = useReadingScroll(root, motion);
   const pinnedKeys = usePinnedSelection(root);
   const selectedProcessKeys = usePinnedSelection(root, '[data-reader-process]');
@@ -900,6 +921,11 @@ export function Reader(props: ReaderProps) {
         );
       })}
       {isAwaitingModel && <WaitingStatus anchor={waitAnchor} label={props.t ? props.t('chat.deepDiving') : '深度求索中...'} />}
+      {/* 完成态的计时条：属于本轮正文，落在最后一条消息下面，随内容滚走。
+          运行态那一份由 composer dock 渲染（那里不受滚动影响）。 */}
+      {clockInTranscript && <div className={css.turnClockDock} data-reader-turn-clock-dock data-reader-turn-phase={clockPhase}>
+        <TurnClock phase={clockPhase} startTime={clockStart} endTime={clockEnd} fallbackStart={waitAnchor.time ?? null} />
+      </div>}
       {pending !== undefined && <div className={css.attention} role="alert" data-reader-attention>
         <strong>{pending.kind === 'question' ? '需要你回答一个问题' : '需要你的确认'}</strong>
         <span>请在下方原生操作区处理。此提示不会收进执行过程。</span>

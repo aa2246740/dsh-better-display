@@ -97,6 +97,7 @@ export function apply(ctx: Context): void {
       };
       return {
         openPrefs: prefs,
+        clockLane: ctx.get('betterDisplayClockLane') as import('./turn-clock-lane.js').ClockLane | undefined,
         officialImageLoader: Object.assign(
           (attachment: ImageAttachmentRef) => ctx.uiConversation.imageUrl(sessionId, attachment),
           { peek: (attachment: ImageAttachmentRef) => ctx.uiConversation.peekImageUrl(sessionId, attachment) },

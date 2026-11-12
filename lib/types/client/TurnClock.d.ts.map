@@ -1,0 +1,1 @@
+{"version":3,"file":"TurnClock.d.ts","sourceRoot":"","sources":["../../../src/client/TurnClock.tsx"],"names":[],"mappings":"AAEA,OAAO,EAKL,KAAK,SAAS,EAEf,MAAM,iBAAiB,CAAC;AAgFzB;;;;;;;;;;;;GAYG;AACH,eAAO,MAAM,SAAS,qFAKnB;IACD,KAAK,EAAE,SAAS,CAAC;IACjB,SAAS,EAAE,MAAM,GAAG,IAAI,CAAC;IACzB,OAAO,EAAE,MAAM,GAAG,IAAI,CAAC;IACvB,aAAa,EAAE,MAAM,GAAG,IAAI,CAAC;CAC9B,iCAwEC,CAAC"}
