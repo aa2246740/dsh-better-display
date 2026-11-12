@@ -15,6 +15,7 @@ import { createReaderStore } from './store.js';
 import { installReaderEntry } from './entry.js';
 import { installBetterDisplaySettings } from './settings.js';
 import { fillComposerDom } from './mcp-app.js';
+import { readImageAttachment, type AttachmentReader } from './image-source.js';
 import { fileAddressFor, modeFromSnapshot, openDeliverableFile } from './open-file.js';
 import type { ReaderInjected } from './types.js';
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment';
@@ -112,11 +113,8 @@ export function apply(ctx: Context): void {
           subscribe: listener => ctx.on('connection/reset', listener),
         },
         loadOlder: async () => { await session().loadOlder(); },
-        loadImage: async attachment => {
-          const receipt = await session().readAttachment(attachment.attachmentId);
-          if (!receipt.ok) throw new Error(receipt.error.message);
-          return { data: Uint8Array.from(receipt.value.data), mediaType: receipt.value.attachment.mediaType };
-        },
+        loadImage: attachment =>
+          readImageAttachment(session() as unknown as AttachmentReader, attachment),
         openFile: async (path, options) => {
           try {
             const cwd = ctx.sessions?.list?.getSnapshot?.()?.byId[sessionId]?.cwd;
