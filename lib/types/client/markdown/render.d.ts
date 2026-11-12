@@ -19,6 +19,7 @@ import type { ReactNode } from 'react';
 import type * as Md from 'mdast';
 import type { MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { PositionedBlock } from './incremental.js';
+export type { MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives';
 /** Copy-button labels forwarded to fence CodeBlocks (this package is cordis-free, so copy arrives via props). */
 export interface MarkdownCodeLabels {
     /** Copy-button idle label. */
@@ -110,6 +111,18 @@ export declare function renderBlocks(blocks: readonly PositionedBlock[], context
  * @returns The interleaved children.
  */
 export declare function wrapBlockChildren(elements: readonly ReactNode[], edges: boolean): ReactNode[];
+/**
+ * A local image destination that resolved to no displayable URL, or an image
+ * that failed to decode. Both stay visible: a silently missing picture is
+ * indistinguishable from an answer that never had one, which is exactly the
+ * report this placeholder answers. The authored destination is shown so the
+ * path can be copied even when it cannot be rendered.
+ */
+export declare function UnavailableImage({ alt, destination, state }: {
+    alt: string;
+    destination: string;
+    state: 'unresolved' | 'failed';
+}): ReactNode;
 /**
  * Render the trailing footnote section for every footnote referenced during
  * the pass, in first-reference order, with one plain-text back-reference

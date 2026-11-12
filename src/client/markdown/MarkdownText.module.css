@@ -270,6 +270,53 @@
   font-style: italic;
 }
 
+/* An image the page could not display, or could not resolve to a URL at all.
+   It stays in the flow at a readable size so a missing picture never reads as
+   an answer that simply had none. */
+.imageUnavailable {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  max-width: 100%;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.imageUnavailable[data-markdown-image-unavailable='failed'] {
+  border-color: var(--dsw-alias-state-error-primary);
+}
+
+.imageUnavailableGlyph {
+  flex: none;
+  font-size: 14px;
+  line-height: 18px;
+  opacity: 0.8;
+}
+
+.imageUnavailableCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.imageUnavailableAlt {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.imageUnavailablePath {
+  overflow-wrap: anywhere;
+  color: var(--dsw-alias-label-tertiary);
+  font-family: var(--dsw-font-code-base, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+}
+
 .image {
   display: block;
   width: auto;
