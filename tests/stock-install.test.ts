@@ -16,16 +16,26 @@ const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as {
   peerDependencies: Record<string, string>;
 };
 
-const HARNESS_PEER = '>=0.2.1-rc.1 <0.2.2';
+// Two supported Harness lines: 0.2.1 through 0.2.2-rc.1 (where the Host changed
+// `session.readAttachment` from an id to the complete reference), and 0.2.2
+// before 0.2.3. `image-source.ts` adapts to both contracts at runtime, so the
+// declaration must accept both or the package cannot be installed at all.
+const HARNESS_PEER = '>=0.2.1-rc.1 <0.2.2 || >=0.2.2-rc.1 <0.2.3';
 
-test('Harness 0.2.1 peer range accepts rc.5 and rejects the 0.2.0 series', () => {
+test('Harness peer range accepts 0.2.1 and 0.2.2, and rejects the 0.2.0 series', () => {
   const peers = Object.entries(pkg.peerDependencies).filter(([name]) => name.startsWith('@deepseek-ai/dsh-'));
   assert.ok(peers.length >= 12);
   for (const [name, range] of peers) {
     assert.equal(range, HARNESS_PEER, name);
-    assert.equal(semver.satisfies('0.2.1-rc.5', range), true, name);
     assert.equal(semver.satisfies('0.2.1-rc.1', range), true, name);
+    assert.equal(semver.satisfies('0.2.1-rc.5', range), true, name);
     assert.equal(semver.satisfies('0.2.1', range), true, name);
+    // The line that changed the attachment contract.
+    assert.equal(semver.satisfies('0.2.2-rc.1', range), true, name);
+    assert.equal(semver.satisfies('0.2.2', range), true, name);
+    // Untested Host lines stay out of the declaration.
+    assert.equal(semver.satisfies('0.2.2-rc.0', range), false, name);
+    assert.equal(semver.satisfies('0.2.3', range), false, name);
     assert.equal(semver.satisfies('0.2.1-alpha.1', range), false, name);
     assert.equal(semver.satisfies('0.2.0-rc.2', range), false, name);
     assert.equal(semver.satisfies('0.2.0', range), false, name);

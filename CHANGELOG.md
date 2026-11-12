@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.13 — 2026-11-12
+
+- **Support Harness 0.2.2.** 0.2.2-rc.1 changed `session.readAttachment` from an attachment id to the complete `ImageAttachmentRef`, so every tool-result image failed with `session/attachment-invalid` and rendered as "图片加载失败". `image-source.ts` now adapts to both contracts at runtime — it tries the reference form first, falls back to the id form, and remembers the one the Host accepts. No version probing, so a future 0.2.3 move in either direction keeps working.
+- **Widen the peer range** to `>=0.2.1-rc.1 <0.2.2 || >=0.2.2-rc.1 <0.2.3` (12 `@deepseek-ai/dsh-*` peers plus `engines.dsh`). The old ceiling excluded 0.2.2 entirely, so the package could not be installed on the Host it now supports. `0.2.2-rc.0`, `0.2.3` and the `0.2.0` series stay rejected — only the tested lines are declared.
+- **Render Windows and workspace-relative images.** `platform-media.ts` rejected anything that did not start with `/`, so `![shot](D:/work/shot.png)`, UNC paths, and workspace-relative destinations produced alt text instead of an `<img>` (#94). Paths are now classified by shape — drive letter, UNC, POSIX absolute, or relative-to-`cwd` — with `#L12` locators stripped and percent escapes decoded once.
+- **Keep an unrenderable image visible.** A destination that still cannot be resolved renders a placeholder carrying the authored path, so a wrong path is distinguishable from a broken feature instead of both collapsing to silent alt text.
+- Add the turn clock row: `HH:mm:ss · 本轮求索中 · 开始于 … · 已用时 …` while a turn runs, then `HH:mm:ss · ● 本轮求索完成 · 时段 … – … · 用时 …` once it closes. The running row mounts in the Host's `conversation.input.dock` (`order: 10`, between the built-in 任务 card and the queue dock), which the Host positions over the scrollport, so scrolling cannot move it; the finished row returns to the transcript under that turn's last message.
+
 ## 0.3.12 — 2026-11-03
 
 - Bump KaTeX from 0.16.47 to 0.19.1 (`^0.19.1`, lockfile 0.19.1). Reader still renders with the host's KaTeX CSS and does not vendor private fonts (#78).
