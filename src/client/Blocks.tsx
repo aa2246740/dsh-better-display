@@ -37,21 +37,32 @@ export const ImageBlock = memo(function ImageBlock({ attachment, loadImage }: {
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const [decoded, setDecoded] = useState(false);
+  // The Host's own reason, so a failed read is diagnosable instead of a
+  // bare "could not load" that looks like a transient network problem.
+  const [detail, setDetail] = useState('');
   const dialog = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     let active = true;
     let owned: string | null = null;
-    const timeout = setTimeout(() => { if (active) { setError(true); active = false; } }, 20000);
-    setError(false); setDecoded(false); setUrl(null);
+    const timeout = setTimeout(() => {
+      if (active) { setDetail('读取超时'); setError(true); active = false; }
+    }, 20000);
+    setError(false); setDecoded(false); setUrl(null); setDetail('');
     void loadImage(attachment).then(result => {
       if (!active) return;
       clearTimeout(timeout);
-      if (!IMAGE_TYPES.has(result.mediaType)) throw new Error('Unsupported image media type');
+      if (!IMAGE_TYPES.has(result.mediaType)) throw new Error(`不支持的图片类型：${result.mediaType}`);
       const bytes = Uint8Array.from(result.data);
       owned = URL.createObjectURL(new Blob([bytes.buffer], { type: result.mediaType }));
       setUrl(owned);
-    }).catch(() => { clearTimeout(timeout); if (active) setError(true); });
+    }).catch((reason: unknown) => {
+      clearTimeout(timeout);
+      if (!active) return;
+      const message = reason instanceof Error ? reason.message : String(reason);
+      setDetail(message.slice(0, 240));
+      setError(true);
+    });
     return () => { active = false; clearTimeout(timeout); if (owned) URL.revokeObjectURL(owned); };
   }, [attachment.attachmentId, attempt, loadImage]);
   const width = Number.isFinite(attachment.width) && attachment.width > 0 ? attachment.width : 4;
@@ -59,10 +70,11 @@ export const ImageBlock = memo(function ImageBlock({ attachment, loadImage }: {
   return <figure className={css.imageFigure} data-reader-image data-image-state={error ? 'error' : decoded ? 'ready' : 'loading'}>
     <div className={css.imageFrame} style={{ aspectRatio: `${width} / ${height}` }}>
       {!error && url && <button ref={opener} type="button" className={css.imageOpen} aria-label={`放大图片${attachment.name ? `：${attachment.name}` : ''}`} onClick={() => dialog.current?.showModal()}>
-        <img src={url} alt={attachment.name ?? '会话图片'} width={width} height={height} onLoad={() => setDecoded(true)} onError={() => setError(true)} data-ready={decoded} />
+        <img src={url} alt={attachment.name ?? '会话图片'} width={width} height={height} onLoad={() => setDecoded(true)} onError={() => { setDetail('浏览器无法解码这些字节'); setError(true); }} data-ready={decoded} />
       </button>}
       {(!decoded || error) && <div className={css.imagePlaceholder}>
         <span>{error ? '图片未能加载' : '正在加载图片'}</span>
+        {error && detail !== '' && <span className={css.imageDetail}>{detail}</span>}
         {error && <button type="button" className={css.textButton} onClick={() => setAttempt(value => value + 1)}>重试</button>}
       </div>}
     </div>
@@ -90,10 +102,12 @@ type MarkdownStreamProps = {
   holdFormatting: boolean;
   kind?: 'body' | 'reasoning';
   fileMentions?: BlockRenderProps['fileMentions'];
+  /** Session workspace, so a relative image destination still resolves. */
+  cwd?: string;
   transformed?: boolean;
 } & TextPresentation;
 
-function MarkdownStream({ text, streaming, holdFormatting, startedAt, interrupted = false, liveText = false, kind = 'body', fileMentions, transformed = false }: MarkdownStreamProps) {
+function MarkdownStream({ text, streaming, holdFormatting, startedAt, interrupted = false, liveText = false, kind = 'body', fileMentions, cwd, transformed = false }: MarkdownStreamProps) {
   const root = useRef<HTMLDivElement>(null);
   const presentation = useStreamingText(text, streaming, { startedAt, interrupted: interrupted || !liveText, selected: holdFormatting });
   // Native Markdown changes block keys for its full final parse. Keep the last
@@ -105,7 +119,7 @@ function MarkdownStream({ text, streaming, holdFormatting, startedAt, interrupte
   return <div ref={root} className={css.readingText} data-reader-text data-reader-text-kind={kind} data-received-length={text.length} data-shown-length={presentation.text.length}
     data-presentation-pending={presentation.pending || undefined} data-motion-style="opacity-blur" data-ud-motion="reader-text-arrival" data-ud-motion-type="reveal" data-ud-motion-no-flash="true"
     data-text-transform={transformed ? (streaming ? 'live' : 'final') : undefined}>
-    <MotionMarkdown text={presentation.text} streaming={effectiveMode} enabled={liveText && presentation.reveal && effectiveMode} revision={presentation.revision} fileMentions={fileMentions} />
+    <MotionMarkdown text={presentation.text} streaming={effectiveMode} enabled={liveText && presentation.reveal && effectiveMode} revision={presentation.revision} fileMentions={fileMentions} cwd={cwd} />
   </div>;
 }
 
@@ -142,10 +156,18 @@ function ReadingReasoning({ blockKey, source, ...props }: ReasoningStreamProps &
   return <ReasoningStream {...props} blockKey={blockKey} />;
 }
 
-function fallback(block: AssistantBlock, streaming: boolean, source: ReaderBlockOwner['source'], loadImage: BlockRenderProps['loadImage'], fillComposer: BlockRenderProps['fillComposer'], holdFormatting: boolean, presentation: TextPresentation, blockKey: string, fileMentions?: BlockRenderProps['fileMentions']): ReactNode {
+type FallbackContext = {
+  loadImage: BlockRenderProps['loadImage'];
+  fillComposer: BlockRenderProps['fillComposer'];
+  fileMentions?: BlockRenderProps['fileMentions'];
+  /** Session workspace; a relative image destination resolves against it. */
+  cwd?: string;
+};
+
+function fallback(block: AssistantBlock, streaming: boolean, source: ReaderBlockOwner['source'], holdFormatting: boolean, presentation: TextPresentation, blockKey: string, context: FallbackContext): ReactNode {
   switch (block.kind) {
-    case 'text': return source === 'user' ? <MarkdownText text={block.text} labels={markdownLabels} /> : <ReadingMarkdown text={block.text} streaming={streaming} holdFormatting={holdFormatting} {...presentation} fileMentions={fileMentions} blockKey={blockKey} source={source} />;
-    case 'image': return <ImageBlock attachment={block.attachment} loadImage={loadImage} />;
+    case 'text': return source === 'user' ? <MarkdownText text={block.text} labels={markdownLabels} /> : <ReadingMarkdown text={block.text} streaming={streaming} holdFormatting={holdFormatting} {...presentation} fileMentions={context.fileMentions} cwd={context.cwd} blockKey={blockKey} source={source} />;
+    case 'image': return <ImageBlock attachment={block.attachment} loadImage={context.loadImage} />;
     case 'reasoning': return <ReadingReasoning text={block.text} streaming={streaming} holdFormatting={holdFormatting} {...presentation} blockKey={blockKey} source={source} />;
     case 'tool-call': return <JsonBlock label={`工具参数 · ${block.name}`} payload={block.argsRaw} truncatedLabel={truncatedJsonLabel} />;
     case 'other': {
@@ -153,7 +175,7 @@ function fallback(block: AssistantBlock, streaming: boolean, source: ReaderBlock
       if (raw && typeof raw === 'object') {
         const item = raw as Record<string, unknown>;
         if ((item.type === 'mcp-app' || item.type === 'mcpapp' || item.type === 'ui') && typeof item.html === 'string') {
-          return <McpAppFrame html={item.html} title={typeof item.title === 'string' ? item.title : undefined} fillComposer={fillComposer} />;
+          return <McpAppFrame html={item.html} title={typeof item.title === 'string' ? item.title : undefined} fillComposer={context.fillComposer} />;
         }
       }
       return <div className={css.unknown}>
@@ -164,14 +186,14 @@ function fallback(block: AssistantBlock, streaming: boolean, source: ReaderBlock
   }
 }
 
-export const Blocks = memo(function Blocks({ blocks, streaming = false, source = 'assistant', holdFormatting = false, startedAt, interrupted, liveText, renderSlotChain, loadImage, fillComposer, fileMentions }: BlockRenderProps & TextPresentation & {
+export const Blocks = memo(function Blocks({ blocks, streaming = false, source = 'assistant', holdFormatting = false, startedAt, interrupted, liveText, renderSlotChain, loadImage, fillComposer, fileMentions, cwd }: BlockRenderProps & TextPresentation & {
   blocks: readonly AssistantBlock[]; streaming?: boolean; source?: ReaderBlockOwner['source']; holdFormatting?: boolean;
 }) {
   const reactId = useId();
   return <ComposerFillContext.Provider value={fillComposer}>
     <div className={css.blocks} data-streaming={streaming || undefined}>
       {blocks.map((block, index) => <BlockBoundary key={block.kind === 'image' ? `image:${block.attachment.attachmentId}:${index}` : `${index}:${block.kind}`}>
-        <Fragment>{renderSlotChain('dsh-better-display.block', readerBlockOwner(block, streaming, source, { startedAt, interrupted, liveText }, holdFormatting), { fallback: fallback(block, streaming, source, loadImage, fillComposer, holdFormatting, { startedAt, interrupted, liveText }, `${reactId}:${index}:${block.kind}`, fileMentions) })}</Fragment>
+        <Fragment>{renderSlotChain('dsh-better-display.block', readerBlockOwner(block, streaming, source, { startedAt, interrupted, liveText }, holdFormatting), { fallback: fallback(block, streaming, source, holdFormatting, { startedAt, interrupted, liveText }, `${reactId}:${index}:${block.kind}`, { loadImage, fillComposer, fileMentions, cwd }) })}</Fragment>
       </BlockBoundary>)}
     </div>
   </ComposerFillContext.Provider>;

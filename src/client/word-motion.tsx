@@ -2,7 +2,7 @@ import { createContext, useContext, useLayoutEffect, useMemo, useRef } from 'rea
 import type { ReactNode, RefObject } from 'react';
 import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives';
 import { MarkdownText } from './markdown/MarkdownText.js';
-import { readerPathImages } from './platform-media.js';
+import { readerPathImagesFor } from './platform-media.js';
 import { WORD_MOTION, WordTimeline } from './word-timeline.js';
 import css from './Reader.module.css';
 
@@ -67,14 +67,19 @@ export function MotionPlainText({ text, enabled, revision }: { text: string; ena
 }
 
 /** Native DSH Markdown semantics with a stable text-leaf animation hook. */
-export function MotionMarkdown({ text, streaming, enabled, revision, fileMentions }: {
+export function MotionMarkdown({ text, streaming, enabled, revision, fileMentions, cwd }: {
   text: string; streaming: boolean; enabled: boolean; revision: number; fileMentions?: MarkdownFileMentions;
+  /** Session workspace, so a relative image destination resolves to a real file. */
+  cwd?: string;
 }) {
   const timeline = useRef<WordTimeline>();
   timeline.current ??= new WordTimeline();
   timeline.current.begin(text, enabled, revision, Number(document.timeline.currentTime ?? performance.now()));
   const generation = timeline.current.generation;
   const scope = useMemo(() => ({ enabled, generation }), [enabled, generation]);
+  // A new identity discards the streaming render cache, so bind it to cwd
+  // rather than rebuilding it on every chunk.
+  const pathImages = useMemo(() => readerPathImagesFor(cwd), [cwd]);
   const renderText = useMemo(() => (value: string, offset: number, inline = false): ReactNode => {
     const current = timeline.current!;
     if (!current.hasLiveText) return value;
@@ -87,6 +92,6 @@ export function MotionMarkdown({ text, streaming, enabled, revision, fileMention
     return current.hasLiveText ? <MotionAtom born={current.bornAt(offset)} generation={current.generation} offset={offset}>{children}</MotionAtom> : children;
   }, []);
   return <WordScope.Provider value={scope}>
-    <MarkdownText text={text} streaming={streaming} codeLabels={CODE_LABELS} fileMentions={fileMentions} pathImages={readerPathImages} renderText={renderText} renderAtom={renderAtom} />
+    <MarkdownText text={text} streaming={streaming} codeLabels={CODE_LABELS} fileMentions={fileMentions} pathImages={pathImages} renderText={renderText} renderAtom={renderAtom} />
   </WordScope.Provider>;
 }

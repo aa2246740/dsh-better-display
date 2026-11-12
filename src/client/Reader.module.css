@@ -482,6 +482,7 @@
 .pendingImage { display: block; width: 100%; height: 100%; max-width: 100%; object-fit: contain; }
 .imagePlaceholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; color: var(--dsw-alias-label-tertiary); font-size: 13px; pointer-events: none; }
 .imagePlaceholder button { pointer-events: auto; }
+.imageDetail { max-width: min(100%, 42ch); text-align: center; overflow-wrap: anywhere; color: var(--dsw-alias-state-error-primary); font-size: 12px; line-height: 16px; }
 .imageFigure figcaption { color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; margin-top: 6px; overflow-wrap: anywhere; }
 .imageDialog { border: 1px solid var(--dsw-alias-border-l2); padding: 38px 20px 20px; border-radius: 16px; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); max-width: 90vw; max-height: 90vh; }
 .imageDialog::backdrop { background: var(--dsw-alias-bg-mask-photo); }

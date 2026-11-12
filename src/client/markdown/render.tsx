@@ -31,6 +31,8 @@ import type { MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PositionedBlock } from './incremental.js'
 import css from './MarkdownText.module.css'
 
+export type { MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives'
+
 /** Copy-button labels forwarded to fence CodeBlocks (this package is cordis-free, so copy arrives via props). */
 export interface MarkdownCodeLabels {
   /** Copy-button idle label. */
@@ -529,14 +531,34 @@ function renderImage(url: string, alt: string, key: Key, context: MarkdownRender
     } catch { /* A vocabulary result must be an absolute URL. */ }
   }
   if (imageSrc === undefined) {
-    return <span key={key} className={css.imageAlt}>{alt}</span>
+    return <UnavailableImage key={key} alt={alt} destination={url} state="unresolved" />
   }
   return <MarkdownImage key={`${key}:${imageSrc}`} src={imageSrc} alt={alt} destination={url} />
 }
 
+/**
+ * A local image destination that resolved to no displayable URL, or an image
+ * that failed to decode. Both stay visible: a silently missing picture is
+ * indistinguishable from an answer that never had one, which is exactly the
+ * report this placeholder answers. The authored destination is shown so the
+ * path can be copied even when it cannot be rendered.
+ */
+export function UnavailableImage({ alt, destination, state }: { alt: string; destination: string; state: 'unresolved' | 'failed' }): ReactNode {
+  return (
+    <span className={css.imageUnavailable} data-markdown-image-unavailable={state} role="img" aria-label={alt || destination}>
+      <span className={css.imageUnavailableGlyph} aria-hidden="true">🖼</span>
+      <span className={css.imageUnavailableCopy}>
+        <span>{state === 'failed' ? '图片加载失败' : '此图片无法在阅读页显示'}</span>
+        {alt && <span className={css.imageUnavailableAlt}>{alt}</span>}
+        {destination && <code className={css.imageUnavailablePath}>{destination}</code>}
+      </span>
+    </span>
+  )
+}
+
 function MarkdownImage({ src, alt, destination }: { src: string; alt: string; destination: string }): ReactNode {
   const [failed, setFailed] = useState(false)
-  if (failed) return <span className={css.imageAlt}>{alt || destination}</span>
+  if (failed) return <UnavailableImage alt={alt} destination={destination} state="failed" />
   return (
     <img
       className={css.image}
