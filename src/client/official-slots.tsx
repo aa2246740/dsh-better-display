@@ -178,6 +178,11 @@ function translatedComponent(entry: StoredEntry, names: ReadonlyMap<string, stri
  * Mirror one elected contribution set incrementally. Unrelated additions do not
  * remount existing cards or recreate their subscriptions. A source unload/HMR
  * disposes the corresponding subtree and closures before its replacement.
+ *
+ * A keyed source cell whose component identity changes in place is re-mirrored
+ * on the next ledger notification. List/chain cells keep the registration-only
+ * path because their display order follows registration sequence, so replacing
+ * their registration could reorder them.
  */
 export function mirrorOfficialSlot(
   slots: CompositionRegistry,
@@ -186,15 +191,16 @@ export function mirrorOfficialSlot(
   namespace: string,
   accept: (entry: StoredEntry) => boolean = () => true,
 ): () => void {
-  const mounted = new Map<StoredEntry, () => void>();
+  const mounted = new Map<StoredEntry, { component: unknown; dispose: () => void }>();
   let stopped = false;
   const reconcile = () => {
     if (stopped) return;
     const entries = slots.entriesOfSlot(source).filter(accept);
     const wanted = new Set(entries);
-    for (const [entry, dispose] of mounted) {
-      if (wanted.has(entry)) continue;
-      dispose();
+    const followsComponent = slots.spec(source)?.kind === 'keyed';
+    for (const [entry, record] of [...mounted]) {
+      if (wanted.has(entry) && (!followsComponent || record.component === entry.component)) continue;
+      record.dispose();
       mounted.delete(entry);
     }
     for (const entry of entries) {
@@ -216,7 +222,7 @@ export function mirrorOfficialSlot(
         for (const [key, seat] of names) {
           disposers.push(mirrorOfficialSlot(slots, key, seat, namespace));
         }
-        mounted.set(entry, dispose);
+        mounted.set(entry, { component: entry.component, dispose });
       } catch (error) {
         dispose();
         throw error;
@@ -227,7 +233,7 @@ export function mirrorOfficialSlot(
   const dispose = () => {
     stopped = true;
     unsubscribe();
-    for (const stop of [...mounted.values()].reverse()) stop();
+    for (const record of [...mounted.values()].reverse()) record.dispose();
     mounted.clear();
   };
   try { reconcile(); } catch (error) { dispose(); throw error; }
