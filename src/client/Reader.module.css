@@ -526,8 +526,19 @@
    when the column is narrow. */
 .foldSummary { display: inline-flex; align-items: baseline; white-space: nowrap !important; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .foldSummaryPart { display: inline-flex; align-items: baseline; white-space: nowrap !important; flex: none; }
-.numberRollRoot { display: inline-flex; position: relative; overflow: hidden; vertical-align: baseline; line-height: inherit; font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; white-space: nowrap !important; flex-shrink: 0; min-width: 1.45em; justify-content: center; text-align: center; }
+/* A number roll is sized by its sizer, and `min-width` only has to cover ONE
+   tabular digit so a single-digit value does not jitter while it rolls.
+   It used to be `1.45em`: at the reader's 14px that reserves 20.3px, while a
+   single digit needs 8.2px. The digest carries several numbers, so the wasted
+   12px per single-digit value pushed the whole line past the width the button
+   can give it (measured: 190px wanted, 183.7px available) and `overflow: hidden`
+   then cut the last number in half. `1ch` is exactly one digit of this font. */
+.numberRollRoot { display: inline-flex; position: relative; overflow: hidden; vertical-align: baseline; line-height: inherit; font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; white-space: nowrap !important; flex-shrink: 0; width: max-content; min-width: 1ch; justify-content: center; text-align: center; }
 .numberRollSizer { visibility: hidden; user-select: none; pointer-events: none; line-height: inherit; white-space: nowrap; }
+/* The animated digits span the whole box. `justify-content: center` is safe once
+   the box is as wide as the widest value it will ever show, which the sizer
+   guarantees; before that it centred an over-wide value and `overflow: hidden`
+   cropped it on both sides, which is what cut the last digit. */
 .numberRollDigit { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; line-height: inherit; white-space: nowrap; }
 .numberRollExit { animation: numberRollOut 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 .numberRollEnter { animation: numberRollIn 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
