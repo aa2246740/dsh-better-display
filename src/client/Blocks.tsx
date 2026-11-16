@@ -1,7 +1,9 @@
 import {
   Component,
   Fragment,
+  createContext,
   memo,
+  useContext,
   useEffect,
   useId,
   useLayoutEffect,
@@ -16,7 +18,8 @@ import type {
 } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import { JsonBlock, MarkdownText, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives';
 import { ComposerFillContext, McpAppFrame } from './McpAppFrame.js';
-import { ImageLightbox } from './ImageLightbox.js';
+import { SoloImage } from './ImageThumb.js';
+import { attachmentLabel } from './image-group-order.js';
 import { formatMessageClock } from './message-chrome.js';
 import { markdownLabels, truncatedJsonLabel } from './primitive-labels.js';
 import type { BlockRenderProps, ReaderBlockOwner } from './types.js';
@@ -59,6 +62,19 @@ export class BlockBoundary extends Component<
   }
 }
 
+/**
+ * The source path a tool call named, for the pictures that call returned.
+ *
+ * A tool result carries the call's arguments (`args`, and the raw `call.argsRaw`), and
+ * for an image tool those arguments name the file. That is the only place a full path
+ * survives: `ImageAttachmentRef.name` is documented as "stripped of local path
+ * information", so the attachment alone can never say where a picture came from.
+ */
+export const ToolPathContext = createContext<string | undefined>(undefined);
+
+/** Re-exported so callers keep one import: the logic lives in `tool-path.ts`. */
+export { pathFromToolArgs } from './tool-path.js';
+
 export const ImageBlock = memo(function ImageBlock({
   attachment,
   loadImage
@@ -66,6 +82,8 @@ export const ImageBlock = memo(function ImageBlock({
   attachment: ImageAttachmentRef;
   loadImage: BlockRenderProps['loadImage'];
 }) {
+  // The call that produced this picture, when the renderer sits inside a tool result.
+  const toolPath = useContext(ToolPathContext);
   const [attempt, setAttempt] = useState(0);
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
@@ -114,14 +132,13 @@ export const ImageBlock = memo(function ImageBlock({
   const height =
     Number.isFinite(attachment.height) && attachment.height > 0 ? attachment.height : 3;
   const alt = attachment.name ?? '会话图片';
+  // The call's own arguments are the only carrier of a full path — the attachment's
+  // name is stripped of it by design — so use that when the renderer is inside a tool
+  // result, and fall back to a file name with the suffix its media type implies.
+  const caption = toolPath ?? attachmentLabel(attachment.name, attachment.mediaType);
   const picture =
     !error && url ? (
-      <ImageLightbox
-        src={url}
-        alt={alt}
-        caption={attachment.name ?? '工具调用图片'}
-        label={`放大图片${attachment.name ? `：${attachment.name}` : ''}`}
-      >
+      <SoloImage src={url} alt={alt} caption={caption} label={`放大图片：${caption}`}>
         <img
           src={url}
           alt={alt}
@@ -134,7 +151,7 @@ export const ImageBlock = memo(function ImageBlock({
           }}
           data-ready={decoded}
         />
-      </ImageLightbox>
+      </SoloImage>
     ) : null;
   return (
     <figure

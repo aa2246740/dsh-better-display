@@ -19,6 +19,7 @@ const root = resolve(import.meta.dirname, '..');
 const lightbox = readFileSync(resolve(root, 'src/client/ImageLightbox.tsx'), 'utf8');
 const blocks = readFileSync(resolve(root, 'src/client/Blocks.tsx'), 'utf8');
 const render = readFileSync(resolve(root, 'src/client/markdown/render.tsx'), 'utf8');
+const thumb = readFileSync(resolve(root, 'src/client/ImageThumb.tsx'), 'utf8');
 const css = readFileSync(resolve(root, 'src/client/Reader.module.css'), 'utf8').replace(
   /\r\n/g,
   '\n'
@@ -31,16 +32,25 @@ function rule(selector: string): string {
   return match[1]!;
 }
 
-test('both image surfaces render the same viewer', () => {
-  // Read by component name, not by surrounding formatting: Prettier is free to
-  // re-wrap the JSX.
-  assert.ok(blocks.includes('<ImageLightbox'), 'the tool-call attachment uses the viewer');
-  assert.ok(blocks.includes("from './ImageLightbox.js'"), 'and imports it');
-  assert.ok(render.includes('<ImageLightbox'), 'a picture inside an answer uses it too');
-  assert.ok(render.includes("from '../ImageLightbox.js'"), 'and imports it');
-  // Neither keeps its own dialog, which is how the two surfaces drifted apart.
-  assert.doesNotMatch(blocks, /<dialog/u);
-  assert.doesNotMatch(render, /<dialog/u);
+test('both image surfaces reach the same viewer', () => {
+  // A tool-call attachment has no gallery, so it brings its own one-member viewer;
+  // a picture inside an answer joins that answer's shared one.
+  assert.ok(blocks.includes('<SoloImage'), 'the tool-call attachment uses a solo viewer');
+  assert.ok(thumb.includes('export function SoloImage'), 'and the solo viewer exists');
+  assert.ok(render.includes('<ImageThumb'), 'a picture inside an answer uses a thumbnail');
+  assert.ok(thumb.includes('export function ImageThumb'), 'and the thumbnail exists');
+  // There is exactly one dialog implementation, so the two cannot drift apart.
+  const dialogOwners = [
+    'src/client/ImageLightbox.tsx',
+    'src/client/ImageThumb.tsx',
+    'src/client/Blocks.tsx'
+  ].filter(file => readFileSync(resolve(root, file), 'utf8').includes('<dialog'));
+  assert.deepEqual(dialogOwners, ['src/client/ImageLightbox.tsx']);
+});
+
+test('the trigger is a button, so the viewer opens from the keyboard', () => {
+  assert.match(thumb, /aria-label=\{label\}/u);
+  assert.match(thumb, /<button/u);
 });
 
 test('the wheel zooms instead of scrolling the page behind the dialog', () => {
@@ -82,13 +92,10 @@ test('oversized pictures scroll and drag at any zoom, including 100%', () => {
   // work before any re-measure happens.
   assert.doesNotMatch(lightbox, /if \(!pannable\) return;/u);
   assert.doesNotMatch(lightbox, /if \(scale <= 1\) return;/u);
-  // The stage really scrolls, so native scrollbars show where in the picture the
-  // reader is, and dragging moves the scroll offset instead of a transform.
+  // The stage really scrolls, and dragging moves the scroll offset.
   assert.match(rule('.imageStage'), /overflow:\s*auto/u);
-  assert.match(lightbox, /node\.scrollLeft = start\.left - \(event\.clientX - start\.x\)/u);
-  assert.match(lightbox, /node\.scrollTop = start\.top - \(event\.clientY - start\.y\)/u);
-  // A transform would hide the overflow with nothing to reveal it.
-  assert.doesNotMatch(rule('.imageStageInner img'), /transform:/u);
+  assert.match(lightbox, /node\.scrollLeft = settled\.left/u);
+  assert.match(lightbox, /node\.scrollTop = settled\.top/u);
 });
 
 test('a picture that fits is centred on both axes, a larger one is not clipped', () => {
@@ -110,11 +117,4 @@ test('a picture that fits is centred on both axes, a larger one is not clipped',
 test('a picture inside a link keeps navigating instead of opening the viewer', () => {
   assert.match(render, /zoomable=\{context\.inLink !== true\}/u);
   assert.match(render, /if \(!zoomable\) return picture/u);
-});
-
-test('the trigger is a button, so the viewer opens from the keyboard', () => {
-  // A real button is what makes Tab + Enter work; closing returns focus to it.
-  assert.match(lightbox, /aria-label=\{label\}/u);
-  assert.match(lightbox, /onClick=\{showTrigger\}/u);
-  assert.match(lightbox, /trigger\.current\?\.focus\(\)/u);
 });

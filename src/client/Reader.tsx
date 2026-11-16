@@ -37,6 +37,8 @@ import css from './Reader.module.css';
 import { markdownLabels, truncatedJsonLabel } from './primitive-labels.js';
 import { chatSeatProps } from './chat-seat.js';
 import { visibleChatKeys, visibleChatSignature } from './rewind-cut.js';
+import { ImageViewerScope, ImageBand, TOOL_BAND } from './image-group.js';
+import { ImageLightbox } from './ImageLightbox.js';
 import { ensureStyles } from './styles.js';
 
 function isNode<K extends ChatNodeKind>(node: ChatConversationViewNode, kind: K): node is ChatNode<K> {
@@ -594,17 +596,23 @@ const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys,
         seamSummary={step.kind === 'body' ? seamPlan.before.get(step.key) : undefined}
         seamAfter={step.kind === 'body' && seamPlan.after.has(step.key)} />
     </BlockBoundary>;
-    if (step.kind === 'tool') return <BlockBoundary><ProcessFragment open={processOpen} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={step.key} framed>
+    if (step.kind === 'tool') return <BlockBoundary><ImageBand rank={TOOL_BAND}><ProcessFragment open={processOpen} motion={motion} onRead={pinProcess} returnFocusTo={processButton} nodeKey={step.key} framed>
       <ToolActivity {...shared} entry={step.entry} motion={motion} turnClosed={boundary.status === 'closed'} onRead={pinProcess} />
       {step.entry.block && <ToolMedia {...shared} block={step.entry.block} />}
-    </ProcessFragment></BlockBoundary>;
+    </ProcessFragment></ImageBand></BlockBoundary>;
     if (step.kind === 'user') return <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={step.nodeKey} /></BlockBoundary>;
     return <Fragment>
       <BlockBoundary><ProcessNode useChat={useFlowChat} t={props.t} nodeKey={step.nodeKey} open={processOpen} motion={motion} onRead={pinProcess} returnFocusTo={processButton} /></BlockBoundary>
       <BlockBoundary><MainNode {...shared} boundary={boundary} nodeKey={step.nodeKey} pinned={pinnedKeys.includes(step.nodeKey)} processOpen={processOpen} /></BlockBoundary>
     </Fragment>;
   };
-  return <section className={css.turn} data-reader-turn={group.turn ?? 'unresolved'} data-reader-turn-state={boundary.status} data-reader-turn-result={boundary.reason ?? undefined}>
+  // One viewer per TURN. Every picture a turn produced can be paged, but how wide the
+  // group is depends on where the reader opened it: a tool-call picture is in the
+  // TOOL band and sees the whole turn, while an answer picture is in the ANSWER band
+  // and sees only the answer. `ImageViewerScope` resolves that with the band ranking.
+  return <ImageViewerScope
+    render={viewer => (viewer.current === null ? null : <ImageLightbox viewer={viewer} />)}
+  ><section className={css.turn} data-reader-turn={group.turn ?? 'unresolved'} data-reader-turn-state={boundary.status} data-reader-turn-result={boundary.reason ?? undefined}>
     {startsWithUser && <BlockBoundary><MainNode {...shared} useChat={props.useChat} boundary={boundary} nodeKey={group.keys[0]} /></BlockBoundary>}
     <div className={css.turnStickyRegion} data-reader-sticky-region>
       {(showStatusLane || showClosedSummary) && <div className={css.turnStickyLanes}>
@@ -626,7 +634,7 @@ const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys,
     {showDeliverablesRow(boundary.status, deliverables) && <DeliverablesRow deliverables={deliverables} openFile={props.openFile} revealFile={props.revealFile} openMode={openMode} />}
     {boundary.status === 'closed' && <BlockBoundary><OfficialTail official={official} owner={tailOwner} produced={deliverables} /></BlockBoundary>}
     {showTerminalNotice && <div className={css.notice} data-reader-terminal>{terminal}</div>}
-  </section>;
+  </section></ImageViewerScope>;
 });
 
 export function Reader(props: ReaderProps) {

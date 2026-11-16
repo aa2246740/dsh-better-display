@@ -3,7 +3,7 @@ import type { ToolCallBlock, ToolResultNode } from '@deepseek-ai/dsh-client-ui-c
 import type { DiffHunk, ReadBlockLine, SearchFileGroup } from '@deepseek-ai/dsh-client-ui-primitives';
 import { DiffBlock, DisclosureRow, JsonTree, ReadBlock, SearchBlock, TerminalBlock, WebBlock,
   IconApiOutlineRegular, IconBrowseOutlineRegular, IconEditOutlineRegular, IconSearchOutlineRegular, IconSkillOutlineRegular, IconSparkleRegular } from '@deepseek-ai/dsh-client-ui-primitives';
-import { Blocks, contentBlocks } from './Blocks.js';
+import { Blocks, contentBlocks, pathFromToolArgs, ToolPathContext } from './Blocks.js';
 import { OfficialTool } from './OfficialContent.js';
 import { ProcessFragment } from './motion.js';
 import { activityPhase, activitySummary, callDiffHunks, diffTotals, executionFacts, forgetCallClock, objectValue, runningClockBase } from './tool-activity.js';
@@ -271,8 +271,14 @@ export function ToolMedia({ block, depth = 0, ...render }: BlockRenderProps & { 
   if (depth > 6) return null;
   const settled = 'kind' in block;
   const visible = settled ? contentBlocks(block.content).filter(item => item.kind === 'image' || item.kind === 'other') : [];
+  // The call's arguments name the file a returned picture came from, and they are the
+  // only carrier of a full path: the attachment's own name is stripped of it.
+  const path = pathFromToolArgs({
+    args: (block as { args?: unknown }).args,
+    argsRaw: (block as { call?: { argsRaw?: string } | null }).call?.argsRaw
+  });
   return <>
-    {visible.length > 0 && <Blocks {...render} blocks={visible} source="tool" />}
+    {visible.length > 0 && <ToolPathContext.Provider value={path}><Blocks {...render} blocks={visible} source="tool" /></ToolPathContext.Provider>}
     {block.subCalls.map(child => <ToolMedia key={child.callId} {...render} block={child} depth={depth + 1} />)}
   </>;
 }

@@ -19,6 +19,17 @@ export declare class BlockBoundary extends Component<{
     };
     render(): string | number | boolean | Iterable<ReactNode> | import("react").JSX.Element | null | undefined;
 }
+/**
+ * The source path a tool call named, for the pictures that call returned.
+ *
+ * A tool result carries the call's arguments (`args`, and the raw `call.argsRaw`), and
+ * for an image tool those arguments name the file. That is the only place a full path
+ * survives: `ImageAttachmentRef.name` is documented as "stripped of local path
+ * information", so the attachment alone can never say where a picture came from.
+ */
+export declare const ToolPathContext: import("react").Context<string | undefined>;
+/** Re-exported so callers keep one import: the logic lives in `tool-path.ts`. */
+export { pathFromToolArgs } from './tool-path.js';
 export declare const ImageBlock: import("react").MemoExoticComponent<({ attachment, loadImage }: {
     attachment: ImageAttachmentRef;
     loadImage: BlockRenderProps["loadImage"];
@@ -45,5 +56,4 @@ export declare function UserMessageActions({ text, time }: {
     text: string;
     time?: number;
 }): import("react").JSX.Element | null;
-export {};
 //# sourceMappingURL=Blocks.d.ts.map

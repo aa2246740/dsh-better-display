@@ -30,7 +30,7 @@ import { isMcpAppCodeBlock, extractMcpAppTitle, extractMcpAppHeight } from '../m
 import type { MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { PositionedBlock } from './incremental.js';
 import css from './MarkdownText.module.css';
-import { ImageLightbox } from '../ImageLightbox.js';
+import { ImageThumb } from '../ImageThumb.js';
 
 export type { MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives';
 
@@ -670,8 +670,10 @@ function MarkdownImage({
   // A picture inside `[![alt](src)](href)` keeps its link behaviour: wrapping it
   // in the zoom trigger would swallow the navigation.
   if (!zoomable) return picture;
+  // The thumbnail only asks the answer's shared viewer to show it; the dialog
+  // itself lives in `MarkdownText`, so paging swaps the picture inside one dialog.
   return (
-    <ImageLightbox
+    <ImageThumb
       src={src}
       alt={alt}
       caption={destination || alt || '图片'}
@@ -679,7 +681,7 @@ function MarkdownImage({
       label={`放大图片${alt ? `：${alt}` : ''}`}
     >
       {picture}
-    </ImageLightbox>
+    </ImageThumb>
   );
 }
 

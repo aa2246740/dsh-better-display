@@ -1,28 +1,19 @@
-import type { ReactNode } from 'react';
+import type { SharedViewer } from './image-group.js';
 /**
- * A click-to-enlarge viewer with wheel zoom, drag panning and real scrollbars.
+ * The one image viewer for a group of pictures.
  *
- * One component serves both image surfaces — tool-call attachments
- * ({@link ImageBlock}) and pictures inside a final answer ({@link MarkdownImage})
- * — so the two cannot drift apart.
+ * Rendered by `ImageViewerScope`, never by a thumbnail: paging has to swap the
+ * picture inside a single `<dialog>`, and a dialog belongs to a component that is
+ * not one of the pictures being paged. That is the bug this replaces — each picture
+ * owned a dialog, so `›` opened a second one on top instead of replacing the first,
+ * and there was no way back.
  *
- * The stage genuinely scrolls rather than faking pan with a transform. That
- * matters for pictures that are larger than the viewport even at 100%: with a
- * transform there is nothing to reveal the hidden part, and no way to tell where
- * in the picture the reader currently is. Native overflow gives both — the
- * scrollbars are the position indicator, and dragging moves the scroll offset.
- * @param props - the thumbnail to show in the page, plus what the viewer labels.
+ * The stage is a genuine scroll container rather than a transform sandbox: a
+ * picture larger than the viewport then has somewhere to go, and the native
+ * scrollbars double as a "where am I" indicator.
+ * @param props - the shared viewer state; the picture comes from `viewer.current`.
  */
-export declare function ImageLightbox({ src, alt, children, label, inline }: {
-    /** Already-resolved URL, shared by the thumbnail and the viewer. */
-    src: string;
-    /** Alternative text; also what the viewer announces. */
-    alt: string;
-    /** The thumbnail markup; it is wrapped in the trigger button. */
-    children: ReactNode;
-    /** Accessible name for the trigger, e.g. `放大图片：shot.png`. */
-    label: string;
-    /** Inline trigger for pictures in the text flow, instead of a filled frame. */
-    inline?: boolean;
+export declare function ImageLightbox({ viewer }: {
+    viewer: SharedViewer;
 }): import("react").JSX.Element;
 //# sourceMappingURL=ImageLightbox.d.ts.map

@@ -32,7 +32,6 @@ import type {
 } from './render.js';
 // KaTeX CSS is supplied once by the shared DSH UI-primitives client bundle.
 import css from './MarkdownText.module.css';
-import { ImageGroupScope, ImageOpenScope } from '../image-group.js';
 
 export type { MarkdownCodeLabels, MarkdownFileMentions } from './render.js';
 
@@ -229,13 +228,8 @@ export const MarkdownText = memo(function MarkdownText({
     }
     return streamRef.current.render(text);
   }, [text, streaming, codeLabels, fileMentions, pathImages, renderText, renderAtom]);
-  // One block of prose is one page group for its pictures, so the viewer can say
-  // `2/5` over the pictures of this answer rather than over the whole page.
-  return (
-    <div className={css.markdown}>
-      <ImageOpenScope>
-        <ImageGroupScope>{children}</ImageGroupScope>
-      </ImageOpenScope>
-    </div>
-  );
+  // The viewer scope lives above the block list (in `Blocks`), not here: one answer
+  // arrives as several blocks and each renders its own MarkdownText, so a scope at
+  // this level split one answer's pictures into one group per block.
+  return <div className={css.markdown}>{children}</div>;
 });
