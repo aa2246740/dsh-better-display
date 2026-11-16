@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import css from './Reader.module.css';
 
@@ -20,17 +20,28 @@ function percent(scale: number): string {
   return `${Math.round(scale * 100)}%`;
 }
 
+/** The cursor point that must stay under the pointer across a zoom step. */
+interface ZoomAnchor {
+  /** Content coordinate of the anchor, in unscaled pixels. */
+  contentX: number;
+  contentY: number;
+  /** Where the anchor sits inside the viewport, in client pixels. */
+  viewX: number;
+  viewY: number;
+}
+
 /**
- * A click-to-enlarge viewer with wheel zoom and drag panning.
+ * A click-to-enlarge viewer with wheel zoom, drag panning and real scrollbars.
  *
  * One component serves both image surfaces — tool-call attachments
  * ({@link ImageBlock}) and pictures inside a final answer ({@link MarkdownImage})
  * — so the two cannot drift apart.
  *
- * The picture is scaled with a CSS transform rather than a width change: a
- * `max-width: 82vw` box inside a dialog cannot grow past its cap, and a transform
- * also avoids re-laying-out the dialog on every wheel tick. The stage clips the
- * overflow, so a zoomed picture never spills onto the backdrop.
+ * The stage genuinely scrolls rather than faking pan with a transform. That
+ * matters for pictures that are larger than the viewport even at 100%: with a
+ * transform there is nothing to reveal the hidden part, and no way to tell where
+ * in the picture the reader currently is. Native overflow gives both — the
+ * scrollbars are the position indicator, and dragging moves the scroll offset.
  * @param props - the thumbnail to show in the page, plus what the viewer labels.
  */
 export function ImageLightbox({
@@ -55,40 +66,63 @@ export function ImageLightbox({
   const trigger = useRef<HTMLButtonElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  /** Natural pixel size, known once the picture decodes. */
+  const [natural, setNatural] = useState<{ width: number; height: number } | null>(null);
   const [dragging, setDragging] = useState(false);
-  // The pointer position that started this drag, in client coordinates.
-  const dragStart = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+  /** Whether the picture currently has anything to scroll or drag. */
+  const [pannable, setPannable] = useState(false);
+  /** Restored scroll position for the frame after a zoom. */
+  const pendingAnchor = useRef<ZoomAnchor | null>(null);
+  const dragStart = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
 
   const reset = useCallback(() => {
     setScale(1);
-    setOffset({ x: 0, y: 0 });
   }, []);
 
-  /** Zoom around a point so the pixel under the cursor stays put. */
-  const zoomAt = useCallback((next: number, clientX?: number, clientY?: number) => {
-    setScale(current => {
+  /** Zoom, keeping the point under the cursor where it is. */
+  const zoomAt = useCallback(
+    (next: number, clientX?: number, clientY?: number) => {
+      const node = stage.current;
       const target = clampScale(next);
-      if (target === current) return current;
-      const box = stage.current?.getBoundingClientRect();
-      if (box === undefined || clientX === undefined || clientY === undefined) {
-        return target;
+      if (target === scale) return;
+      if (node !== null) {
+        const box = node.getBoundingClientRect();
+        const viewX = clientX === undefined ? box.width / 2 : clientX - box.left;
+        const viewY = clientY === undefined ? box.height / 2 : clientY - box.top;
+        pendingAnchor.current = {
+          contentX: (node.scrollLeft + viewX) / scale,
+          contentY: (node.scrollTop + viewY) / scale,
+          viewX,
+          viewY
+        };
       }
-      // Cursor position relative to the stage centre, which is the transform origin.
-      const cx = clientX - (box.left + box.width / 2);
-      const cy = clientY - (box.top + box.height / 2);
-      const ratio = target / current;
-      setOffset(prev => ({
-        x: cx - (cx - prev.x) * ratio,
-        y: cy - (cy - prev.y) * ratio
-      }));
-      return target;
-    });
-  }, []);
+      setScale(target);
+    },
+    [scale]
+  );
 
-  // The dialog scrolls the page behind it away unless the wheel is handled
-  // non-passively, so this binds directly rather than through React's passive
-  // `onWheel`.
+  // Apply the anchor after the new size is laid out but before the frame paints,
+  // so the picture does not visibly jump.
+  useLayoutEffect(() => {
+    const node = stage.current;
+    const anchor = pendingAnchor.current;
+    if (node === null || anchor === null) return;
+    pendingAnchor.current = null;
+    node.scrollLeft = anchor.contentX * scale - anchor.viewX;
+    node.scrollTop = anchor.contentY * scale - anchor.viewY;
+  }, [scale]);
+
+  // Recompute whether anything is hidden, whenever the size or the zoom changes.
+  useLayoutEffect(() => {
+    const node = stage.current;
+    if (node === null) return;
+    const overflow =
+      node.scrollWidth > node.clientWidth + 1 || node.scrollHeight > node.clientHeight + 1;
+    setPannable(overflow);
+  }, [scale, natural, dragging]);
+
+  // The wheel must not scroll the page behind the dialog, and React's `onWheel`
+  // is passive, so this binds directly.
   useEffect(() => {
     const node = stage.current;
     if (node === null) return undefined;
@@ -102,30 +136,36 @@ export function ImageLightbox({
     };
   }, [scale, zoomAt]);
 
-  // Reset whenever the viewer opens or closes, so a reopened picture starts at
-  // 100% instead of wherever the last one was left.
+  // Opening and closing both start from a clean 100%, so one picture never
+  // inherits the last one's zoom, and closing returns focus to the trigger.
   useEffect(() => {
     const node = dialog.current;
     if (node === null) return undefined;
     const onClose = () => {
-      reset();
+      setScale(1);
+      if (stage.current !== null) {
+        stage.current.scrollLeft = 0;
+        stage.current.scrollTop = 0;
+      }
       trigger.current?.focus();
     };
     node.addEventListener('close', onClose);
     return () => {
       node.removeEventListener('close', onClose);
     };
-  }, [reset]);
+  }, []);
 
+  // Dragging pans the scroll offset. It is gated on there being something
+  // hidden, not on the zoom level: a picture wider or taller than the viewport
+  // needs dragging at 100% too.
   useEffect(() => {
     if (!dragging) return undefined;
     const onMove = (event: PointerEvent) => {
       const start = dragStart.current;
-      if (start === null) return;
-      setOffset({
-        x: start.ox + (event.clientX - start.x),
-        y: start.oy + (event.clientY - start.y)
-      });
+      const node = stage.current;
+      if (start === null || node === null) return;
+      node.scrollLeft = start.left - (event.clientX - start.x);
+      node.scrollTop = start.top - (event.clientY - start.y);
     };
     const onUp = () => {
       dragStart.current = null;
@@ -158,9 +198,12 @@ export function ImageLightbox({
   };
 
   const open = () => {
-    reset();
+    setScale(1);
     dialog.current?.showModal();
   };
+
+  const width = natural === null ? undefined : Math.round(natural.width * scale);
+  const height = natural === null ? undefined : Math.round(natural.height * scale);
 
   return (
     <>
@@ -194,13 +237,19 @@ export function ImageLightbox({
         <div
           ref={stage}
           className={css.imageStage}
+          data-pannable={pannable ? '' : undefined}
           data-dragging={dragging ? '' : undefined}
-          data-zoomed={scale > 1 ? '' : undefined}
           onPointerDown={event => {
-            // Only a zoomed picture can be panned; at 100% it is already centred.
-            if (scale <= 1) return;
+            if (!pannable) return;
             event.preventDefault();
-            dragStart.current = { x: event.clientX, y: event.clientY, ox: offset.x, oy: offset.y };
+            const node = stage.current;
+            if (node === null) return;
+            dragStart.current = {
+              x: event.clientX,
+              y: event.clientY,
+              left: node.scrollLeft,
+              top: node.scrollTop
+            };
             setDragging(true);
           }}
           onDoubleClick={() => {
@@ -211,12 +260,22 @@ export function ImageLightbox({
             }
           }}
         >
-          <img
-            src={src}
-            alt={alt}
-            draggable={false}
-            style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})` }}
-          />
+          <div className={css.imageStageInner}>
+            <img
+              src={src}
+              alt={alt}
+              draggable={false}
+              width={width}
+              height={height}
+              style={
+                width === undefined ? undefined : { width: `${width}px`, height: `${height}px` }
+              }
+              onLoad={event => {
+                const node = event.currentTarget;
+                setNatural({ width: node.naturalWidth, height: node.naturalHeight });
+              }}
+            />
+          </div>
         </div>
         <div className={css.lightboxToolbar}>
           <button

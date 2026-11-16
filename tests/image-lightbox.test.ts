@@ -52,6 +52,14 @@ test('the wheel zooms instead of scrolling the page behind the dialog', () => {
   assert.match(lightbox, /Math\.exp\(-event\.deltaY \* WHEEL_FACTOR\)/u);
 });
 
+test('zoom keeps the point under the cursor still', () => {
+  // The anchor is recorded in content pixels before the size changes and applied
+  // in a layout effect after it, so the picture does not visibly jump.
+  assert.match(lightbox, /contentX: \(node\.scrollLeft \+ viewX\) \/ scale/u);
+  assert.match(lightbox, /useLayoutEffect/u);
+  assert.match(lightbox, /node\.scrollLeft = anchor\.contentX \* scale - anchor\.viewX/u);
+});
+
 test('zoom is clamped and can always be reset to 100%', () => {
   assert.match(lightbox, /const MIN_SCALE = 0\.5/u);
   assert.match(lightbox, /const MAX_SCALE = 8/u);
@@ -68,15 +76,35 @@ test('the current scale is shown and announced', () => {
   assert.match(lightbox, /Math\.round\(scale \* 100\)/u);
 });
 
-test('a zoomed picture can be dragged and never spills onto the backdrop', () => {
-  // Panning is gated on zoom, because at 100% the picture is already centred.
-  assert.match(lightbox, /if \(scale <= 1\) return;/u);
-  assert.match(lightbox, /translate\(\$\{offset\.x\}px, \$\{offset\.y\}px\) scale\(\$\{scale\}\)/u);
-  // The stage clips; the img itself must not cap the zoom with max-width.
-  assert.match(rule('.imageStage'), /overflow:\s*hidden/u);
-  const img = rule('.imageStage img');
-  assert.match(img, /max-width:\s*none/u);
-  assert.match(img, /max-height:\s*none/u);
+test('oversized pictures scroll and drag at any zoom, including 100%', () => {
+  // Panning is gated on there being something hidden, NOT on the zoom level:
+  // a picture wider or taller than the viewport must pan at 100% too. Gating on
+  // `scale > 1` was the reported bug.
+  assert.match(lightbox, /if \(!pannable\) return;/u);
+  assert.doesNotMatch(lightbox, /if \(scale <= 1\) return;/u);
+  // The stage really scrolls, so native scrollbars show where in the picture the
+  // reader is, and dragging moves the scroll offset instead of a transform.
+  assert.match(rule('.imageStage'), /overflow:\s*auto/u);
+  assert.match(lightbox, /node\.scrollLeft = start\.left - \(event\.clientX - start\.x\)/u);
+  assert.match(lightbox, /node\.scrollTop = start\.top - \(event\.clientY - start\.y\)/u);
+  // A transform would hide the overflow with nothing to reveal it.
+  assert.doesNotMatch(rule('.imageStageInner img'), /transform:/u);
+});
+
+test('a picture that fits is centred on both axes, a larger one is not clipped', () => {
+  // Centring must live on the inner wrapper: `align-items: center` on the scroll
+  // container itself clips the overflow at the start edge and makes it
+  // unreachable.
+  const inner = rule('.imageStageInner');
+  assert.match(inner, /display:\s*flex/u);
+  assert.match(inner, /align-items:\s*center/u);
+  assert.match(inner, /justify-content:\s*center/u);
+  // `min-width`/`min-height` 100% let it fill the viewport so a smaller picture
+  // centres, while `max-content` lets a larger one extend and scroll.
+  assert.match(inner, /width:\s*max-content/u);
+  assert.match(inner, /min-width:\s*100%/u);
+  assert.match(inner, /min-height:\s*100%/u);
+  assert.doesNotMatch(rule('.imageStage'), /align-items:\s*center/u);
 });
 
 test('a picture inside a link keeps navigating instead of opening the viewer', () => {

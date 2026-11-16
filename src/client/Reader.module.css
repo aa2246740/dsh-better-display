@@ -495,13 +495,25 @@
 /* The stage owns the viewport cap, not the image: the picture is scaled with a
    transform, so a max-width on the img itself would cap the zoom at whatever it
    already fits. Clipping here keeps a zoomed picture off the backdrop. */
-.imageStage { display: flex; align-items: center; justify-content: center; overflow: hidden;
-  width: 82vw; height: 75vh; touch-action: none; cursor: default; }
-.imageStage[data-zoomed] { cursor: grab; }
+/* The stage is a real scroll container, not a transform sandbox. A picture that
+   is larger than the viewport even at 100% then has somewhere to go, and the
+   native scrollbars double as a "where am I in this picture" indicator.
+   `overscroll-behavior: contain` keeps a flick at the end of the picture from
+   chaining out to the page behind the dialog. */
+.imageStage { display: block; overflow: auto; overscroll-behavior: contain;
+  width: 82vw; height: 75vh; touch-action: none; scrollbar-width: thin;
+  scrollbar-color: var(--dsw-alias-border-l1) transparent; }
+.imageStage[data-pannable] { cursor: grab; }
 .imageStage[data-dragging] { cursor: grabbing; }
-.imageStage img { max-width: none; max-height: none; display: block; object-fit: contain;
-  user-select: none; -webkit-user-drag: none; will-change: transform;
-  transform-origin: center center; }
+/* Centring comes from the inner wrapper, not from the scroll container: centring
+   a scrollport clips the overflow on the start edge and makes it unreachable.
+   `margin: auto` handles the horizontal axis; the inner wrapper is a flex column
+   so the vertical axis centres the same way without capping the overflow. */
+.imageStageInner { display: flex; align-items: center; justify-content: center;
+  box-sizing: border-box; width: max-content; min-width: 100%;
+  min-height: 100%; margin: auto; padding: 0; }
+.imageStageInner img { max-width: none; max-height: none; display: block; flex: none;
+  object-fit: contain; user-select: none; -webkit-user-drag: none; }
 .lightboxToolbar { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 10px; }
 .lightboxButton { min-width: 34px; height: 28px; padding: 0 8px; border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 7px; background: transparent; color: var(--dsw-alias-label-secondary);
