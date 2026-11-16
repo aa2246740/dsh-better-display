@@ -12,20 +12,29 @@
  * full parse self-heals it.
  */
 
-import { memo, useMemo, useRef } from 'react'
-import type { ReactNode } from 'react'
-import type { MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives'
-import { IncrementalMarkdownParser } from './incremental.js'
-import { parseGfm, parseGfmWithMath } from './parse.js'
+import { memo, useMemo, useRef } from 'react';
+import type { ReactNode } from 'react';
+import type { MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives';
+import { IncrementalMarkdownParser } from './incremental.js';
+import { parseGfm, parseGfmWithMath } from './parse.js';
 import {
-  collectReferenceTargets, createReferenceTargets, renderBlocks, renderFootnoteSection,
-  wrapBlockChildren,
-} from './render.js'
-import type { MarkdownCodeLabels, MarkdownFileMentions, MarkdownRenderContext, ReferenceTargets } from './render.js'
+  collectReferenceTargets,
+  createReferenceTargets,
+  renderBlocks,
+  renderFootnoteSection,
+  wrapBlockChildren
+} from './render.js';
+import type {
+  MarkdownCodeLabels,
+  MarkdownFileMentions,
+  MarkdownRenderContext,
+  ReferenceTargets
+} from './render.js';
 // KaTeX CSS is supplied once by the shared DSH UI-primitives client bundle.
-import css from './MarkdownText.module.css'
+import css from './MarkdownText.module.css';
+import { ImageGroupScope, ImageOpenScope } from '../image-group.js';
 
-export type { MarkdownCodeLabels, MarkdownFileMentions } from './render.js'
+export type { MarkdownCodeLabels, MarkdownFileMentions } from './render.js';
 
 /** One settled full render: parse with math, resolve references, append the footnote section. */
 function renderSettled(
@@ -34,11 +43,11 @@ function renderSettled(
   fileMentions: MarkdownFileMentions | undefined,
   pathImages: MarkdownPathImages | undefined,
   renderText: MarkdownRenderContext['renderText'],
-  renderAtom: MarkdownRenderContext['renderAtom'],
+  renderAtom: MarkdownRenderContext['renderAtom']
 ): ReactNode[] {
-  const root = parseGfmWithMath(text)
-  const targets = createReferenceTargets()
-  collectReferenceTargets(root.children, targets)
+  const root = parseGfmWithMath(text);
+  const targets = createReferenceTargets();
+  collectReferenceTargets(root.children, targets);
   const context: MarkdownRenderContext = {
     renderText,
     renderAtom,
@@ -48,14 +57,20 @@ function renderSettled(
     pathImages,
     targets,
     footnoteOrder: [],
-    footnoteCounts: new Map(),
-  }
+    footnoteCounts: new Map()
+  };
   const blocks = wrapBlockChildren(
-    renderBlocks(root.children.map((node, index) => ({ node, key: node.position?.start.offset ?? -(index + 1) })), context),
-    false,
-  )
-  const section = renderFootnoteSection(context)
-  return section === null ? blocks : [...blocks, '\n', section]
+    renderBlocks(
+      root.children.map((node, index) => ({
+        node,
+        key: node.position?.start.offset ?? -(index + 1)
+      })),
+      context
+    ),
+    false
+  );
+  const section = renderFootnoteSection(context);
+  return section === null ? blocks : [...blocks, '\n', section];
 }
 
 /**
@@ -65,18 +80,23 @@ function renderSettled(
  * final, so the tail continues from a copy of it each frame).
  */
 class StreamingRenderer {
-  private readonly parser = new IncrementalMarkdownParser(parseGfm)
-  private generation = -1
-  private frozenCount = 0
-  private frozenElements: ReactNode[] = []
-  private frozenTargets: ReferenceTargets = createReferenceTargets()
-  private frozenFootnoteOrder: string[] = []
-  private frozenFootnoteCounts = new Map<string, number>()
-  private lastText: string | null = null
-  private lastRendered: ReactNode[] = []
+  private readonly parser = new IncrementalMarkdownParser(parseGfm);
+  private generation = -1;
+  private frozenCount = 0;
+  private frozenElements: ReactNode[] = [];
+  private frozenTargets: ReferenceTargets = createReferenceTargets();
+  private frozenFootnoteOrder: string[] = [];
+  private frozenFootnoteCounts = new Map<string, number>();
+  private lastText: string | null = null;
+  private lastRendered: ReactNode[] = [];
 
   /** @param codeLabels - Fence copy labels baked into cached elements; the owner replaces the renderer when they change. */
-  constructor(private readonly codeLabels: MarkdownCodeLabels | undefined, private readonly renderText: MarkdownRenderContext['renderText'], private readonly renderAtom: MarkdownRenderContext['renderAtom'], private readonly pathImages: MarkdownPathImages | undefined) {}
+  constructor(
+    private readonly codeLabels: MarkdownCodeLabels | undefined,
+    private readonly renderText: MarkdownRenderContext['renderText'],
+    private readonly renderAtom: MarkdownRenderContext['renderAtom'],
+    private readonly pathImages: MarkdownPathImages | undefined
+  ) {}
 
   /**
    * Render the current accumulated text. Idempotent per text value, so React
@@ -85,26 +105,32 @@ class StreamingRenderer {
    * @returns Frozen elements, re-rendered tail, and the footnote section.
    */
   render(text: string): ReactNode[] {
-    if (text === this.lastText) return this.lastRendered
-    const { frozen, tail, generation } = this.parser.update(text)
+    if (text === this.lastText) return this.lastRendered;
+    const { frozen, tail, generation } = this.parser.update(text);
     if (generation !== this.generation) {
-      this.generation = generation
-      this.frozenCount = 0
-      this.frozenElements = []
-      this.frozenTargets = createReferenceTargets()
-      this.frozenFootnoteOrder = []
-      this.frozenFootnoteCounts = new Map()
+      this.generation = generation;
+      this.frozenCount = 0;
+      this.frozenElements = [];
+      this.frozenTargets = createReferenceTargets();
+      this.frozenFootnoteOrder = [];
+      this.frozenFootnoteCounts = new Map();
     }
-    const newlyFrozen = frozen.slice(this.frozenCount)
-    collectReferenceTargets(newlyFrozen.map(block => block.node), this.frozenTargets)
+    const newlyFrozen = frozen.slice(this.frozenCount);
+    collectReferenceTargets(
+      newlyFrozen.map(block => block.node),
+      this.frozenTargets
+    );
     // Targets visible this frame: everything frozen so far plus the current
     // tail parse — a newly frozen block's references resolved against the
     // same parse tree its definitions came from.
     const frameTargets: ReferenceTargets = {
       definitions: new Map(this.frozenTargets.definitions),
-      footnotes: new Map(this.frozenTargets.footnotes),
-    }
-    collectReferenceTargets(tail.map(block => block.node), frameTargets)
+      footnotes: new Map(this.frozenTargets.footnotes)
+    };
+    collectReferenceTargets(
+      tail.map(block => block.node),
+      frameTargets
+    );
     if (newlyFrozen.length > 0) {
       const frozenContext: MarkdownRenderContext = {
         renderText: this.renderText,
@@ -115,17 +141,17 @@ class StreamingRenderer {
         pathImages: this.pathImages,
         targets: frameTargets,
         footnoteOrder: this.frozenFootnoteOrder,
-        footnoteCounts: this.frozenFootnoteCounts,
-      }
+        footnoteCounts: this.frozenFootnoteCounts
+      };
       // Separator newlines are cached alongside the elements so the
       // assembled children match the settled pipeline's block wrapping.
-      const batch = [...this.frozenElements]
+      const batch = [...this.frozenElements];
       for (const element of renderBlocks(newlyFrozen, frozenContext)) {
-        if (batch.length > 0) batch.push('\n')
-        batch.push(element)
+        if (batch.length > 0) batch.push('\n');
+        batch.push(element);
       }
-      this.frozenElements = batch
-      this.frozenCount = frozen.length
+      this.frozenElements = batch;
+      this.frozenCount = frozen.length;
     }
     const tailContext: MarkdownRenderContext = {
       renderText: this.renderText,
@@ -133,21 +159,21 @@ class StreamingRenderer {
       streaming: true,
       codeLabels: this.codeLabels,
       fileMentions: undefined,
-        pathImages: this.pathImages,
+      pathImages: this.pathImages,
       targets: frameTargets,
       footnoteOrder: [...this.frozenFootnoteOrder],
-      footnoteCounts: new Map(this.frozenFootnoteCounts),
-    }
-    const children = [...this.frozenElements]
+      footnoteCounts: new Map(this.frozenFootnoteCounts)
+    };
+    const children = [...this.frozenElements];
     for (const element of renderBlocks(tail, tailContext)) {
-      if (children.length > 0) children.push('\n')
-      children.push(element)
+      if (children.length > 0) children.push('\n');
+      children.push(element);
     }
-    const section = renderFootnoteSection(tailContext)
-    if (section !== null) children.push('\n', section)
-    this.lastText = text
-    this.lastRendered = children
-    return this.lastRendered
+    const section = renderFootnoteSection(tailContext);
+    if (section !== null) children.push('\n', section);
+    this.lastText = text;
+    this.lastRendered = children;
+    return this.lastRendered;
   }
 }
 
@@ -167,29 +193,49 @@ class StreamingRenderer {
  * relative links, and unsafe protocols are disabled, while absolute HTTP(S)
  * images render directly.
  */
-export const MarkdownText = memo(function MarkdownText({ text, streaming = false, codeLabels, fileMentions, pathImages, renderText, renderAtom }: {
-  text: string
-  streaming?: boolean
-  codeLabels?: MarkdownCodeLabels | undefined
-  fileMentions?: MarkdownFileMentions | undefined
-  pathImages?: MarkdownPathImages | undefined
-  renderText?: MarkdownRenderContext['renderText']
-  renderAtom?: MarkdownRenderContext['renderAtom']
+export const MarkdownText = memo(function MarkdownText({
+  text,
+  streaming = false,
+  codeLabels,
+  fileMentions,
+  pathImages,
+  renderText,
+  renderAtom
+}: {
+  text: string;
+  streaming?: boolean;
+  codeLabels?: MarkdownCodeLabels | undefined;
+  fileMentions?: MarkdownFileMentions | undefined;
+  pathImages?: MarkdownPathImages | undefined;
+  renderText?: MarkdownRenderContext['renderText'];
+  renderAtom?: MarkdownRenderContext['renderAtom'];
 }) {
-  const streamRef = useRef<StreamingRenderer | null>(null)
-  const streamImagesRef = useRef(pathImages)
-  const streamLabelsRef = useRef<MarkdownCodeLabels | undefined>(codeLabels)
+  const streamRef = useRef<StreamingRenderer | null>(null);
+  const streamImagesRef = useRef(pathImages);
+  const streamLabelsRef = useRef<MarkdownCodeLabels | undefined>(codeLabels);
   const children = useMemo(() => {
     if (!streaming) {
-      streamRef.current = null
-      return renderSettled(text, codeLabels, fileMentions, pathImages, renderText, renderAtom)
+      streamRef.current = null;
+      return renderSettled(text, codeLabels, fileMentions, pathImages, renderText, renderAtom);
     }
-    if (streamRef.current === null || streamLabelsRef.current !== codeLabels || streamImagesRef.current !== pathImages) {
-      streamRef.current = new StreamingRenderer(codeLabels, renderText, renderAtom, pathImages)
-      streamLabelsRef.current = codeLabels
-      streamImagesRef.current = pathImages
+    if (
+      streamRef.current === null ||
+      streamLabelsRef.current !== codeLabels ||
+      streamImagesRef.current !== pathImages
+    ) {
+      streamRef.current = new StreamingRenderer(codeLabels, renderText, renderAtom, pathImages);
+      streamLabelsRef.current = codeLabels;
+      streamImagesRef.current = pathImages;
     }
-    return streamRef.current.render(text)
-  }, [text, streaming, codeLabels, fileMentions, pathImages, renderText, renderAtom])
-  return <div className={css.markdown}>{children}</div>
-})
+    return streamRef.current.render(text);
+  }, [text, streaming, codeLabels, fileMentions, pathImages, renderText, renderAtom]);
+  // One block of prose is one page group for its pictures, so the viewer can say
+  // `2/5` over the pictures of this answer rather than over the whole page.
+  return (
+    <div className={css.markdown}>
+      <ImageOpenScope>
+        <ImageGroupScope>{children}</ImageGroupScope>
+      </ImageOpenScope>
+    </div>
+  );
+});

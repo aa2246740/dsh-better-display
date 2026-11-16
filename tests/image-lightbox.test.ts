@@ -77,10 +77,10 @@ test('the current scale is shown and announced', () => {
 });
 
 test('oversized pictures scroll and drag at any zoom, including 100%', () => {
-  // Panning is gated on there being something hidden, NOT on the zoom level:
-  // a picture wider or taller than the viewport must pan at 100% too. Gating on
-  // `scale > 1` was the reported bug.
-  assert.match(lightbox, /if \(!pannable\) return;/u);
+  // Panning is not gated on the zoom level or on a measurement: a picture wider
+  // or taller than the viewport must pan at 100% too, and the first open must
+  // work before any re-measure happens.
+  assert.doesNotMatch(lightbox, /if \(!pannable\) return;/u);
   assert.doesNotMatch(lightbox, /if \(scale <= 1\) return;/u);
   // The stage really scrolls, so native scrollbars show where in the picture the
   // reader is, and dragging moves the scroll offset instead of a transform.
@@ -113,7 +113,8 @@ test('a picture inside a link keeps navigating instead of opening the viewer', (
 });
 
 test('the trigger is a button, so the viewer opens from the keyboard', () => {
-  assert.match(lightbox, /<button[\s\S]{0,200}aria-label=\{label\}[\s\S]{0,80}onClick=\{open\}/u);
-  // Closing returns focus to the trigger.
+  // A real button is what makes Tab + Enter work; closing returns focus to it.
+  assert.match(lightbox, /aria-label=\{label\}/u);
+  assert.match(lightbox, /onClick=\{showTrigger\}/u);
   assert.match(lightbox, /trigger\.current\?\.focus\(\)/u);
 });

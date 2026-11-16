@@ -671,7 +671,13 @@ function MarkdownImage({
   // in the zoom trigger would swallow the navigation.
   if (!zoomable) return picture;
   return (
-    <ImageLightbox src={src} alt={alt} inline label={`放大图片${alt ? `：${alt}` : ''}`}>
+    <ImageLightbox
+      src={src}
+      alt={alt}
+      caption={destination || alt || '图片'}
+      inline
+      label={`放大图片${alt ? `：${alt}` : ''}`}
+    >
       {picture}
     </ImageLightbox>
   );

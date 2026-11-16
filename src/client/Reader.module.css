@@ -515,6 +515,16 @@
 .imageStageInner img { max-width: none; max-height: none; display: block; flex: none;
   object-fit: contain; user-select: none; -webkit-user-drag: none; }
 .lightboxToolbar { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 10px; }
+/* The title bar: where the picture came from, and where it sits in its group. */
+.lightboxHeader { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; min-height: 28px; }
+/* `direction: rtl` truncates from the left, so the file name at the end of a long
+   path stays visible; `unicode-bidi: plaintext` keeps the text itself LTR. */
+.lightboxCaption { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; color: var(--dsw-alias-label-secondary); font-size: 12px;
+  font-family: var(--dsh-mono-font, ui-monospace, monospace);
+  direction: rtl; unicode-bidi: plaintext; text-align: left; }
+.lightboxCounter { flex: none; color: var(--dsw-alias-label-tertiary); font-size: 12px;
+  font-variant-numeric: tabular-nums; }
 .lightboxButton { min-width: 34px; height: 28px; padding: 0 8px; border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 7px; background: transparent; color: var(--dsw-alias-label-secondary);
   font-size: 13px; line-height: 1; cursor: pointer; }

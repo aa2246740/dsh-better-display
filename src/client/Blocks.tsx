@@ -119,6 +119,7 @@ export const ImageBlock = memo(function ImageBlock({
       <ImageLightbox
         src={url}
         alt={alt}
+        caption={attachment.name ?? '工具调用图片'}
         label={`放大图片${attachment.name ? `：${attachment.name}` : ''}`}
       >
         <img
