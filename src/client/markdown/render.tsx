@@ -17,28 +17,29 @@
  * may add node types this renderer has no mapping for.
  */
 
-import { Fragment, createElement, useState } from 'react'
-import type { Key, ReactNode } from 'react'
-import clsx from 'clsx'
-import type * as Md from 'mdast'
-import type {} from 'mdast-util-math'
-import { normalizeUri } from 'micromark-util-sanitize-uri'
-import { CodeBlock } from '@deepseek-ai/dsh-client-ui-primitives'
-import { renderTexToReact } from './katex.js'
-import { McpAppCodeBlock, StreamingMcpAppPlaceholder } from '../McpAppFrame.js'
-import { isMcpAppCodeBlock, extractMcpAppTitle, extractMcpAppHeight } from '../mcp-app.js'
-import type { MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { PositionedBlock } from './incremental.js'
-import css from './MarkdownText.module.css'
+import { Fragment, createElement, useState } from 'react';
+import type { Key, ReactNode } from 'react';
+import clsx from 'clsx';
+import type * as Md from 'mdast';
+import type {} from 'mdast-util-math';
+import { normalizeUri } from 'micromark-util-sanitize-uri';
+import { CodeBlock } from '@deepseek-ai/dsh-client-ui-primitives';
+import { renderTexToReact } from './katex.js';
+import { McpAppCodeBlock, StreamingMcpAppPlaceholder } from '../McpAppFrame.js';
+import { isMcpAppCodeBlock, extractMcpAppTitle, extractMcpAppHeight } from '../mcp-app.js';
+import type { MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives';
+import type { PositionedBlock } from './incremental.js';
+import css from './MarkdownText.module.css';
+import { ImageLightbox } from '../ImageLightbox.js';
 
-export type { MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives'
+export type { MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives';
 
 /** Copy-button labels forwarded to fence CodeBlocks (this package is cordis-free, so copy arrives via props). */
 export interface MarkdownCodeLabels {
   /** Copy-button idle label. */
-  copyLabel?: string | undefined
+  copyLabel?: string | undefined;
   /** Copy-button label during the post-copy confirmation window. */
-  copiedLabel?: string | undefined
+  copiedLabel?: string | undefined;
 }
 
 function sanitizeUrl(url: string): string {
@@ -47,33 +48,33 @@ function sanitizeUrl(url: string): string {
       case 'http:':
       case 'https:':
       case 'mailto:':
-        return url
+        return url;
       default:
-        return ''
+        return '';
     }
   } catch {
     // Relative and otherwise unparsable destinations are disallowed alongside
     // disallowed protocols; new URL() has no other failure mode for strings.
-    return ''
+    return '';
   }
 }
 
 function remoteImageUrl(url: string): string | undefined {
   try {
-    const protocol = new URL(url).protocol
-    return protocol === 'http:' || protocol === 'https:' ? url : undefined
+    const protocol = new URL(url).protocol;
+    return protocol === 'http:' || protocol === 'https:' ? url : undefined;
   } catch {
     // Same single failure mode as above: not an absolute URL.
-    return undefined
+    return undefined;
   }
 }
 
 /** Link/image reference targets collected from a document (first definition per identifier wins, as in CommonMark). */
 export interface ReferenceTargets {
   /** Link/image definitions keyed by upper-cased identifier. */
-  definitions: Map<string, Md.Definition>
+  definitions: Map<string, Md.Definition>;
   /** Footnote definitions keyed by upper-cased identifier. */
-  footnotes: Map<string, Md.FootnoteDefinition>
+  footnotes: Map<string, Md.FootnoteDefinition>;
 }
 
 /**
@@ -81,7 +82,7 @@ export interface ReferenceTargets {
  * @returns Fresh empty maps.
  */
 export function createReferenceTargets(): ReferenceTargets {
-  return { definitions: new Map(), footnotes: new Map() }
+  return { definitions: new Map(), footnotes: new Map() };
 }
 
 /**
@@ -92,17 +93,17 @@ export function createReferenceTargets(): ReferenceTargets {
  */
 export function collectReferenceTargets(
   nodes: readonly Md.RootContent[],
-  targets: ReferenceTargets,
+  targets: ReferenceTargets
 ): void {
   for (const node of nodes) {
     if (node.type === 'definition') {
-      const id = node.identifier.toUpperCase()
-      if (!targets.definitions.has(id)) targets.definitions.set(id, node)
+      const id = node.identifier.toUpperCase();
+      if (!targets.definitions.has(id)) targets.definitions.set(id, node);
     } else if (node.type === 'footnoteDefinition') {
-      const id = node.identifier.toUpperCase()
-      if (!targets.footnotes.has(id)) targets.footnotes.set(id, node)
+      const id = node.identifier.toUpperCase();
+      if (!targets.footnotes.has(id)) targets.footnotes.set(id, node);
     }
-    if ('children' in node) collectReferenceTargets(node.children, targets)
+    if ('children' in node) collectReferenceTargets(node.children, targets);
   }
 }
 
@@ -118,7 +119,7 @@ export interface MarkdownFileMentions {
    * @returns The opener with its accessible label and full-path title, or
    * undefined when the token names no known file — it then stays inert code.
    */
-  resolve(value: string): { open: () => void; label: string; title: string } | undefined
+  resolve(value: string): { open: () => void; label: string; title: string } | undefined;
 }
 
 /**
@@ -127,27 +128,27 @@ export interface MarkdownFileMentions {
  */
 export interface MarkdownRenderContext {
   /** Reader addition: optional semantic text-leaf renderer with an absolute source offset. */
-  readonly renderText?: (value: string, offset: number, inline?: boolean) => ReactNode
+  readonly renderText?: (value: string, offset: number, inline?: boolean) => ReactNode;
   /** Reader addition: keep atomic code content behind the source-order gate. */
-  readonly renderAtom?: (children: ReactNode, offset: number) => ReactNode
-  readonly sourceOffset?: number
+  readonly renderAtom?: (children: ReactNode, offset: number) => ReactNode;
+  readonly sourceOffset?: number;
   /** Streaming arm: fences render plain and TeX stays literal. */
-  readonly streaming: boolean
+  readonly streaming: boolean;
   /** Localized fence copy-button labels. */
-  readonly codeLabels: MarkdownCodeLabels | undefined
+  readonly codeLabels: MarkdownCodeLabels | undefined;
   /** Inside a blockquote's children: tables there always fill the quote's width. */
-  readonly inBlockquote?: boolean
+  readonly inBlockquote?: boolean;
   /** Inline-code file mentions; absent wherever no opener vocabulary exists. */
-  readonly fileMentions: MarkdownFileMentions | undefined
-  readonly pathImages?: MarkdownPathImages
+  readonly fileMentions: MarkdownFileMentions | undefined;
+  readonly pathImages?: MarkdownPathImages;
   /** Inside an anchor's children: interactive mentions must not nest there. */
-  readonly inLink?: boolean
+  readonly inLink?: boolean;
   /** Reference targets visible to this pass. */
-  readonly targets: ReferenceTargets
+  readonly targets: ReferenceTargets;
   /** Footnote identifiers in first-reference order; a footnote's number is its 1-based index here. */
-  readonly footnoteOrder: string[]
+  readonly footnoteOrder: string[];
   /** References rendered per identifier; drives the section's back-reference count. */
-  readonly footnoteCounts: Map<string, number>
+  readonly footnoteCounts: Map<string, number>;
 }
 
 /**
@@ -160,14 +161,16 @@ export interface MarkdownRenderContext {
  */
 export function renderBlocks(
   blocks: readonly PositionedBlock[],
-  context: MarkdownRenderContext,
+  context: MarkdownRenderContext
 ): ReactNode[] {
   return blocks
-    .map(block => renderNode(block.node, block.key, {
-      ...context,
-      sourceOffset: block.key - (block.node.position?.start.offset ?? block.key),
-    }))
-    .filter(element => element !== null)
+    .map(block =>
+      renderNode(block.node, block.key, {
+        ...context,
+        sourceOffset: block.key - (block.node.position?.start.offset ?? block.key)
+      })
+    )
+    .filter(element => element !== null);
 }
 
 /**
@@ -180,13 +183,13 @@ export function renderBlocks(
  * @returns The interleaved children.
  */
 export function wrapBlockChildren(elements: readonly ReactNode[], edges: boolean): ReactNode[] {
-  const wrapped: ReactNode[] = []
+  const wrapped: ReactNode[] = [];
   for (const element of elements) {
-    if (edges || wrapped.length > 0) wrapped.push('\n')
-    wrapped.push(element)
+    if (edges || wrapped.length > 0) wrapped.push('\n');
+    wrapped.push(element);
   }
-  if (edges && elements.length > 0) wrapped.push('\n')
-  return wrapped
+  if (edges && elements.length > 0) wrapped.push('\n');
+  return wrapped;
 }
 
 /**
@@ -194,77 +197,100 @@ export function wrapBlockChildren(elements: readonly ReactNode[], edges: boolean
  * other blocks (list items unwrap them when tight; footnote bodies receive
  * their back-references inside the trailing paragraph).
  */
-type BlockEntry = { paragraph: ReactNode[] } | { element: ReactNode }
+type BlockEntry = { paragraph: ReactNode[] } | { element: ReactNode };
 
 /** Render container children into {@link BlockEntry} values, dropping empty renders. */
 function renderBlockEntries(
   blocks: readonly Md.RootContent[],
-  context: MarkdownRenderContext,
+  context: MarkdownRenderContext
 ): BlockEntry[] {
-  const entries: BlockEntry[] = []
+  const entries: BlockEntry[] = [];
   for (const [index, block] of blocks.entries()) {
     if (block.type === 'paragraph') {
-      entries.push({ paragraph: renderChildren(block.children, context) })
+      entries.push({ paragraph: renderChildren(block.children, context) });
     } else {
-      const element = renderNode(block, index, context)
-      if (element !== null) entries.push({ element })
+      const element = renderNode(block, index, context);
+      if (element !== null) entries.push({ element });
     }
   }
-  return entries
+  return entries;
 }
 
 function renderChildren(
   nodes: readonly Md.RootContent[],
-  context: MarkdownRenderContext,
+  context: MarkdownRenderContext
 ): ReactNode[] {
-  return nodes.map((node, index) => renderNode(node, index, context))
+  return nodes.map((node, index) => renderNode(node, index, context));
 }
 
 function renderNode(node: Md.RootContent, key: Key, context: MarkdownRenderContext): ReactNode {
   switch (node.type) {
     case 'text':
-      return context.renderText ? context.renderText(node.value, (context.sourceOffset ?? 0) + (node.position?.start.offset ?? 0)) : node.value
+      return context.renderText
+        ? context.renderText(
+            node.value,
+            (context.sourceOffset ?? 0) + (node.position?.start.offset ?? 0)
+          )
+        : node.value;
     case 'paragraph':
-      return <p key={key}>{renderChildren(node.children, context)}</p>
+      return <p key={key}>{renderChildren(node.children, context)}</p>;
     case 'heading':
-      return createElement(`h${node.depth}`, { key }, ...renderChildren(node.children, context))
+      return createElement(`h${node.depth}`, { key }, ...renderChildren(node.children, context));
     case 'blockquote':
       return (
         <blockquote key={key}>
           {wrapBlockChildren(
-            renderChildren(node.children, { ...context, inBlockquote: true }).filter(child => child !== null),
-            true,
+            renderChildren(node.children, { ...context, inBlockquote: true }).filter(
+              child => child !== null
+            ),
+            true
           )}
         </blockquote>
-      )
+      );
     case 'thematicBreak':
-      return <hr key={key} />
+      return <hr key={key} />;
     case 'break':
       // The replaced pipeline emitted a newline text node after each <br>.
-      return <Fragment key={key}><br />{'\n'}</Fragment>
+      return (
+        <Fragment key={key}>
+          <br />
+          {'\n'}
+        </Fragment>
+      );
     case 'strong':
-      return <strong key={key}>{renderChildren(node.children, context)}</strong>
+      return <strong key={key}>{renderChildren(node.children, context)}</strong>;
     case 'emphasis':
-      return <em key={key}>{renderChildren(node.children, context)}</em>
+      return <em key={key}>{renderChildren(node.children, context)}</em>;
     case 'delete':
-      return <del key={key}>{renderChildren(node.children, context)}</del>
+      return <del key={key}>{renderChildren(node.children, context)}</del>;
     case 'inlineCode': {
       // Parity with mdast-util-to-hast: inline code renders line endings as spaces.
-      const value = node.value.replace(/\r?\n|\r/g, ' ')
+      const value = node.value.replace(/\r?\n|\r/g, ' ');
       // Native code chips are inline-flex. Keep a single inline formatting
       // context so motion spans do not become flex items or drop code spaces.
-      const content = context.renderText ? <span>{context.renderText(value, (context.sourceOffset ?? 0) + (node.position?.start.offset ?? 0), true)}</span> : value
+      const content = context.renderText ? (
+        <span>
+          {context.renderText(
+            value,
+            (context.sourceOffset ?? 0) + (node.position?.start.offset ?? 0),
+            true
+          )}
+        </span>
+      ) : (
+        value
+      );
       // An inline-code token that is entirely an absolute HTTP(S) URL keeps
       // its code chrome and gains the same safe external anchor as a link;
       // commands, partial URLs, and other schemes stay inert. The value is
       // authored text, not a parsed destination, so no normalizeUri: port,
       // path, and query render unchanged.
-      const href = inlineCodeHttpUrl(value)
-      if (href !== undefined) return <code key={key}>{renderSafeLink(href, [content], 'link')}</code>
+      const href = inlineCodeHttpUrl(value);
+      if (href !== undefined)
+        return <code key={key}>{renderSafeLink(href, [content], 'link')}</code>;
       // A token the owner's file-mention vocabulary recognizes opens that
       // file; the resolver, not this renderer, decides what names a file.
       // Inside an anchor the token stays inert — a button cannot nest there.
-      const mention = context.inLink === true ? undefined : context.fileMentions?.resolve(value)
+      const mention = context.inLink === true ? undefined : context.fileMentions?.resolve(value);
       if (mention !== undefined) {
         return (
           <code key={key}>
@@ -278,78 +304,98 @@ function renderNode(node: Md.RootContent, key: Key, context: MarkdownRenderConte
               {content}
             </button>
           </code>
-        )
+        );
       }
-      return <code key={key}>{content}</code>
+      return <code key={key}>{content}</code>;
     }
     case 'html':
       // No HTML parser enters the pipeline: raw HTML stays literal text.
-      return context.renderText ? context.renderText(node.value, (context.sourceOffset ?? 0) + (node.position?.start.offset ?? 0)) : node.value
+      return context.renderText
+        ? context.renderText(
+            node.value,
+            (context.sourceOffset ?? 0) + (node.position?.start.offset ?? 0)
+          )
+        : node.value;
     case 'code': {
-      const code = renderCode(node, key, context)
-      return context.renderAtom ? <Fragment key={key}>{context.renderAtom(code, (context.sourceOffset ?? 0) + (node.position?.start.offset ?? 0))}</Fragment> : code
+      const code = renderCode(node, key, context);
+      return context.renderAtom ? (
+        <Fragment key={key}>
+          {context.renderAtom(
+            code,
+            (context.sourceOffset ?? 0) + (node.position?.start.offset ?? 0)
+          )}
+        </Fragment>
+      ) : (
+        code
+      );
     }
     case 'math':
-      return <Fragment key={key}>{renderTexToReact(node.value, true)}</Fragment>
+      return <Fragment key={key}>{renderTexToReact(node.value, true)}</Fragment>;
     case 'inlineMath':
-      return <Fragment key={key}>{renderTexToReact(node.value, false)}</Fragment>
+      return <Fragment key={key}>{renderTexToReact(node.value, false)}</Fragment>;
     case 'list':
-      return renderList(node, key, context)
+      return renderList(node, key, context);
     case 'listItem':
       // Reachable only in hand-built trees: the grammar emits items inside lists.
-      return renderListItem(node, listItemLoose(node), key, context)
+      return renderListItem(node, listItemLoose(node), key, context);
     case 'table':
-      return renderTable(node, key, context)
+      return renderTable(node, key, context);
     case 'link':
-      return renderAnchor(node.url, renderChildren(node.children, { ...context, inLink: true }), key)
+      return renderAnchor(
+        node.url,
+        renderChildren(node.children, { ...context, inLink: true }),
+        key
+      );
     case 'linkReference':
-      return renderLinkReference(node, key, context)
+      return renderLinkReference(node, key, context);
     case 'image':
-      return renderImage(node.url, node.alt ?? '', key, context)
+      return renderImage(node.url, node.alt ?? '', key, context);
     case 'imageReference':
-      return renderImageReference(node, key, context)
+      return renderImageReference(node, key, context);
     case 'footnoteReference':
-      return renderFootnoteReference(node, key, context)
+      return renderFootnoteReference(node, key, context);
     case 'definition':
     case 'footnoteDefinition':
       // Targets render elsewhere: definitions resolve references in place;
       // footnote bodies render in the trailing section.
-      return null
+      return null;
     default:
       // Documented default for the merge-extensible union: node types without
       // a mapping (tableRow/tableCell outside a table, frontmatter, future
       // grammar contributions) render nothing.
-      return null
+      return null;
   }
 }
 
 function renderCode(node: Md.Code, key: Key, context: MarkdownRenderContext): ReactNode {
-  const language = node.lang ?? undefined
+  const language = node.lang ?? undefined;
   if (node.value === '') {
     // Parity: the replaced pipeline kept the stock <pre> for an empty fence.
     return (
       <pre key={key}>
         <code className={language === undefined ? undefined : `language-${language}`} />
       </pre>
-    )
+    );
   }
   // The replaced pipeline recovered the grammar id from the hast class with
   // /language-([\w-]+)/, which truncates at the first non-word character.
-  const lang = language === undefined ? undefined : /^[\w-]+/.exec(language)?.[0]
+  const lang = language === undefined ? undefined : /^[\w-]+/.exec(language)?.[0];
 
   if (isMcpAppCodeBlock(node.lang, node.meta, node.value)) {
-    const title = extractMcpAppTitle(node.meta, node.value)
-    const initialHeight = extractMcpAppHeight(node.meta)
+    const title = extractMcpAppTitle(node.meta, node.value);
+    const initialHeight = extractMcpAppHeight(node.meta);
     if (context.streaming) {
-      return <StreamingMcpAppPlaceholder key={key} title={title} />
+      return <StreamingMcpAppPlaceholder key={key} title={title} />;
     }
-    return <McpAppCodeBlock key={key} html={node.value} title={title} initialHeight={initialHeight} />
+    return (
+      <McpAppCodeBlock key={key} html={node.value} title={title} initialHeight={initialHeight} />
+    );
   }
 
   if (!context.streaming && lang === 'math') {
     // ```math fences render as display TeX once settled (rehype-katex parity);
     // its text extraction saw the code block's trailing newline.
-    return <Fragment key={key}>{renderTexToReact(`${node.value}\n`, true)}</Fragment>
+    return <Fragment key={key}>{renderTexToReact(`${node.value}\n`, true)}</Fragment>;
   }
   return (
     <CodeBlock
@@ -362,80 +408,82 @@ function renderCode(node: Md.Code, key: Key, context: MarkdownRenderContext): Re
       copyLabel={context.codeLabels?.copyLabel ?? '复制代码'}
       copiedLabel={context.codeLabels?.copiedLabel ?? '已复制'}
     />
-  )
+  );
 }
 
 /** A list is loose when it or any of its items is spread; every item then keeps its paragraphs. */
 function listLoose(list: Md.List): boolean {
-  return (list.spread ?? false) || list.children.some(listItemLoose)
+  return (list.spread ?? false) || list.children.some(listItemLoose);
 }
 
 function listItemLoose(item: Md.ListItem): boolean {
-  return item.spread ?? item.children.length > 1
+  return item.spread ?? item.children.length > 1;
 }
 
 function renderList(node: Md.List, key: Key, context: MarkdownRenderContext): ReactNode {
-  const loose = listLoose(node)
-  const properties: { start?: number; className?: string } = {}
-  if (typeof node.start === 'number' && node.start !== 1) properties.start = node.start
+  const loose = listLoose(node);
+  const properties: { start?: number; className?: string } = {};
+  if (typeof node.start === 'number' && node.start !== 1) properties.start = node.start;
   if (node.children.some(item => typeof item.checked === 'boolean')) {
-    properties.className = 'contains-task-list'
+    properties.className = 'contains-task-list';
   }
   return createElement(
     node.ordered === true ? 'ol' : 'ul',
     { key, ...properties },
-    ...node.children.map((item, index) => renderListItem(item, loose, index, context)),
-  )
+    ...node.children.map((item, index) => renderListItem(item, loose, index, context))
+  );
 }
 
 function renderListItem(
   item: Md.ListItem,
   loose: boolean,
   key: Key,
-  context: MarkdownRenderContext,
+  context: MarkdownRenderContext
 ): ReactNode {
-  const entries = renderBlockEntries(item.children, context)
-  const task = typeof item.checked === 'boolean'
+  const entries = renderBlockEntries(item.children, context);
+  const task = typeof item.checked === 'boolean';
   if (task) {
-    const checkbox = <input key="task-checkbox" type="checkbox" checked={item.checked === true} disabled />
-    const head = entries[0]
+    const checkbox = (
+      <input key="task-checkbox" type="checkbox" checked={item.checked === true} disabled />
+    );
+    const head = entries[0];
     if (head !== undefined && 'paragraph' in head) {
-      head.paragraph = head.paragraph.length > 0 ? [checkbox, ' ', ...head.paragraph] : [checkbox]
+      head.paragraph = head.paragraph.length > 0 ? [checkbox, ' ', ...head.paragraph] : [checkbox];
     } else {
-      entries.unshift({ paragraph: [checkbox] })
+      entries.unshift({ paragraph: [checkbox] });
     }
   }
   // Newline placement and tight-paragraph unwrapping mirror
   // mdast-util-to-hast's list-item handler: a newline before every child
   // except a tight leading paragraph, and after a trailing non-paragraph
   // (or any trailing child when loose).
-  const parts: ReactNode[] = []
+  const parts: ReactNode[] = [];
   for (const [index, entry] of entries.entries()) {
-    const isParagraph = 'paragraph' in entry
-    if (loose || index !== 0 || !isParagraph) parts.push('\n')
-    if (!isParagraph) parts.push(entry.element)
-    else if (loose) parts.push(<p key={`p-${index}`}>{entry.paragraph}</p>)
-    else parts.push(<Fragment key={`p-${index}`}>{entry.paragraph}</Fragment>)
+    const isParagraph = 'paragraph' in entry;
+    if (loose || index !== 0 || !isParagraph) parts.push('\n');
+    if (!isParagraph) parts.push(entry.element);
+    else if (loose) parts.push(<p key={`p-${index}`}>{entry.paragraph}</p>);
+    else parts.push(<Fragment key={`p-${index}`}>{entry.paragraph}</Fragment>);
   }
-  const tail = entries[entries.length - 1]
-  if (tail !== undefined && (loose || !('paragraph' in tail))) parts.push('\n')
+  const tail = entries[entries.length - 1];
+  if (tail !== undefined && (loose || !('paragraph' in tail))) parts.push('\n');
   return (
     <li key={key} className={task ? 'task-list-item' : undefined}>
       {parts}
     </li>
-  )
+  );
 }
 
 function renderTable(node: Md.Table, key: Key, context: MarkdownRenderContext): ReactNode {
-  const align = node.align ?? null
-  const [headRow, ...bodyRows] = node.children
-  const columns = align === null ? headRow?.children.length ?? 0 : align.length
+  const align = node.align ?? null;
+  const [headRow, ...bodyRows] = node.children;
+  const columns = align === null ? (headRow?.children.length ?? 0) : align.length;
   // Four or more columns read as a comparison matrix: the block keeps the
   // table at natural width and exposes the stable `md-table-wide` hook so a
   // hosting layout (the chat transcript) can widen it past the message
   // column. Narrower tables — and any table inside a blockquote — fill the
   // column and wrap instead (deepsuite chat TableWrapper parity).
-  const wide = columns >= 4 && context.inBlockquote !== true
+  const wide = columns >= 4 && context.inBlockquote !== true;
   return (
     // Wide tables rest with overflow-x hidden (the hover-revealed bar in
     // MarkdownText.module.css), which drops Chromium's implicit scroller
@@ -455,7 +503,7 @@ function renderTable(node: Md.Table, key: Key, context: MarkdownRenderContext): 
         )}
       </table>
     </div>
-  )
+  );
 }
 
 function renderTableRow(
@@ -463,31 +511,33 @@ function renderTableRow(
   cellTag: 'th' | 'td',
   align: readonly Md.AlignType[] | null,
   key: Key,
-  context: MarkdownRenderContext,
+  context: MarkdownRenderContext
 ): ReactNode {
   // With column alignment present, every row renders exactly one cell per
   // column, padding or truncating the row (mdast-util-to-hast parity).
-  const length = align === null ? row.children.length : align.length
-  const cells: ReactNode[] = []
+  const length = align === null ? row.children.length : align.length;
+  const cells: ReactNode[] = [];
   for (let index = 0; index < length; index++) {
-    const cell = row.children[index]
-    const alignValue = align?.[index]
-    cells.push(createElement(
-      cellTag,
-      // hast-util-to-jsx-runtime's default tableCellAlignToStyle turned the
-      // deprecated align attribute into an inline style; keep that DOM.
-      { key: index, style: alignValue == null ? undefined : { textAlign: alignValue } },
-      ...(cell === undefined ? [] : renderChildren(cell.children, context)),
-    ))
+    const cell = row.children[index];
+    const alignValue = align?.[index];
+    cells.push(
+      createElement(
+        cellTag,
+        // hast-util-to-jsx-runtime's default tableCellAlignToStyle turned the
+        // deprecated align attribute into an inline style; keep that DOM.
+        { key: index, style: alignValue == null ? undefined : { textAlign: alignValue } },
+        ...(cell === undefined ? [] : renderChildren(cell.children, context))
+      )
+    );
   }
-  return <tr key={key}>{cells}</tr>
+  return <tr key={key}>{cells}</tr>;
 }
 
 /** Anchor over an already-authored href: allowlisted or unwrapped, external links get the safe attributes. */
 function renderSafeLink(href: string, children: ReactNode[], key: Key): ReactNode {
-  const safeHref = sanitizeUrl(href)
-  if (safeHref === '') return <Fragment key={key}>{children}</Fragment>
-  const external = ['http:', 'https:'].includes(new URL(safeHref).protocol)
+  const safeHref = sanitizeUrl(href);
+  if (safeHref === '') return <Fragment key={key}>{children}</Fragment>;
+  const external = ['http:', 'https:'].includes(new URL(safeHref).protocol);
   return (
     <a
       key={key}
@@ -496,12 +546,12 @@ function renderSafeLink(href: string, children: ReactNode[], key: Key): ReactNod
     >
       {children}
     </a>
-  )
+  );
 }
 
 /** Anchor over a parsed markdown destination, which hast normalized before the allowlist saw it. */
 function renderAnchor(url: string, children: ReactNode[], key: Key): ReactNode {
-  return renderSafeLink(normalizeUri(url), children, key)
+  return renderSafeLink(normalizeUri(url), children, key);
 }
 
 /**
@@ -509,31 +559,50 @@ function renderAnchor(url: string, children: ReactNode[], key: Key): ReactNode {
  * (no surrounding whitespace); anything else stays inert code.
  */
 function inlineCodeHttpUrl(value: string): string | undefined {
-  if (value.trim() !== value) return undefined
+  if (value.trim() !== value) return undefined;
   try {
-    const protocol = new URL(value).protocol
-    return protocol === 'http:' || protocol === 'https:' ? value : undefined
+    const protocol = new URL(value).protocol;
+    return protocol === 'http:' || protocol === 'https:' ? value : undefined;
   } catch {
     // Not an absolute URL at all — the only way new URL() rejects a string.
-    return undefined
+    return undefined;
   }
 }
 
-function renderImage(url: string, alt: string, key: Key, context: MarkdownRenderContext): ReactNode {
+function renderImage(
+  url: string,
+  alt: string,
+  key: Key,
+  context: MarkdownRenderContext
+): ReactNode {
   // RC2 semantics, including the revalidation of a trusted vocabulary result.
-  const remote = remoteImageUrl(sanitizeUrl(normalizeUri(url)))
-  const rewritten = remote === undefined ? context.pathImages?.resolve(url) : undefined
-  let imageSrc = remote
+  const remote = remoteImageUrl(sanitizeUrl(normalizeUri(url)));
+  const rewritten = remote === undefined ? context.pathImages?.resolve(url) : undefined;
+  let imageSrc = remote;
   if (rewritten !== undefined) {
     try {
-      const parsed = new URL(rewritten)
-      if (['http:', 'https:', 'blob:', 'data:'].includes(parsed.protocol) || rewritten.startsWith('dsh-app://app/api/file?')) imageSrc = rewritten
-    } catch { /* A vocabulary result must be an absolute URL. */ }
+      const parsed = new URL(rewritten);
+      if (
+        ['http:', 'https:', 'blob:', 'data:'].includes(parsed.protocol) ||
+        rewritten.startsWith('dsh-app://app/api/file?')
+      )
+        imageSrc = rewritten;
+    } catch {
+      /* A vocabulary result must be an absolute URL. */
+    }
   }
   if (imageSrc === undefined) {
-    return <UnavailableImage key={key} alt={alt} destination={url} state="unresolved" />
+    return <UnavailableImage key={key} alt={alt} destination={url} state="unresolved" />;
   }
-  return <MarkdownImage key={`${key}:${imageSrc}`} src={imageSrc} alt={alt} destination={url} />
+  return (
+    <MarkdownImage
+      key={`${key}:${imageSrc}`}
+      src={imageSrc}
+      alt={alt}
+      destination={url}
+      zoomable={context.inLink !== true}
+    />
+  );
 }
 
 /**
@@ -543,80 +612,126 @@ function renderImage(url: string, alt: string, key: Key, context: MarkdownRender
  * report this placeholder answers. The authored destination is shown so the
  * path can be copied even when it cannot be rendered.
  */
-export function UnavailableImage({ alt, destination, state }: { alt: string; destination: string; state: 'unresolved' | 'failed' }): ReactNode {
+export function UnavailableImage({
+  alt,
+  destination,
+  state
+}: {
+  alt: string;
+  destination: string;
+  state: 'unresolved' | 'failed';
+}): ReactNode {
   return (
-    <span className={css.imageUnavailable} data-markdown-image-unavailable={state} role="img" aria-label={alt || destination}>
-      <span className={css.imageUnavailableGlyph} aria-hidden="true">🖼</span>
+    <span
+      className={css.imageUnavailable}
+      data-markdown-image-unavailable={state}
+      role="img"
+      aria-label={alt || destination}
+    >
+      <span className={css.imageUnavailableGlyph} aria-hidden="true">
+        🖼
+      </span>
       <span className={css.imageUnavailableCopy}>
         <span>{state === 'failed' ? '图片加载失败' : '此图片无法在阅读页显示'}</span>
         {alt && <span className={css.imageUnavailableAlt}>{alt}</span>}
         {destination && <code className={css.imageUnavailablePath}>{destination}</code>}
       </span>
     </span>
-  )
+  );
 }
 
-function MarkdownImage({ src, alt, destination }: { src: string; alt: string; destination: string }): ReactNode {
-  const [failed, setFailed] = useState(false)
-  if (failed) return <UnavailableImage alt={alt} destination={destination} state="failed" />
-  return (
+function MarkdownImage({
+  src,
+  alt,
+  destination,
+  zoomable = true
+}: {
+  src: string;
+  alt: string;
+  destination: string;
+  /** False inside a link, where a click must keep navigating. */
+  zoomable?: boolean;
+}): ReactNode {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <UnavailableImage alt={alt} destination={destination} state="failed" />;
+  const picture = (
     <img
       className={css.image}
       src={src}
       alt={alt}
-      onError={() => { setFailed(true) }}
+      onError={() => {
+        setFailed(true);
+      }}
       loading="lazy"
       decoding="async"
       referrerPolicy="no-referrer"
     />
-  )
+  );
+  // A picture inside `[![alt](src)](href)` keeps its link behaviour: wrapping it
+  // in the zoom trigger would swallow the navigation.
+  if (!zoomable) return picture;
+  return (
+    <ImageLightbox src={src} alt={alt} inline label={`放大图片${alt ? `：${alt}` : ''}`}>
+      {picture}
+    </ImageLightbox>
+  );
 }
 
 /** The bracketed source text a reference reverts to when its definition is missing. */
 function referenceSuffix(node: Md.LinkReference | Md.ImageReference): string {
-  if (node.referenceType === 'collapsed') return '][]'
-  if (node.referenceType === 'full') return `][${node.label ?? node.identifier}]`
-  return ']'
+  if (node.referenceType === 'collapsed') return '][]';
+  if (node.referenceType === 'full') return `][${node.label ?? node.identifier}]`;
+  return ']';
 }
 
 function renderLinkReference(
   node: Md.LinkReference,
   key: Key,
-  context: MarkdownRenderContext,
+  context: MarkdownRenderContext
 ): ReactNode {
-  const definition = context.targets.definitions.get(node.identifier.toUpperCase())
+  const definition = context.targets.definitions.get(node.identifier.toUpperCase());
   if (definition === undefined) {
     // The grammar only emits references whose definitions exist somewhere in
     // the same parse, but incremental segments and hand-built trees may still
     // present unresolved ones: revert to the bracketed source text — which is
     // not an anchor, so mentions inside it stay live.
-    return <Fragment key={key}>{'['}{renderChildren(node.children, context)}{referenceSuffix(node)}</Fragment>
+    return (
+      <Fragment key={key}>
+        {'['}
+        {renderChildren(node.children, context)}
+        {referenceSuffix(node)}
+      </Fragment>
+    );
   }
-  return renderAnchor(definition.url, renderChildren(node.children, { ...context, inLink: true }), key)
+  return renderAnchor(
+    definition.url,
+    renderChildren(node.children, { ...context, inLink: true }),
+    key
+  );
 }
 
 function renderImageReference(
   node: Md.ImageReference,
   key: Key,
-  context: MarkdownRenderContext,
+  context: MarkdownRenderContext
 ): ReactNode {
-  const definition = context.targets.definitions.get(node.identifier.toUpperCase())
-  if (definition === undefined) return `![${node.alt ?? ''}${referenceSuffix(node)}`
-  return renderImage(definition.url, node.alt ?? '', key, context)
+  const definition = context.targets.definitions.get(node.identifier.toUpperCase());
+  if (definition === undefined) return `![${node.alt ?? ''}${referenceSuffix(node)}`;
+  return renderImage(definition.url, node.alt ?? '', key, context);
 }
 
 function renderFootnoteReference(
   node: Md.FootnoteReference,
   key: Key,
-  context: MarkdownRenderContext,
+  context: MarkdownRenderContext
 ): ReactNode {
-  const id = node.identifier.toUpperCase()
-  const seen = context.footnoteCounts.get(id)
-  if (seen === undefined) context.footnoteOrder.push(id)
-  context.footnoteCounts.set(id, (seen ?? 0) + 1)
+  const id = node.identifier.toUpperCase();
+  const seen = context.footnoteCounts.get(id);
+  if (seen === undefined) context.footnoteOrder.push(id);
+  context.footnoteCounts.set(id, (seen ?? 0) + 1);
   // The in-page anchor fails the protocol allowlist, so only the numbered
   // superscript renders (matching the replaced pipeline's unwrapped link).
-  return <sup key={key}>{String(context.footnoteOrder.indexOf(id) + 1)}</sup>
+  return <sup key={key}>{String(context.footnoteOrder.indexOf(id) + 1)}</sup>;
 }
 
 /**
@@ -627,43 +742,45 @@ function renderFootnoteReference(
  * @returns The section, or null when no referenced footnote has a definition.
  */
 export function renderFootnoteSection(context: MarkdownRenderContext): ReactNode | null {
-  const items: ReactNode[] = []
+  const items: ReactNode[] = [];
   for (const id of context.footnoteOrder) {
-    const definition = context.targets.footnotes.get(id)
-    if (definition === undefined) continue
-    const count = context.footnoteCounts.get(id) ?? 0
-    const backrefs: ReactNode[] = []
+    const definition = context.targets.footnotes.get(id);
+    if (definition === undefined) continue;
+    const count = context.footnoteCounts.get(id) ?? 0;
+    const backrefs: ReactNode[] = [];
     for (let reference = 1; reference <= count; reference++) {
-      if (backrefs.length > 0) backrefs.push(' ')
-      backrefs.push('↩')
-      if (reference > 1) backrefs.push(<sup key={`re-${reference}`}>{String(reference)}</sup>)
+      if (backrefs.length > 0) backrefs.push(' ');
+      backrefs.push('↩');
+      if (reference > 1) backrefs.push(<sup key={`re-${reference}`}>{String(reference)}</sup>);
     }
-    const entries = renderBlockEntries(definition.children, context)
-    const tail = entries[entries.length - 1]
-    const body: ReactNode[] = entries.map((entry, index) => (
-      'paragraph' in entry
-        ? (
-          <p key={`p-${index}`}>
-            {entry.paragraph}
-            {entry === tail && <>{' '}{backrefs}</>}
-          </p>
-        )
-        : entry.element
-    ))
+    const entries = renderBlockEntries(definition.children, context);
+    const tail = entries[entries.length - 1];
+    const body: ReactNode[] = entries.map((entry, index) =>
+      'paragraph' in entry ? (
+        <p key={`p-${index}`}>
+          {entry.paragraph}
+          {entry === tail && <> {backrefs}</>}
+        </p>
+      ) : (
+        entry.element
+      )
+    );
     // Without a trailing paragraph the back-references join the block list
     // itself (and pick up the wrap newlines), as in the replaced pipeline.
-    if (tail === undefined || !('paragraph' in tail)) body.push(...backrefs)
+    if (tail === undefined || !('paragraph' in tail)) body.push(...backrefs);
     items.push(
       <li key={id} id={`user-content-fn-${normalizeUri(id.toLowerCase())}`}>
         {wrapBlockChildren(body, true)}
-      </li>,
-    )
+      </li>
+    );
   }
-  if (items.length === 0) return null
+  if (items.length === 0) return null;
   return (
     <section key="footnotes" data-footnotes className="footnotes">
-      <h2 id="footnote-label" className="sr-only">Footnotes</h2>
+      <h2 id="footnote-label" className="sr-only">
+        Footnotes
+      </h2>
       <ol>{items}</ol>
     </section>
-  )
+  );
 }
