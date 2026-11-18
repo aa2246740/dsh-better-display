@@ -292,7 +292,7 @@ function renderNode(node: Md.RootContent, key: Key, context: MarkdownRenderConte
       // Inside an anchor the token stays inert — a button cannot nest there.
       const mention = context.inLink === true ? undefined : context.fileMentions?.resolve(value);
       if (mention !== undefined) {
-        return (
+        const chip = (
           <code key={key}>
             <button
               type="button"
@@ -304,6 +304,19 @@ function renderNode(node: Md.RootContent, key: Key, context: MarkdownRenderConte
               {content}
             </button>
           </code>
+        );
+        // A mention of a picture also loads that picture, on the line below the chip.
+        // The chip keeps the exact rendering the original view gives it — inline,
+        // clickable, code-styled — and the picture is added after it rather than
+        // instead of it. Both live in block boxes so the name and the picture each get
+        // their own line and the surrounding sentence resumes underneath.
+        const picture = pictureForMention(value, context);
+        if (picture === undefined) return chip;
+        return (
+          <Fragment key={key}>
+            <span className={css.mentionLine}>{chip}</span>
+            <span className={css.mentionShot}>{picture}</span>
+          </Fragment>
         );
       }
       return <code key={key}>{content}</code>;
@@ -341,10 +354,11 @@ function renderNode(node: Md.RootContent, key: Key, context: MarkdownRenderConte
     case 'table':
       return renderTable(node, key, context);
     case 'link':
-      return renderAnchor(
+      return renderLink(
         node.url,
         renderChildren(node.children, { ...context, inLink: true }),
-        key
+        key,
+        context
       );
     case 'linkReference':
       return renderLinkReference(node, key, context);
@@ -594,6 +608,9 @@ function renderImage(
   if (imageSrc === undefined) {
     return <UnavailableImage key={key} alt={alt} destination={url} state="unresolved" />;
   }
+  // `![alt](path)` is a picture reference: the original view shows the picture and
+  // nothing else, so this keeps that and adds no chip. The file-name chip in the
+  // reader's request belongs to the inline-code path, not to this one.
   return (
     <MarkdownImage
       key={`${key}:${imageSrc}`}
@@ -603,6 +620,119 @@ function renderImage(
       zoomable={context.inLink !== true}
     />
   );
+}
+
+/** Extensions that name a picture file. */
+const IMAGE_FILE = /\.(png|jpe?g|gif|webp|avif|bmp|svg|ico)$/iu;
+
+/**
+ * A link, plus the picture it points at when it points at a file.
+ *
+ * The original view renders `[shot.png](shot.png)` through its file-link affordance: a
+ * blue, clickable chip with a file-type icon in front of the name. That is what the
+ * reader wants kept. This reproduces it through the same file-mention vocabulary the
+ * inline-code path uses, and then adds the picture underneath so the file's content is
+ * visible without a second click.
+ * @param url - the authored destination.
+ * @param children - the link's rendered text.
+ * @param key - the render key.
+ * @param context - the render context, for the file vocabulary and path resolver.
+ * @returns the chip (or a plain anchor) and, below it, the picture when there is one.
+ */
+function renderLink(
+  url: string,
+  children: ReactNode[],
+  key: Key,
+  context: MarkdownRenderContext
+): ReactNode {
+  // A destination the file vocabulary knows becomes the same clickable chip the original
+  // view uses, so the blue styling and the icon are preserved rather than replaced by a
+  // bare anchor that a relative path cannot even navigate.
+  const mention = context.inLink === true ? undefined : context.fileMentions?.resolve(url);
+  const label = plainText(children);
+  const chip =
+    mention === undefined ? (
+      renderAnchor(url, children, key)
+    ) : (
+      <button
+        type="button"
+        className={css.fileMention}
+        title={mention.title}
+        aria-label={mention.label}
+        onClick={mention.open}
+      >
+        <FileGlyph path={url} />
+        {label === '' ? url : label}
+      </button>
+    );
+  const picture = pictureForMention(url, context);
+  if (picture === undefined)
+    return mention === undefined ? chip : <Fragment key={key}>{chip}</Fragment>;
+  return (
+    <Fragment key={key}>
+      <span className={css.mentionLine}>{chip}</span>
+      <span className={css.mentionShot}>{picture}</span>
+    </Fragment>
+  );
+}
+
+/** The text a node list renders, for re-using a link's own label inside a button. */
+function plainText(children: ReactNode[]): string {
+  return children
+    .map(child => (typeof child === 'string' || typeof child === 'number' ? String(child) : ''))
+    .join('');
+}
+
+/**
+ * The small file-type mark the original view puts in front of a file name.
+ *
+ * Drawn here rather than imported: the Host draws its own icon from a private icon set,
+ * and a picture reference should look the same either way — a small mark, then the name.
+ * @param props - the destination, whose extension picks the glyph.
+ */
+function FileGlyph({ path }: { path: string }) {
+  const image = IMAGE_FILE.test(path.split(/[?#]/u)[0] ?? path);
+  return (
+    <svg
+      className={css.linkIcon}
+      viewBox="0 0 16 16"
+      width="13"
+      height="13"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {image ? (
+        <>
+          <rect x="1.5" y="2.5" width="13" height="11" rx="2" stroke="currentColor" fill="none" />
+          <circle cx="5.5" cy="6" r="1.2" fill="currentColor" />
+          <path d="M2.5 11.5 6 8l3 2.5L12 7l1.5 1.5" stroke="currentColor" fill="none" />
+        </>
+      ) : (
+        <>
+          <path d="M4 1.5h5l3 3v10H4z" stroke="currentColor" fill="none" />
+          <path d="M9 1.5v3h3" stroke="currentColor" fill="none" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+/**
+ * The picture a link or mention points at, when it points at an image file.
+ *
+ * The original view shows only the file name for these; the picture is what this adds.
+ * The name itself is never replaced.
+ * @param token - the destination or authored token.
+ * @param context - the render context, for the path-to-URL resolver.
+ * @returns the picture node, or undefined when the target is not a resolvable image.
+ */
+function pictureForMention(token: string, context: MarkdownRenderContext): ReactNode {
+  const bare = token.trim();
+  if (!IMAGE_FILE.test(bare.split(/[?#]/u)[0] ?? bare)) return undefined;
+  // A remote destination loads directly; a local one goes through the workspace resolver.
+  const resolved = /^https?:/iu.test(bare) ? bare : context.pathImages?.resolve(bare);
+  if (resolved === undefined) return undefined;
+  return <MarkdownImage src={resolved} alt={bare} destination={bare} />;
 }
 
 /**
