@@ -25,6 +25,8 @@ export declare function ProcessFragment({ open, motion, onRead, returnFocusTo, n
     framed?: boolean;
 }): import("react").JSX.Element | null;
 /** Retire only narration that was actually visible; historical rows stay folded. */
+/** True inside a turn that left the visible order and is collapsing out. */
+export declare const RetiringTurnContext: import("react").Context<boolean>;
 export declare function RetiringContent({ visible, children, onRetired }: {
     visible: boolean;
     children: ReactNode;
