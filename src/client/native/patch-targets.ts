@@ -29,7 +29,7 @@ export interface PatchTarget {
 const HEADERS = [
   ['*** Add File: ', 'add'],
   ['*** Update File: ', 'update'],
-  ['*** Delete File: ', 'delete'],
+  ['*** Delete File: ', 'delete']
 ] as const;
 const MOVE = '*** Move to: ';
 
@@ -57,7 +57,8 @@ export function patchTargets(input: string | undefined): PatchTarget[] {
     for (const [prefix, kind] of HEADERS) {
       if (!line.startsWith(prefix)) continue;
       const path = line.slice(prefix.length).trim();
-      if (path !== '') targets.push({ kind, path: kind === 'delete' ? undefined : path, label: path });
+      if (path !== '')
+        targets.push({ kind, path: kind === 'delete' ? undefined : path, label: path });
       break;
     }
   }
@@ -70,9 +71,17 @@ export function patchTargets(input: string | undefined): PatchTarget[] {
  * @param display - shortens one path for display (cwd/home relative).
  * @returns the summary, or an empty string when no file is named.
  */
-export function patchSummary(targets: readonly PatchTarget[], display: (path: string) => string = path => path): string {
-  return targets.map(target => target.from === undefined ? display(target.label)
-    : `${display(target.from)} → ${display(target.label)}`).join(', ');
+export function patchSummary(
+  targets: readonly PatchTarget[],
+  display: (path: string) => string = path => path
+): string {
+  return targets
+    .map(target =>
+      target.from === undefined
+        ? display(target.label)
+        : `${display(target.from)} → ${display(target.label)}`
+    )
+    .join(', ');
 }
 
 /**
@@ -82,6 +91,10 @@ export function patchSummary(targets: readonly PatchTarget[], display: (path: st
  * @returns true only for an explicit `stopped: true`.
  */
 export function stoppedFromMeta(meta: unknown): boolean {
-  return typeof meta === 'object' && meta !== null && !Array.isArray(meta)
-    && (meta as Record<string, unknown>).stopped === true;
+  return (
+    typeof meta === 'object' &&
+    meta !== null &&
+    !Array.isArray(meta) &&
+    (meta as Record<string, unknown>).stopped === true
+  );
 }

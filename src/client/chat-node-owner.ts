@@ -8,12 +8,15 @@ import type { BlockRenderProps } from './types.js';
  * slot renderer spreads owner props after injected props, so a Reader owner
  * key with that name would shadow a renderer's injected face. It is omitted.
  */
-export function chatNodeOwner(render: Pick<BlockRenderProps, 'cwd' | 'openFile' | 'forkAt'>, official: Pick<NonNullable<BlockRenderProps['official']>, 'openView' | 'officialImageLoader'>): ChatNodeOwnerProps {
+export function chatNodeOwner(
+  render: Pick<BlockRenderProps, 'cwd' | 'openFile' | 'forkAt'>,
+  official: Pick<NonNullable<BlockRenderProps['official']>, 'openView' | 'officialImageLoader'>
+): ChatNodeOwnerProps {
   return {
     cwd: render.cwd,
     openFile: render.openFile ?? (() => {}),
     forkAt: render.forkAt ?? (() => {}),
     inspectCall: callId => official.openView('trajectory', callId),
-    loadImage: official.officialImageLoader,
+    loadImage: official.officialImageLoader
   };
 }
