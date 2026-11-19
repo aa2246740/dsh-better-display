@@ -84,6 +84,11 @@ export declare function officialChildren(slots: Pick<CompositionRegistry, 'spec'
  * Mirror one elected contribution set incrementally. Unrelated additions do not
  * remount existing cards or recreate their subscriptions. A source unload/HMR
  * disposes the corresponding subtree and closures before its replacement.
+ *
+ * A keyed source cell whose component identity changes in place is re-mirrored
+ * on the next ledger notification. List/chain cells keep the registration-only
+ * path because their display order follows registration sequence, so replacing
+ * their registration could reorder them.
  */
 export declare function mirrorOfficialSlot(slots: CompositionRegistry, source: string, target: string, namespace: string, accept?: (entry: StoredEntry) => boolean): () => void;
 export declare function installOfficialSlots(ctx: Context): () => void;
