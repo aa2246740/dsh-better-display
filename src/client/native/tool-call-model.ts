@@ -10,6 +10,9 @@
 // contract only forwards it (type-definition authority stays with the layer
 // that produces the values).
 import { abbreviateHomePath } from '@deepseek-ai/dsh-util-workspace-path'
+import { patchSummary, patchTargets, stoppedFromMeta } from './patch-targets.js'
+// Top-level fields of complete or still-streaming argument JSON.
+import { inputFields, stringValue } from '../tool-activity.js'
 import type { ToolCallBlock, ToolResultNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
 
 export type { ToolCallBlock } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -47,6 +50,8 @@ const TOOL_VARIANTS: Record<string, ToolRowVariant> = {
   glob: 'search',
   write: 'write',
   edit: 'edit',
+  // Harness 0.2.2 adds apply_patch; upstream classifies it as an edit row.
+  apply_patch: 'edit',
   run_code: 'code',
   cordis_package_inspect: 'read',
   cordis_runtime_inspect: 'read',
@@ -218,12 +223,17 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
   const variant = classifyTool(toolName)
   const done = 'kind' in block
   const argsRaw = (done ? block.call?.argsRaw : ('argsRaw' in block ? block.argsRaw : '')) ?? ''
+  // 0.2.2: result metadata `stopped: true` marks a call that did not finish every
+  // requested effect (a partly applied patch); upstream shows it as an error row.
   const state: ToolRowState = !done ? 'running'
     : block.error?.code === 'interrupted' ? 'stopped'
-      : block.isError ? 'error' : 'ok'
-  const base = argsRaw === ''
-    ? block.callId
-    : abbreviateHomePath(relativizeToCwd(deriveSummary(variant, argsRaw), cwd), home)
+      : block.isError || stoppedFromMeta(block.meta) ? 'error' : 'ok'
+  const display = (path: string) => abbreviateHomePath(relativizeToCwd(path, cwd), home)
+  // An apply_patch row names the files its headers declare, never the raw patch text.
+  const patch = toolName === 'apply_patch' ? patchTargets(stringValue(inputFields(argsRaw), 'input')) : undefined
+  const base = patch !== undefined ? patchSummary(patch, display)
+    : argsRaw === '' ? block.callId
+      : display(deriveSummary(variant, argsRaw))
   const toolTitle = TOOL_TITLES[toolName]
   // Others keeps the static "Tool call" title (figma literal); the real tool
   // name rides the mutable summary slot unless the tool owns a specific title.
@@ -239,7 +249,10 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
     variant,
     title: toolTitle ?? VARIANT_TITLES[variant],
     summary,
-    filePath: deriveFilePath(variant, argsRaw),
+    // Only a lone added or updated file without a move links the whole summary.
+    filePath: patch !== undefined
+      ? patch.length === 1 && patch[0]!.kind !== 'delete' && patch[0]!.from === undefined ? patch[0]!.path : undefined
+      : deriveFilePath(variant, argsRaw),
     body: deriveBody(variant, argsRaw),
     output,
     errorSummary,
