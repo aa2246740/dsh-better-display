@@ -10,6 +10,16 @@ const root = resolve(import.meta.dirname, '..');
 // The renderer's only Harness dependency is the fence component; stubbing the
 // package keeps this a pure element-shape test (the real package pulls CSS
 // modules Node cannot load).
+// Expanding a function component by calling it is how these assertions see through the
+// wrapper that places a picture. The picture trigger inside it uses hooks, so React warns
+// even though the component is skipped. That warning is expected here and is filtered so
+// a real one still stands out.
+const realConsoleError = console.error;
+console.error = (...args: unknown[]): void => {
+  if (typeof args[0] === 'string' && /Invalid hook call|Rules of Hooks/u.test(args[0])) return;
+  realConsoleError(...args);
+};
+
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({ CodeBlock: () => null }));
 vi.mock('../src/client/McpAppFrame.js', () => ({
   McpAppCodeBlock: () => null,
@@ -126,24 +136,65 @@ function renderInlineCode(
  * @returns the resolved source the picture will load, if any.
  */
 function pictureSrc(element: ReactNode): string | undefined {
+  // A list can appear as a child (`.map` produces one), so arrays are walked too.
+  if (Array.isArray(element)) {
+    for (const item of element) {
+      const found = pictureSrc(item);
+      if (found !== undefined) return found;
+    }
+    return undefined;
+  }
   if (!isValidElement(element)) return undefined;
   const props = element.props as { src?: string; children?: ReactNode };
   if (typeof props.src === 'string') return props.src;
-  const children = Array.isArray(props.children) ? props.children : [props.children];
-  for (const child of children) {
-    const found = pictureSrc(child);
-    if (found !== undefined) return found;
+  // A function component wraps the picture; expand it the way React would at paint time.
+  // Calling a component outside a renderer is only safe while it holds no hooks, so the
+  // expansion is skipped for one that does (the picture trigger uses `useEffect`).
+  if (typeof element.type === 'function' && !usesHooks(element.type)) {
+    try {
+      const expanded = (element.type as (props: unknown) => ReactNode)(props);
+      const found = pictureSrc(expanded);
+      if (found !== undefined) return found;
+    } catch {
+      /* Fall through to children. */
+    }
   }
-  return undefined;
+  return pictureSrc(props.children);
+}
+
+/**
+ * Whether a component calls a hook, by reading its source.
+ *
+ * Expanding a component by calling it is how these assertions see through the wrapper
+ * that now places a picture. A component with hooks cannot be called that way, so the
+ * walk has to know which ones to leave alone. The build rewrites hooks to
+ * `react.useXxx`, so both spellings are matched.
+ * @param component - the component to inspect.
+ * @returns true when its body mentions a React hook.
+ */
+function usesHooks(component: unknown): boolean {
+  const source = typeof component === 'function' ? component.toString() : '';
+  return /\buse[A-Z][a-zA-Z]*\s*\(/u.test(source) || /\breact\.use[A-Z]/u.test(source);
 }
 
 /** Every tag rendered inside a reference, for asserting on the chip. */
 function renderedTags(element: ReactNode, into: string[] = []): string[] {
+  if (Array.isArray(element)) {
+    for (const item of element) renderedTags(item, into);
+    return into;
+  }
   if (!isValidElement(element)) return into;
   if (typeof element.type === 'string') into.push(element.type);
   const props = element.props as { children?: ReactNode };
-  const children = Array.isArray(props.children) ? props.children : [props.children];
-  for (const child of children) renderedTags(child, into);
+  // A function component holds the real tags; expand it the way React would at paint time.
+  if (typeof element.type === 'function' && !usesHooks(element.type)) {
+    try {
+      renderedTags((element.type as (props: unknown) => ReactNode)(props), into);
+    } catch {
+      /* Fall through to children. */
+    }
+  }
+  renderedTags(props.children, into);
   return into;
 }
 
@@ -155,30 +206,60 @@ function renderedTags(element: ReactNode, into: string[] = []): string[] {
  * @param nodes - the tree to walk.
  * @param name - the component's declared name.
  */
-function containsComponentNamed(nodes: ReactNode[], name: string): boolean {
-  for (const node of nodes) {
+function containsComponentNamed(nodes: ReactNode, name: string): boolean {
+  const list = Array.isArray(nodes) ? nodes : [nodes];
+  for (const node of list) {
     if (!isValidElement(node)) continue;
     const type = node.type as { name?: string } | string;
     if (typeof type !== 'string' && type.name === name) return true;
     const props = node.props as { children?: ReactNode };
-    const children = Array.isArray(props.children) ? props.children : [props.children];
-    if (containsComponentNamed(children, name)) return true;
+    // A wrapper component holds the icon; expand it the way React would at paint time.
+    if (typeof type === 'function' && !usesHooks(type)) {
+      try {
+        const expanded = (type as (props: unknown) => ReactNode)(props);
+        if (containsComponentNamed(expanded, name)) return true;
+      } catch {
+        /* Fall through to children. */
+      }
+    }
+    if (containsComponentNamed(props.children, name)) return true;
   }
   return false;
 }
 
 /**
- * The first element with this host tag.
+ * The first element with this host tag, expanding function components on the way.
+ *
+ * A picture reference now renders through `ChipWithPicture`, a plain function component,
+ * so the tree handed back by `renderBlocks` holds a component element rather than host
+ * tags. React would expand it at paint time; these assertions need the same view, so the
+ * walk calls the component directly.
  * @param nodes - the tree to walk.
  * @param tag - the host tag name, such as `button`.
  */
-function findElementTag(nodes: ReactNode[], tag: string): ReactElement | undefined {
-  for (const node of nodes) {
+function findElementTag(nodes: ReactNode, tag: string): ReactElement | undefined {
+  const expand = (node: ReactNode): ReactNode => {
+    if (!isValidElement(node)) return node;
+    if (typeof node.type === 'string') return node;
+    const type = node.type as (props: unknown) => ReactNode;
+    if (typeof type !== 'function') return node;
+    try {
+      return type((node.props as { children?: ReactNode }) ?? {});
+    } catch {
+      return node;
+    }
+  };
+  const list = Array.isArray(nodes) ? nodes : [nodes];
+  for (const raw of list) {
+    const node = expand(raw);
+    if (Array.isArray(node)) {
+      const found = findElementTag(node, tag);
+      if (found !== undefined) return found;
+      continue;
+    }
     if (!isValidElement(node)) continue;
     if (node.type === tag) return node;
-    const props = node.props as { children?: ReactNode };
-    const children = Array.isArray(props.children) ? props.children : [props.children];
-    const found = findElementTag(children, tag);
+    const found = findElementTag((node.props as { children?: ReactNode }).children, tag);
     if (found !== undefined) return found;
   }
   return undefined;
@@ -581,6 +662,185 @@ test('with no openFile supplied the mention opener is used', () => {
   const onClick = (findElementTag(flat, 'button')!.props as { onClick?: () => void }).onClick;
   onClick!();
   assert.deepEqual(opened, ['mention'], 'the mention opener is the fallback');
+});
+
+/**
+ * Render one heading the way the reader wrote it.
+ *
+ * `## 方案图：[方案-分档窗口UI.png](方案-分档窗口UI.png)` — a heading whose only link is a
+ * picture. The original view keeps the heading on one line and shows nothing else; the
+ * plugin adds the picture, which has to sit below the heading rather than inside it.
+ * @param label - the heading's leading text.
+ * @param file - the linked file name, used for both text and destination.
+ * @param pathImages - the path resolver.
+ * @returns every element the block rendered.
+ */
+function renderHeading(label: string, file: string, pathImages?: MarkdownPathImages): ReactNode[] {
+  const blocks = [
+    {
+      key: 0,
+      node: {
+        type: 'heading',
+        depth: 2,
+        children: [
+          { type: 'text', value: label },
+          {
+            type: 'link',
+            url: file,
+            children: [{ type: 'text', value: file }],
+            position: {
+              start: { offset: label.length },
+              end: { offset: label.length + file.length }
+            }
+          }
+        ],
+        position: { start: { offset: 0 }, end: { offset: label.length + file.length } }
+      }
+    }
+  ] as unknown as Parameters<typeof renderBlocks>[0];
+  return renderBlocks(blocks, context(pathImages));
+}
+
+test('a picture in a heading is emitted below the heading, not inside it', () => {
+  // The reader compared the two views: the original keeps `## 方案图：[x.png](x.png)` on one
+  // line, and the plugin split it into two. A block chip inside the heading is what broke
+  // the line, so the picture has to leave the heading entirely.
+  const rendered = renderHeading(
+    '方案图：',
+    'artifacts/dock-preview/dock-zoom.png',
+    resolveWith(String.raw`C:\repo`)
+  );
+  const flat = rendered.flatMap(node => (Array.isArray(node) ? node : [node]));
+  // The heading itself carries no picture: its children are the text and the chip only.
+  const heading = findElementTag(flat, 'h2');
+  assert.notEqual(heading, undefined, 'the heading renders');
+  const insideHeading = (heading!.props as { children?: ReactNode }).children;
+  const inside = Array.isArray(insideHeading) ? insideHeading : [insideHeading];
+  assert.equal(
+    inside.map(node => pictureSrc(node)).find(src => src !== undefined),
+    undefined,
+    'no picture inside the heading'
+  );
+  // And the picture is present somewhere outside the heading. The block renders as a
+  // fragment, so the check walks the whole tree and skips the heading subtree.
+  const renderedPicture = pictureSrc(rendered);
+  assert.notEqual(renderedPicture, undefined, 'the picture sits below the heading');
+  // Nothing in the heading subtree actually loads a picture.
+  assert.notEqual(inside.map(node => pictureSrc(node)).find(Boolean), renderedPicture);
+});
+
+test('a heading with no picture stays a single element', () => {
+  const rendered = renderHeading('方案图：', 'docs/openapi.yaml', resolveWith(String.raw`C:\repo`));
+  const flat = rendered.flatMap(node => (Array.isArray(node) ? node : [node]));
+  // Only the heading: nothing was appended.
+  assert.equal(flat.length, 1);
+  assert.notEqual(findElementTag(flat, 'h2'), undefined);
+});
+
+/**
+ * The first `display: block` box found inside an inline-only parent.
+ *
+ * Tag names do not tell the story: the break comes from a `span` the sheet styles
+ * `display: block`, which is invalid inside `strong` / `em` / `del` / `a` — the browser
+ * hoists it out of the paragraph and the sentence breaks. That is the same failure the
+ * reader reported for headings.
+ * @param nodes - the rendered tree.
+ * @returns a description of the bad nesting, or undefined when the tree is clean.
+ */
+function blockInInline(nodes: ReactNode): string | undefined {
+  const BLOCK_CLASSES = new Set(['mentionLine', 'mentionShot', 'headingShot']);
+  const INLINE_ONLY = new Set(['strong', 'em', 'del', 'a']);
+  const walk = (node: ReactNode, parent: string | undefined): string | undefined => {
+    if (Array.isArray(node)) {
+      for (const child of node) {
+        const found = walk(child, parent);
+        if (found !== undefined) return found;
+      }
+      return undefined;
+    }
+    if (!isValidElement(node)) return undefined;
+    const tag = typeof node.type === 'string' ? node.type : undefined;
+    if (typeof node.type === 'function' && !usesHooks(node.type)) {
+      try {
+        const expanded = (node.type as (props: unknown) => ReactNode)(node.props);
+        const found = walk(expanded, parent);
+        if (found !== undefined) return found;
+      } catch {
+        /* Fall through to children. */
+      }
+    }
+    const className = String((node.props as { className?: string }).className ?? '');
+    if (INLINE_ONLY.has(parent ?? '') && tag === 'span' && BLOCK_CLASSES.has(className)) {
+      return `block span(.${className}) inside ${parent}`;
+    }
+    return walk((node.props as { children?: ReactNode }).children, tag ?? parent);
+  };
+  return walk(nodes, undefined);
+}
+
+/** A link whose text and destination name a picture, as an answer writes it. */
+const pictureLink = {
+  type: 'link',
+  url: 'a.png',
+  children: [{ type: 'text', value: 'a.png' }],
+  position: { start: { offset: 0 }, end: { offset: 5 } }
+};
+
+/**
+ * Render one paragraph with the given inline children.
+ * @param children - the mdast inline children.
+ * @returns every element the block rendered.
+ */
+function renderParagraph(children: unknown[]): ReactNode[] {
+  const blocks = [
+    {
+      key: 0,
+      node: {
+        type: 'paragraph',
+        children,
+        position: { start: { offset: 0 }, end: { offset: 10 } }
+      }
+    }
+  ] as unknown as Parameters<typeof renderBlocks>[0];
+  return renderBlocks(blocks, context(resolveWith(String.raw`C:\repo`)));
+}
+
+test('a picture reference inside bold or italic stays inline', () => {
+  // `**加粗 [图.png](图.png)**` puts the reference inside `strong`, an inline-only parent.
+  // A block box there is invalid nesting: the browser hoists it out and the sentence
+  // breaks, exactly as the heading case did.
+  for (const kind of ['strong', 'emphasis', 'delete'] as const) {
+    const rendered = renderParagraph([
+      { type: kind, children: [{ type: 'text', value: '文字 ' }, pictureLink] }
+    ]);
+    assert.equal(blockInInline(rendered), undefined, `${kind} must not contain a block box`);
+    // The picture is still shown, just inline.
+    assert.notEqual(pictureSrc(rendered), undefined, `${kind} still shows the picture`);
+  }
+});
+
+test('an inline-code picture mention inside bold stays inline', () => {
+  const rendered = renderParagraph([
+    {
+      type: 'strong',
+      children: [
+        { type: 'text', value: '加粗 ' },
+        {
+          type: 'inlineCode',
+          value: 'a.png',
+          position: { start: { offset: 0 }, end: { offset: 5 } }
+        }
+      ]
+    }
+  ]);
+  assert.equal(blockInInline(rendered), undefined);
+});
+
+test('a picture reference in a list item still takes its own line', () => {
+  // `li` may hold block content, so the prose placement is kept there.
+  const rendered = renderParagraph([pictureLink]);
+  assert.equal(blockInInline(rendered), undefined);
+  assert.notEqual(pictureSrc(rendered), undefined);
 });
 
 test('the failed state keeps the same visible placeholder', () => {

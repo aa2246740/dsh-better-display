@@ -31,6 +31,9 @@ import type { MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { PositionedBlock } from './incremental.js';
 import css from './MarkdownText.module.css';
 import { FileGlyph } from './file-glyph.js';
+import { pictureSourceFor, pictureSourcesIn } from './picture-sources.js';
+import { ChipWithPicture, SHOT_CLASSES } from './picture-placement.js';
+
 import { ImageThumb } from '../ImageThumb.js';
 
 export type { MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives';
@@ -152,6 +155,16 @@ export interface MarkdownRenderContext {
   readonly pathImages?: MarkdownPathImages;
   /** Inside an anchor's children: interactive mentions must not nest there. */
   readonly inLink?: boolean;
+  /** Inside a heading: one line, so a picture is emitted below it instead of within. */
+  readonly inHeading?: boolean;
+  /**
+   * Inside inline-only content: `strong`, `em`, `del`, or an anchor.
+   *
+   * A `display: block` box cannot live here — the browser hoists it out of the paragraph
+   * and the sentence breaks, which is the same failure a heading showed. A picture
+   * reference in these positions keeps the picture inline.
+   */
+  readonly inInlineOnly?: boolean;
   /** Reference targets visible to this pass. */
   readonly targets: ReferenceTargets;
   /** Footnote identifiers in first-reference order; a footnote's number is its 1-based index here. */
@@ -243,8 +256,28 @@ function renderNode(node: Md.RootContent, key: Key, context: MarkdownRenderConte
         : node.value;
     case 'paragraph':
       return <p key={key}>{renderChildren(node.children, context)}</p>;
-    case 'heading':
-      return createElement(`h${node.depth}`, { key }, ...renderChildren(node.children, context));
+    case 'heading': {
+      // A picture named in a heading belongs under the heading, not inside it: the
+      // heading is one line, and its own block pair there would split the title. The chip
+      // stays inline in the title, and the picture is emitted as the heading's sibling.
+      const pictures = pictureSourcesIn(node.children, context.pathImages);
+      const heading = createElement(
+        `h${node.depth}`,
+        { key },
+        ...renderChildren(node.children, { ...context, inHeading: true })
+      );
+      if (pictures.length === 0) return heading;
+      return (
+        <Fragment key={key}>
+          {heading}
+          {pictures.map((src, index) => (
+            <span key={`${key}:shot:${index}`} className={css.headingShot}>
+              <MarkdownImage src={src} alt={src} destination={src} />
+            </span>
+          ))}
+        </Fragment>
+      );
+    }
     case 'blockquote':
       return (
         <blockquote key={key}>
@@ -267,11 +300,17 @@ function renderNode(node: Md.RootContent, key: Key, context: MarkdownRenderConte
         </Fragment>
       );
     case 'strong':
-      return <strong key={key}>{renderChildren(node.children, context)}</strong>;
+      return (
+        <strong key={key}>
+          {renderChildren(node.children, { ...context, inInlineOnly: true })}
+        </strong>
+      );
     case 'emphasis':
-      return <em key={key}>{renderChildren(node.children, context)}</em>;
+      return <em key={key}>{renderChildren(node.children, { ...context, inInlineOnly: true })}</em>;
     case 'delete':
-      return <del key={key}>{renderChildren(node.children, context)}</del>;
+      return (
+        <del key={key}>{renderChildren(node.children, { ...context, inInlineOnly: true })}</del>
+      );
     case 'inlineCode': {
       // Parity with mdast-util-to-hast: inline code renders line endings as spaces.
       const value = node.value.replace(/\r?\n|\r/g, ' ');
@@ -320,16 +359,11 @@ function renderNode(node: Md.RootContent, key: Key, context: MarkdownRenderConte
         );
         // A mention of a picture also loads that picture, on the line below the chip.
         // The chip keeps the exact rendering the original view gives it — inline,
-        // clickable, code-styled — and the picture is added after it rather than
-        // instead of it. Both live in block boxes so the name and the picture each get
-        // their own line and the surrounding sentence resumes underneath.
+        // clickable, code-styled — and the picture is added after it rather than instead.
         const picture = pictureForMention(value, context);
         if (picture === undefined) return chip;
         return (
-          <Fragment key={key}>
-            <span className={css.mentionLine}>{chip}</span>
-            <span className={css.mentionShot}>{picture}</span>
-          </Fragment>
+          <ChipWithPicture chip={chip} picture={picture} context={context} classes={SHOT_CLASSES} />
         );
       }
       return <code key={key}>{content}</code>;
@@ -657,9 +691,6 @@ function renderImage(
   );
 }
 
-/** Extensions that name a picture file. */
-const IMAGE_FILE = /\.(png|jpe?g|gif|webp|avif|bmp|svg|ico)$/iu;
-
 /**
  * A link, plus the picture it points at when it points at a file.
  *
@@ -680,9 +711,8 @@ function renderLink(
   key: Key,
   context: MarkdownRenderContext
 ): ReactNode {
-  // A destination the file vocabulary knows becomes the same clickable chip the original
-  // view uses, so the blue styling and the icon are preserved rather than replaced by a
-  // bare anchor that a relative path cannot even navigate.
+  // A destination the file vocabulary knows becomes the clickable chip the original view
+  // uses: same blue styling and icon, and it actually opens the file.
   const mention = context.inLink === true ? undefined : context.fileMentions?.resolve(url);
   const label = plainText(children);
   const chip =
@@ -703,12 +733,7 @@ function renderLink(
   const picture = pictureForMention(url, context);
   if (picture === undefined)
     return mention === undefined ? chip : <Fragment key={key}>{chip}</Fragment>;
-  return (
-    <Fragment key={key}>
-      <span className={css.mentionLine}>{chip}</span>
-      <span className={css.mentionShot}>{picture}</span>
-    </Fragment>
-  );
+  return <ChipWithPicture chip={chip} picture={picture} context={context} classes={SHOT_CLASSES} />;
 }
 
 /** The text a node list renders, for re-using a link's own label inside a button. */
@@ -736,12 +761,9 @@ function plainText(children: ReactNode[]): string {
  * @returns the picture node, or undefined when the target is not a resolvable image.
  */
 function pictureForMention(token: string, context: MarkdownRenderContext): ReactNode {
-  const bare = token.trim();
-  if (!IMAGE_FILE.test(bare.split(/[?#]/u)[0] ?? bare)) return undefined;
-  // A remote destination loads directly; a local one goes through the workspace resolver.
-  const resolved = /^https?:/iu.test(bare) ? bare : context.pathImages?.resolve(bare);
+  const resolved = pictureSourceFor(token, context.pathImages);
   if (resolved === undefined) return undefined;
-  return <MarkdownImage src={resolved} alt={bare} destination={bare} />;
+  return <MarkdownImage src={resolved} alt={token.trim()} destination={token.trim()} />;
 }
 
 /**

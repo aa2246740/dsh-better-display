@@ -328,6 +328,43 @@
   object-fit: contain;
 }
 
+/* A picture reference inside bold, italic, or an anchor. Those are inline-only parents:
+   a block box there is invalid nesting and the browser hoists it out of the paragraph, so
+   the picture stays inline and sized to the line. */
+.inlineShot {
+  display: inline-block;
+  max-width: 100%;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.inlineShot img {
+  display: block;
+  max-width: 100%;
+  max-height: 1.6em;
+  width: auto;
+  height: auto;
+  border-radius: 4px;
+  border: 1px solid var(--dsw-alias-border-l2);
+}
+
+/* A picture named inside a heading. The heading keeps its single line: the chip stays
+   inline in the title and the picture is emitted below it, as its own block, matching how
+   a picture reference reads in prose. The negative top margin folds the heading's own
+   bottom margin into this gap, so the heading and its picture read as one unit. */
+.headingShot {
+  display: block;
+  margin: -8px 0 16px;
+}
+.headingShot img {
+  display: block;
+  max-width: 100%;
+  max-height: 800px;
+  width: auto;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+}
+
 /* A file link that names a picture gets the picture on the line below it.
    The link keeps the original chip styling — blue, clickable, icon-prefixed — so the
    sentence still reads as it did; only its box changes, plus the added picture. */

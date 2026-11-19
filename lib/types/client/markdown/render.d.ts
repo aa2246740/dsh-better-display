@@ -95,6 +95,16 @@ export interface MarkdownRenderContext {
     readonly pathImages?: MarkdownPathImages;
     /** Inside an anchor's children: interactive mentions must not nest there. */
     readonly inLink?: boolean;
+    /** Inside a heading: one line, so a picture is emitted below it instead of within. */
+    readonly inHeading?: boolean;
+    /**
+     * Inside inline-only content: `strong`, `em`, `del`, or an anchor.
+     *
+     * A `display: block` box cannot live here — the browser hoists it out of the paragraph
+     * and the sentence breaks, which is the same failure a heading showed. A picture
+     * reference in these positions keeps the picture inline.
+     */
+    readonly inInlineOnly?: boolean;
     /** Reference targets visible to this pass. */
     readonly targets: ReferenceTargets;
     /** Footnote identifiers in first-reference order; a footnote's number is its 1-based index here. */
