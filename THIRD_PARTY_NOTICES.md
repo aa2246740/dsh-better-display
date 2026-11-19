@@ -26,7 +26,7 @@ portions of `Reader.module.css`, `motion.tsx` and `word-timeline.ts`.
 
 ## DeepSeek Harness Markdown renderer
 
-`src/client/markdown` derives from DeepSeek Harness commit `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`. Changes add source-offset hooks for text leaves, literal HTML, inline code and atomic code-block entry, and keep source-offset keys on finalization. Native CodeBlock is reused through the public package API without changing its content renderer. Original file hashes are recorded in `upstream.json`.
+`src/client/markdown` derives from DeepSeek Harness commit `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`. Changes add source-offset hooks for text leaves, literal HTML, inline code and atomic code-block entry, and keep source-offset keys on finalization. Native CodeBlock is reused through the public package API without changing its content renderer. Original file hashes are recorded in `upstream.json`. `windows-path-destinations.ts`, the `singleTilde: false` GFM option and the file-route image `load` tag come from Harness `0.2.2-rc.5` (`9c2670d3bce5275e0d1610272958121af87787bb`).
 
 MIT License
 

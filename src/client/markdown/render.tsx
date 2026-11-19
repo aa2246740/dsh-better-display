@@ -556,13 +556,38 @@ export function UnavailableImage({ alt, destination, state }: { alt: string; des
   )
 }
 
+// Harness 0.2.2-rc.5 render.tsx, ported: a module counter, not useId. useId
+// derives from tree position, so images at the same position in two sessions
+// would share a URL.
+let imageLoads = 0
+const nextImageLoad = (): number => ++imageLoads
+
+/**
+ * Tag a Host file-route image URL with its mount's load number. Browsers reuse
+ * a same-URL image within one document despite `no-store`, so without the tag
+ * a newly rendered image of a rewritten file would show the earlier bytes.
+ * @param url - Absolute resolved image URL; URLs outside the `api/file` route stay unchanged.
+ * @param load - Number allocated once per mounted image.
+ * @returns The URL with a `load` query parameter, or the unchanged URL.
+ */
+export function freshImageUrl(url: string, load: number): string {
+  let fresh: URL
+  try { fresh = new URL(url) }
+  catch { return url }
+  if (!fresh.pathname.endsWith('/api/file')) return url
+  // Appending preserves the resolver's existing query encoding.
+  fresh.search = `${fresh.search === '' ? '?' : `${fresh.search}&`}load=${load}`
+  return fresh.href
+}
+
 function MarkdownImage({ src, alt, destination }: { src: string; alt: string; destination: string }): ReactNode {
   const [failed, setFailed] = useState(false)
+  const [load] = useState(nextImageLoad)
   if (failed) return <UnavailableImage alt={alt} destination={destination} state="failed" />
   return (
     <img
       className={css.image}
-      src={src}
+      src={freshImageUrl(src, load)}
       alt={alt}
       onError={() => { setFailed(true) }}
       loading="lazy"

@@ -17,6 +17,12 @@ import { gfm } from 'micromark-extension-gfm'
 import { math } from 'micromark-extension-math'
 import { cjkFriendlyStrong } from './cjkFriendlyStrong.js'
 import { mathCompatibility } from './mathCompatibility.js'
+// Harness 0.2.2-rc.5 parse.ts changes, ported: Windows-path destinations keep
+// their backslashes, and GFM strikethrough needs `~~`.
+import { windowsPathDestinations } from './windows-path-destinations.js'
+
+/** GFM strikethrough requires `~~`; a single `~` stays literal, as in ranges such as `10~20`. */
+const gfmOptions = { singleTilde: false }
 
 /**
  * Parse GFM markdown (the streaming arm's grammar: no math, so incomplete
@@ -26,8 +32,8 @@ import { mathCompatibility } from './mathCompatibility.js'
  */
 export function parseGfm(text: string): Root {
   return fromMarkdown(text, {
-    extensions: [gfm(), cjkFriendlyStrong()],
-    mdastExtensions: [gfmFromMarkdown()],
+    extensions: [gfm(gfmOptions), cjkFriendlyStrong()],
+    mdastExtensions: [gfmFromMarkdown(), windowsPathDestinations()],
   })
 }
 
@@ -39,7 +45,7 @@ export function parseGfm(text: string): Root {
  */
 export function parseGfmWithMath(text: string): Root {
   return fromMarkdown(text, {
-    extensions: [gfm(), cjkFriendlyStrong(), mathCompatibility(), math()],
-    mdastExtensions: [gfmFromMarkdown(), mathFromMarkdown()],
+    extensions: [gfm(gfmOptions), cjkFriendlyStrong(), mathCompatibility(), math()],
+    mdastExtensions: [gfmFromMarkdown(), mathFromMarkdown(), windowsPathDestinations()],
   })
 }

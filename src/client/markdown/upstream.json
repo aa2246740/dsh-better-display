@@ -10,5 +10,18 @@
     "cjkFriendlyStrong.ts": "bc4adf3183f7d0feea17e3a176e7c4b1db5bdddc29e7fc87261f627ff8a39b53",
     "mathCompatibility.ts": "5f8cec86fd613fd2f67510e22b0a9d661f4173b3d49fb13fef71b25f4abb652b",
     "katex.tsx": "8227e04d29333d2568021ed012143237b457852bce25d82cf394d72b941e74a5"
+  },
+  "portedFrom0.2.2-rc.5": {
+    "commit": "9c2670d3bce5275e0d1610272958121af87787bb",
+    "changes": [
+      "parse.ts: gfm({ singleTilde: false }) and windowsPathDestinations() on both grammars",
+      "windows-path-destinations.ts: copied verbatim with an attribution header",
+      "render.tsx: freshImageUrl per-mount load tag on file-route images"
+    ],
+    "notPorted": [
+      "render.tsx sanitizeUrl allowlist-to-denylist change: the fork keeps the stricter http/https/mailto allowlist",
+      "render.tsx MarkdownFenceSeat / renderCode delegate (conversation.chat.markdown.fence hoc layers): Reader renders fences with the native CodeBlock",
+      "render.tsx context-menu trigger props, DraggableImage, plugin-market media routes; MarkdownText omitHtml, textInteractionSource, copyKatexAsTex"
+    ]
   }
 }
