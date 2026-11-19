@@ -90,6 +90,10 @@ test('enlarged theme tokens do not let the answer heading share a lane', { skip,
   const browser = await launchPinnedChromium();
   try {
     const page = await browser.newPage({ viewport: { width: 1000, height: 320 }, deviceScaleFactor: 1 });
+    // The plate-colour sample below is the opaque fallback's contract. Default
+    // lanes are frosted (#87, reader-lane-wallpaper.test.ts); geometry is the same.
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-transparency', value: 'reduce' }] });
     const errors: string[] = [];
     page.on('pageerror', (error: Error) => errors.push(String(error)));
     await page.goto(`http://127.0.0.1:${address.port}/`);

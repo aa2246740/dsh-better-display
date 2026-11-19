@@ -167,7 +167,15 @@ async function sample(page: { screenshot(options: { clip: { x: number; y: number
   return [red, green, blue];
 }
 
-test('transparent and faded theme tokens keep lane pixels on the page surface', { skip, timeout: 30_000 }, async () => {
+async function reduceTransparency(page: { context(): { newCDPSession(page: unknown): Promise<{ send(method: string, params: object): Promise<unknown> }> } }) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-transparency', value: 'reduce' }] });
+}
+
+// The opaque Canvas-backed plate (#66) is the lane surface when the reader
+// prefers reduced transparency or the browser has no backdrop-filter. The
+// default frosted lanes (#87) are covered in reader-lane-wallpaper.test.ts.
+test('transparent and faded theme tokens keep lane pixels on the page surface (opaque fallback)', { skip, timeout: 30_000 }, async () => {
   const css = readFileSync(join(root, 'src/client/Reader.module.css'));
   const files = new Map<string, Buffer | string>([['/reader.css', css]]);
   const cases = [
@@ -184,6 +192,7 @@ test('transparent and faded theme tokens keep lane pixels on the page surface', 
   mkdirSync(shots, { recursive: true });
   try {
     const page = await browser.newPage({ viewport: { width: 1000, height: 360 }, deviceScaleFactor: 1 });
+    await reduceTransparency(page);
     const errors: string[] = [];
     page.on('pageerror', (error: Error) => errors.push(String(error)));
     for (const item of cases) {
@@ -242,7 +251,10 @@ test('transparent and faded theme tokens keep lane pixels on the page surface', 
   }
 });
 
-test('stock and glass lanes stay pixel-identical to origin/main', { skip, timeout: 30_000 }, async () => {
+// Stock lanes keep main's opaque plate in the fallback; default-mode stock is
+// checked at rest against the token in reader-lane-wallpaper.test.ts. Glass
+// mode is compared in the default media state, where #87 must not touch it.
+test('stock (opaque fallback) and glass lanes stay pixel-identical to origin/main', { skip, timeout: 30_000 }, async () => {
   const headCss = readFileSync(join(root, 'src/client/Reader.module.css'));
   const mainCss = execFileSync('git', ['show', 'origin/main:src/client/Reader.module.css'], { cwd: root });
   const files = new Map<string, Buffer | string>([
@@ -259,10 +271,12 @@ test('stock and glass lanes stay pixel-identical to origin/main', { skip, timeou
   mkdirSync(shots, { recursive: true });
   try {
     const page = await browser.newPage({ viewport: { width: 1000, height: 360 }, deviceScaleFactor: 1 });
-    const read = async (path: string) => {
-      await page.goto(`http://127.0.0.1:${server.port}${path}`);
-      await page.waitForFunction(() => Reflect.get(window, '__ready') === true);
-      const points = await page.evaluate(() => {
+    const glassPage = await browser.newPage({ viewport: { width: 1000, height: 360 }, deviceScaleFactor: 1 });
+    await reduceTransparency(page);
+    const read = async (path: string, target = page) => {
+      await target.goto(`http://127.0.0.1:${server.port}${path}`);
+      await target.waitForFunction(() => Reflect.get(window, '__ready') === true);
+      const points = await target.evaluate(() => {
         const summary = document.querySelector('#summary')!.getBoundingClientRect();
         const toolbar = document.querySelector('.toolbar')!.getBoundingClientRect();
         return {
@@ -272,19 +286,19 @@ test('stock and glass lanes stay pixel-identical to origin/main', { skip, timeou
         };
       });
       return {
-        lane: await sample(page, points.lane.x, points.lane.y),
-        gap: await sample(page, points.gap.x, points.gap.y),
-        toolbar: await sample(page, points.toolbar.x, points.toolbar.y),
+        lane: await sample(target, points.lane.x, points.lane.y),
+        gap: await sample(target, points.gap.x, points.gap.y),
+        toolbar: await sample(target, points.toolbar.x, points.toolbar.y),
       };
     };
     const stockHead = await read('/stock-head.html');
     await page.screenshot({ path: join(shots, 'stock-head.png') });
     const stockMain = await read('/stock-main.html');
     await page.screenshot({ path: join(shots, 'stock-main.png') });
-    const glassHead = await read('/glass-head.html');
-    await page.screenshot({ path: join(shots, 'glass-head.png') });
-    const glassMain = await read('/glass-main.html');
-    await page.screenshot({ path: join(shots, 'glass-main.png') });
+    const glassHead = await read('/glass-head.html', glassPage);
+    await glassPage.screenshot({ path: join(shots, 'glass-head.png') });
+    const glassMain = await read('/glass-main.html', glassPage);
+    await glassPage.screenshot({ path: join(shots, 'glass-main.png') });
     for (const place of ['lane', 'gap', 'toolbar'] as const) {
       assert.ok(dist(stockHead[place], stockMain[place]) <= 2, `stock ${place} head ${stockHead[place].join(',')} main ${stockMain[place].join(',')}`);
       assert.ok(dist(stockHead[place], [34, 51, 68]) <= 2, `stock ${place} left the opaque token: ${stockHead[place].join(',')}`);

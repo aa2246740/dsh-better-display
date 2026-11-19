@@ -22,7 +22,20 @@ test('built Reader CSS retains Chromium blur and the older Safari fallback', asy
   const css = await readerCss();
   assert.match(css, /(?<![\w-])backdrop-filter:blur\(12px\)/);
   assert.match(css, /-webkit-backdrop-filter:blur\(12px\)/);
-  const prefixed = [...css.matchAll(/-webkit-backdrop-filter:([^;}]+)/g)].map(match => match[1]);
-  const standard = [...css.matchAll(/(?<![\w-])backdrop-filter:([^;}]+)/g)].map(match => match[1]);
+  // Declarations only: an @supports condition such as `(backdrop-filter:blur(1px))` is not one.
+  const prefixed = [...css.matchAll(/[{;]-webkit-backdrop-filter:([^;}]+)/g)].map(match => match[1]);
+  const standard = [...css.matchAll(/[{;]backdrop-filter:([^;}]+)/g)].map(match => match[1]);
+  assert.ok(standard.length >= 8);
   assert.deepEqual(standard, prefixed, 'every Safari fallback also has a working standard declaration');
+});
+
+test('built Reader CSS frosts default lanes only where the wash can hide text (#87)', async () => {
+  const css = await readerCss();
+  const at = css.indexOf('@media (prefers-reduced-transparency:no-preference)');
+  assert.ok(at >= 0, 'the frosted lanes sit behind the reduced-transparency preference');
+  const block = css.slice(at);
+  assert.match(block, /^@media \(prefers-reduced-transparency:no-preference\)\{@supports \(\(-webkit-backdrop-filter:blur\(1px\)\) or \(backdrop-filter:blur\(1px\)\)\)\{/);
+  assert.match(block, /:not\(\[data-reader-glass\]\)\{--reader-lane-tint:color-mix\(in srgb, var\(--dsw-alias-bg-base\) 60%, transparent\)/);
+  // Outside that block the opaque plate is still the base rule.
+  assert.match(css.slice(0, at), /background-color:canvas;background-image:var\(--reader-lane-plate\)/i);
 });
