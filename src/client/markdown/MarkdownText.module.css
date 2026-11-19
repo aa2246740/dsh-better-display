@@ -350,18 +350,23 @@
   border-radius: 8px;
   border: 1px solid var(--dsw-alias-border-l2);
 }
-/* The file-type mark in front of a file name. */
+/* The file-type mark in front of a file name. The chip's `gap` spaces it, so no
+   margin here — one source of spacing only. */
 .linkIcon {
   flex: none;
-  margin-right: 4px;
-  vertical-align: -2px;
+  display: block;
 }
 
 /* Inline file mention: the same link language this sheet gives anchors (and
    thereby URL-promoted inline code) — link-blue at rest, underline only on
    hover/focus. An underline at rest reads badly inside the code chip, where
-   it collides with monospace descenders and the pill background. */
+   it collides with monospace descenders and the pill background.
+   `inline-flex` keeps the file mark and the name on one baseline; the mark is a
+   sibling of the text, not a background, so it has to take part in the line box. */
 .fileMention {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   margin: 0;
   padding: 0;
   border: none;
@@ -370,6 +375,7 @@
   color: var(--dsw-alias-state-business-primary);
   text-decoration: none;
   cursor: pointer;
+  vertical-align: baseline;
 }
 
 .fileMention:hover,

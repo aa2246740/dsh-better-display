@@ -200,6 +200,8 @@ type MarkdownStreamProps = {
   fileMentions?: BlockRenderProps['fileMentions'];
   /** Session workspace, so a relative image destination still resolves. */
   cwd?: string;
+  /** Opens a file chip's target; the route that reaches the right-hand preview panel. */
+  openFile?: BlockRenderProps['openFile'];
   transformed?: boolean;
 } & TextPresentation;
 
@@ -213,6 +215,7 @@ function MarkdownStream({
   kind = 'body',
   fileMentions,
   cwd,
+  openFile,
   transformed = false
 }: MarkdownStreamProps) {
   const root = useRef<HTMLDivElement>(null);
@@ -251,6 +254,7 @@ function MarkdownStream({
         revision={presentation.revision}
         fileMentions={fileMentions}
         cwd={cwd}
+        openFile={openFile}
       />
     </div>
   );
@@ -382,6 +386,8 @@ type FallbackContext = {
   fileMentions?: BlockRenderProps['fileMentions'];
   /** Session workspace; a relative image destination resolves against it. */
   cwd?: string;
+  /** Opens a file chip's target through the right-hand preview panel. */
+  openFile?: BlockRenderProps['openFile'];
 };
 
 function fallback(
@@ -405,6 +411,7 @@ function fallback(
           {...presentation}
           fileMentions={context.fileMentions}
           cwd={context.cwd}
+          openFile={context.openFile}
           blockKey={blockKey}
           source={source}
         />
@@ -473,7 +480,9 @@ export const Blocks = memo(function Blocks({
   loadImage,
   fillComposer,
   fileMentions,
-  cwd
+  cwd,
+  official,
+  openFile
 }: BlockRenderProps &
   TextPresentation & {
     blocks: readonly AssistantBlock[];
@@ -511,7 +520,13 @@ export const Blocks = memo(function Blocks({
                     holdFormatting,
                     { startedAt, interrupted, liveText },
                     `${reactId}:${index}:${block.kind}`,
-                    { loadImage, fillComposer, fileMentions, cwd }
+                    {
+                      loadImage,
+                      fillComposer,
+                      fileMentions,
+                      cwd,
+                      openFile: official?.officialPreviewFile ?? openFile
+                    }
                   )
                 }
               )}

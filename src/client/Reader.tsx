@@ -38,6 +38,7 @@ import { markdownLabels, truncatedJsonLabel } from './primitive-labels.js';
 import { chatSeatProps } from './chat-seat.js';
 import { visibleChatKeys, visibleChatSignature } from './rewind-cut.js';
 import { ImageViewerScope, ImageBand, TOOL_BAND } from './image-group.js';
+import { MarkdownDelegateProvider } from '@deepseek-ai/dsh-client-ui-primitives';
 import { ImageLightbox } from './ImageLightbox.js';
 import { ensureStyles } from './styles.js';
 
@@ -537,9 +538,15 @@ const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys,
   } : undefined, [turn, tailData, props.openFile]);
   const fileMentions = useMemo(() => {
     const official = tailOwner ? props.officialFileMentions(tailOwner) : undefined;
-    const reader = deliverables.length > 0 ? createProducedFileMentions(deliverables, props.openFile) : undefined;
+    // A produced file opens in the right-hand panel, which is what the original view
+    // does. `props.openFile` follows the reader's deliverable-open preference and can
+    // hand the file to an external editor instead, so it is the wrong route here.
+    const reader =
+      deliverables.length > 0
+        ? createProducedFileMentions(deliverables, props.officialPreviewFile)
+        : undefined;
     return official || reader ? { resolve: (value: string) => official?.resolve(value) ?? reader?.resolve(value) } : undefined;
-  }, [tailOwner, props.officialFileMentions, deliverables, props.openFile]);
+  }, [tailOwner, props.officialFileMentions, deliverables, props.officialPreviewFile]);
   const official = useMemo(() => ({
     renderSlot: props.renderSlot, renderSlotChain: props.renderSlotChain,
     officialImageLoader: props.officialImageLoader, officialFileMentions: props.officialFileMentions,
@@ -875,7 +882,8 @@ export function Reader(props: ReaderProps) {
   // dsh-claude-style 0.19.x also hides the host seat whenever the first tab
   // is not 对话. Reader.module.css restores that seat only while this root
   // (data-dsh-better-display) is mounted.
-  return <StreamMotionContext.Provider value={streamMotion}><ReaderLaneScope><div ref={root} className={css.root} data-reader-build="0.3.4" data-dsh-better-display="0.3.4" data-reader-wait-clock-version="input-v1" data-reader-wait-start={waitAnchor.time ?? undefined} data-motion={motion ? 'on' : 'off'} data-reader-glass={frostedGlass || undefined} data-reader-auto-fold={autoFold ? 'on' : 'off'}>
+  return <MarkdownDelegateProvider openFile={props.officialPreviewFile}>
+    <StreamMotionContext.Provider value={streamMotion}><ReaderLaneScope><div ref={root} className={css.root} data-reader-build="0.3.4" data-dsh-better-display="0.3.4" data-reader-wait-clock-version="input-v1" data-reader-wait-start={waitAnchor.time ?? undefined} data-motion={motion ? 'on' : 'off'} data-reader-glass={frostedGlass || undefined} data-reader-auto-fold={autoFold ? 'on' : 'off'}>
     <TimelineRail items={timelineItems} activeTurn={activeTurn} busyTurn={busyTurn} onNavigate={onNavigateTurn} />
     <div className={css.column} data-chat-flow="" tabIndex={-1}>
       <StickyLane kind="toolbar" className={css.toolbar}>
@@ -942,5 +950,6 @@ export function Reader(props: ReaderProps) {
         <svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true"><path d="M3 5.5 7 9.5 11 5.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </button></div>}
     </div>
-  </div></ReaderLaneScope></StreamMotionContext.Provider>;
+  </div></ReaderLaneScope></StreamMotionContext.Provider>
+  </MarkdownDelegateProvider>;
 }

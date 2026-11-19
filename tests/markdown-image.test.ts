@@ -1,7 +1,11 @@
 import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { isValidElement } from 'react';
 import type { ReactElement, ReactNode } from 'react';
+
+const root = resolve(import.meta.dirname, '..');
 
 // The renderer's only Harness dependency is the fence component; stubbing the
 // package keeps this a pure element-shape test (the real package pulls CSS
@@ -161,6 +165,23 @@ function containsComponentNamed(nodes: ReactNode[], name: string): boolean {
     if (containsComponentNamed(children, name)) return true;
   }
   return false;
+}
+
+/**
+ * The first element with this host tag.
+ * @param nodes - the tree to walk.
+ * @param tag - the host tag name, such as `button`.
+ */
+function findElementTag(nodes: ReactNode[], tag: string): ReactElement | undefined {
+  for (const node of nodes) {
+    if (!isValidElement(node)) continue;
+    if (node.type === tag) return node;
+    const props = node.props as { children?: ReactNode };
+    const children = Array.isArray(props.children) ? props.children : [props.children];
+    const found = findElementTag(children, tag);
+    if (found !== undefined) return found;
+  }
+  return undefined;
 }
 
 test('a Windows image path renders through the file API instead of disappearing', () => {
@@ -425,6 +446,141 @@ test('a recognized non-image file link keeps its chip and grows no picture', () 
     undefined,
     'no picture for a non-image file'
   );
+});
+
+test('an inline-code file mention keeps the original chip shape', () => {
+  // The reader reported the chip losing its icon and its blue link styling: a token that
+  // the file vocabulary knows became a grey code box. The chip has to be a button with
+  // the file mark in front of the name, like the original view.
+  const rendered = renderInlineCode('docs/openapi.yaml', resolveWith(String.raw`C:\repo`));
+  const flat = rendered.flatMap(node => (Array.isArray(node) ? node : [node]));
+  const tags = flat.flatMap(node => renderedTags(node));
+  assert.equal(tags.includes('button'), true, 'the chip is a clickable button');
+  assert.equal(containsComponentNamed(flat, 'FileGlyph'), true, 'the chip carries its icon');
+  // The icon is a sibling of the name inside the button, not a wrapper around it.
+  const button = findElementTag(flat, 'button');
+  assert.notEqual(button, undefined, 'the button is present');
+});
+
+test('a produced file opens in the right-hand panel, as the original view does', () => {
+  // `openFile` follows the reader's deliverable-open preference and can hand the file to
+  // an external editor. The original view always opens the right-hand panel, so the
+  // mention resolver must use that route, not the preference-driven one.
+  const reader = readFileSync(resolve(root, 'src/client/Reader.tsx'), 'utf8');
+  assert.match(
+    reader,
+    /createProducedFileMentions\(deliverables, props\.officialPreviewFile\)/u,
+    'mentions open through the panel, not through the preference'
+  );
+  assert.doesNotMatch(
+    reader,
+    /createProducedFileMentions\(deliverables, props\.openFile\)/u,
+    'the external-editor route must not be used for mentions'
+  );
+});
+
+test('the preview panel dependency is declared, or the panel is never resolvable', () => {
+  // `sidebarRight` is an injected service name in this Host: it appears in the official
+  // chat module's own `inject` list. Reading it as `ctx.get('sidebarRight')` returns
+  // undefined, and because `mention.open` has no try/catch that failure was silent —
+  // the click did nothing at all, with no error in the console.
+  const source = readFileSync(resolve(root, 'src/client/index.tsx'), 'utf8');
+  const injectList = /export const inject = \[([\s\S]*?)\]/u.exec(source)?.[1] ?? '';
+  assert.match(injectList, /'sidebarRight'/u, 'the panel dependency must be injected');
+  // And it is read off the context, the way the Host reads it.
+  assert.match(source, /ctx as unknown as \{ sidebarRight\?: SidebarRightFace \}/u);
+  assert.match(source, /sidebar\.openResource\(/u);
+  // The path is resolved against the workspace before it becomes a file address, as the
+  // Host's own openFile does; passing the raw token produces an address the panel cannot
+  // resolve.
+  assert.match(source, /resolveWorkspacePath\(cwd, path\)/u);
+});
+
+test('the chip icon follows the file type, as the original view does', () => {
+  // The reader compared the two views and the icons differed: the Host gives a source
+  // file the `<>` mark, an image a picture mark, and other files a page. One document
+  // glyph for everything is not the same rendering.
+  const glyph = readFileSync(resolve(root, 'src/client/markdown/file-glyph.tsx'), 'utf8');
+  assert.match(glyph, /glyphKindOf/u);
+  assert.match(glyph, /CODE_EXTENSIONS/u);
+  assert.match(glyph, /kind === 'code'/u);
+  assert.match(glyph, /kind === 'image'/u);
+  assert.match(glyph, /kind === 'document'/u);
+  // A source file is in the code group, not in the document fallback.
+  const codeGroup = /CODE_EXTENSIONS = new Set\(\[([\s\S]*?)\]\)/u.exec(glyph)?.[1] ?? '';
+  assert.match(codeGroup, /'ts'/u, 'a .ts file maps to the code glyph');
+  assert.match(codeGroup, /'tsx'/u);
+  // And the renderer puts it in front of the chip's name.
+  const renderer = readFileSync(resolve(root, 'src/client/markdown/render.tsx'), 'utf8');
+  assert.match(renderer, /import \{ FileGlyph \} from '\.\/file-glyph\.js'/u);
+  assert.match(renderer, /<FileGlyph path=\{value\} \/>/u);
+});
+
+test('clicking a file chip calls the openFile the owner supplies', () => {
+  // This is the assertion the last two attempts lacked. They checked that the code
+  // existed and still shipped a chip that did nothing when clicked, because the renderer
+  // used the mention's own opener instead of the panel route. Here the click is invoked.
+  const opened: string[] = [];
+  const mention: MarkdownFileMentions = {
+    resolve: value => ({ label: value, title: value, open: () => opened.push('mention') })
+  };
+  const blocks = [
+    {
+      key: 0,
+      node: {
+        type: 'paragraph',
+        children: [
+          {
+            type: 'inlineCode',
+            value: 'docs/openapi.yaml',
+            position: { start: { offset: 0 }, end: { offset: 18 } }
+          }
+        ],
+        position: { start: { offset: 0 }, end: { offset: 18 } }
+      }
+    }
+  ] as unknown as Parameters<typeof renderBlocks>[0];
+  const rendered = renderBlocks(blocks, {
+    ...context(resolveWith(String.raw`C:\repo`)),
+    fileMentions: mention,
+    openFile: path => opened.push(path)
+  });
+  const flat = rendered.flatMap(node => (Array.isArray(node) ? node : [node]));
+  const button = findElementTag(flat, 'button');
+  assert.notEqual(button, undefined, 'the token became a chip');
+  // Invoke the click the way a reader would.
+  const onClick = (button!.props as { onClick?: () => void }).onClick;
+  assert.equal(typeof onClick, 'function', 'the chip is clickable');
+  onClick!();
+  assert.deepEqual(opened, ['docs/openapi.yaml'], 'the click opened through openFile');
+});
+
+test('with no openFile supplied the mention opener is used', () => {
+  const opened: string[] = [];
+  const mention: MarkdownFileMentions = {
+    resolve: value => ({ label: value, title: value, open: () => opened.push('mention') })
+  };
+  const blocks = [
+    {
+      key: 0,
+      node: {
+        type: 'paragraph',
+        children: [
+          {
+            type: 'inlineCode',
+            value: 'docs/openapi.yaml',
+            position: { start: { offset: 0 }, end: { offset: 18 } }
+          }
+        ],
+        position: { start: { offset: 0 }, end: { offset: 18 } }
+      }
+    }
+  ] as unknown as Parameters<typeof renderBlocks>[0];
+  const rendered = renderBlocks(blocks, { ...context(), fileMentions: mention });
+  const flat = rendered.flatMap(node => (Array.isArray(node) ? node : [node]));
+  const onClick = (findElementTag(flat, 'button')!.props as { onClick?: () => void }).onClick;
+  onClick!();
+  assert.deepEqual(opened, ['mention'], 'the mention opener is the fallback');
 });
 
 test('the failed state keeps the same visible placeholder', () => {

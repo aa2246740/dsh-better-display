@@ -19,8 +19,16 @@ import { readImageAttachment, type AttachmentReader } from './image-source.js';
 import { fileAddressFor, modeFromSnapshot, openDeliverableFile } from './open-file.js';
 import type { ReaderInjected } from './types.js';
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment';
-import { installOfficialSlots, officialChildren, type CompositionRegistry } from './official-slots.js';
-import { TEXT_TRANSFORM_SERVICE, createTextTransformRegistry, installTextTransformRegistry } from './text-transform.js';
+import {
+  installOfficialSlots,
+  officialChildren,
+  type CompositionRegistry
+} from './official-slots.js';
+import {
+  TEXT_TRANSFORM_SERVICE,
+  createTextTransformRegistry,
+  installTextTransformRegistry
+} from './text-transform.js';
 
 /** Structural face of the sanctioned per-session composer writer. */
 interface ComposerShell {
@@ -34,18 +42,40 @@ interface SidebarRightFace {
   openResource?: (address: string, options?: { params?: { line?: number } }) => void;
 }
 
-const officialFileAddressFor = (workspacePathPkg as {
-  fileAddressFor?: typeof fileAddressFor;
-}).fileAddressFor;
+const officialFileAddressFor = (
+  workspacePathPkg as {
+    fileAddressFor?: typeof fileAddressFor;
+  }
+).fileAddressFor;
 
-async function openWorkspacePath(
-  ctx: Context,
-  path: string,
-): Promise<void> {
-  const remote = ctx.remote as unknown as { session?: { openWorkspacePath: (arg: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }> } } | undefined;
-  const remoteSession = remote?.session
-    ?? (ctx.get?.('remote.session') as unknown as { openWorkspacePath: (arg: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }> } | undefined)
-    ?? ((ctx.get?.('remote') as unknown as { session?: { openWorkspacePath: (arg: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }> } })?.session);
+async function openWorkspacePath(ctx: Context, path: string): Promise<void> {
+  const remote = ctx.remote as unknown as
+    | {
+        session?: {
+          openWorkspacePath: (arg: {
+            path: string;
+          }) => Promise<{ ok: boolean; error?: { message: string } }>;
+        };
+      }
+    | undefined;
+  const remoteSession =
+    remote?.session ??
+    (ctx.get?.('remote.session') as unknown as
+      | {
+          openWorkspacePath: (arg: {
+            path: string;
+          }) => Promise<{ ok: boolean; error?: { message: string } }>;
+        }
+      | undefined) ??
+    (
+      ctx.get?.('remote') as unknown as {
+        session?: {
+          openWorkspacePath: (arg: {
+            path: string;
+          }) => Promise<{ ok: boolean; error?: { message: string } }>;
+        };
+      }
+    )?.session;
   if (remoteSession?.openWorkspacePath) {
     const result = await remoteSession.openWorkspacePath({ path });
     if (!result?.ok) {
@@ -57,11 +87,33 @@ async function openWorkspacePath(
 }
 
 export type { ReaderBlockOwner, ReaderBlockPresentation } from './types.js';
-export type { DisplayCursor, DisplayText, DisplayTextKind, DisplayTextRequest, DisplayTextTransformer, TextTransformRegistry } from './text-transform.js';
+export type {
+  DisplayCursor,
+  DisplayText,
+  DisplayTextKind,
+  DisplayTextRequest,
+  DisplayTextTransformer,
+  TextTransformRegistry
+} from './text-transform.js';
 export { McpAppFrame } from './McpAppFrame.js';
-export { TEXT_TRANSFORM_SERVICE, createTextTransformRegistry, originalAnswerText } from './text-transform.js';
+export {
+  TEXT_TRANSFORM_SERVICE,
+  createTextTransformRegistry,
+  originalAnswerText
+} from './text-transform.js';
 export const name = 'dsh-better-display-client';
-export const inject = ['slots', 'sessions', 'conversation', 'uiConversation', 'remote', 'remote.session'];
+export const inject = [
+  'slots',
+  'sessions',
+  'conversation',
+  'uiConversation',
+  'remote',
+  'remote.session',
+  // The right-hand preview panel. Without this the dependency is not resolved, so
+  // `ctx.sidebarRight` is undefined at runtime and every file click silently did nothing.
+  // The Host's own chat module injects the same name for the same reason.
+  'sidebarRight'
+];
 
 // All CSS imports have injected their nodes before this module's body runs.
 ensureStyles();
@@ -78,159 +130,230 @@ export function apply(ctx: Context): void {
   const prefs = store.create();
   installBetterDisplaySettings(ctx, prefs);
   ctx.slots.inject('conversation.chat.node', function* () {
-    yield ctx.slots.register({
-    name: 'conversation.view',
-    id: 'reader',
-    order: -5,
-    label: () => '阅读',
-    locale: 'chat',
-    children: {
-      'dsh-better-display.block': { kind: 'chain', scope: 'session' },
-      ...officialChildren(ctx.slots as unknown as CompositionRegistry),
-    },
-    store,
-    inject: (sessionId: SessionId): ReaderInjected => {
-      const session = () => {
-        const current = ctx.sessions.binding(sessionId)?.session;
-        if (!current) throw new Error('阅读页对应的会话已关闭。');
-        return current;
-      };
-      return {
-        openPrefs: prefs,
-        clockLane: ctx.get('betterDisplayClockLane') as import('./turn-clock-lane.js').ClockLane | undefined,
-        officialImageLoader: Object.assign(
-          (attachment: ImageAttachmentRef) => ctx.uiConversation.imageUrl(sessionId, attachment),
-          { peek: (attachment: ImageAttachmentRef) => ctx.uiConversation.peekImageUrl(sessionId, attachment) },
-        ),
-        officialFileMentions: owner => ctx.get('chatFileMentions')?.forClosing(owner, sessionId),
-        officialPreviewFile: path => {
-          const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd;
-          const sidebar = ctx.get('sidebarRight') as SidebarRightFace | undefined;
-          if (!sidebar?.openResource) throw new Error('文件预览面板不可用。');
-          sidebar.openResource((officialFileAddressFor ?? fileAddressFor)(sessionId, cwd, path));
+    yield ctx.slots.register(
+      {
+        name: 'conversation.view',
+        id: 'reader',
+        order: -5,
+        label: () => '阅读',
+        locale: 'chat',
+        children: {
+          'dsh-better-display.block': { kind: 'chain', scope: 'session' },
+          ...officialChildren(ctx.slots as unknown as CompositionRegistry)
         },
-        officialHost: {
-          getSnapshot: () => ctx.remote.$host,
-          subscribe: listener => ctx.on('connection/reset', listener),
-        },
-        loadOlder: async () => { await session().loadOlder(); },
-        loadImage: attachment =>
-          readImageAttachment(session() as unknown as AttachmentReader, attachment),
-        openFile: async (path, options) => {
-          try {
-            const cwd = ctx.sessions?.list?.getSnapshot?.()?.byId[sessionId]?.cwd;
-            const sidebar = (
-              ctx.get?.('sidebarRight')
-              ?? (ctx as unknown as { sidebarRight?: SidebarRightFace }).sidebarRight
-            ) as SidebarRightFace | undefined;
-            await openDeliverableFile({
-              path,
-              mode: modeFromSnapshot(prefs),
-              sessionId,
-              cwd,
-              resolveWorkspacePath,
-              openExternal: async (absolutePath) => { await openWorkspacePath(ctx, absolutePath); },
-              openSidebar: typeof sidebar?.openResource === 'function'
-                ? (address) => { sidebar.openResource!(address, options?.line === undefined ? undefined : { params: { line: options.line } }); }
-                : undefined,
-              fileAddressFor: officialFileAddressFor ?? fileAddressFor,
-              warn: (message, extra) => { console.warn(message, extra); },
-            });
-          } catch (error) {
-            console.warn('[dsh-better-display] openFile error:', error);
-          }
-        },
-        revealFile: async (path: string) => {
-          try {
-            const cwd = ctx.sessions?.list?.getSnapshot?.()?.byId[sessionId]?.cwd;
-            const targetPath = resolveWorkspacePath(cwd, path);
-            // 1. Try dedicated host endpoint for native file highlighting (open -R / explorer /select)
-            try {
-              const res = await fetch('/better-display/reveal', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path: targetPath, sessionId }),
-              });
-              if (res.ok) {
-                const data = await res.json();
-                if (data.ok) return;
+        store,
+        inject: (sessionId: SessionId): ReaderInjected => {
+          const session = () => {
+            const current = ctx.sessions.binding(sessionId)?.session;
+            if (!current) throw new Error('阅读页对应的会话已关闭。');
+            return current;
+          };
+          return {
+            openPrefs: prefs,
+            clockLane: ctx.get('betterDisplayClockLane') as
+              import('./turn-clock-lane.js').ClockLane | undefined,
+            officialImageLoader: Object.assign(
+              (attachment: ImageAttachmentRef) =>
+                ctx.uiConversation.imageUrl(sessionId, attachment),
+              {
+                peek: (attachment: ImageAttachmentRef) =>
+                  ctx.uiConversation.peekImageUrl(sessionId, attachment)
               }
-            } catch {
-              // Server endpoint not yet available, fallback to directory open
-            }
-
-            // 2. Fallback to official opener with parent directory
-            const parentDir = dirname(targetPath);
-            if (!isAbsoluteWorkspacePath(parentDir)) {
-              console.warn('[dsh-better-display] reveal failed; refusing to open a relative parent:', targetPath);
-              return;
-            }
-            const remote = ctx.remote as unknown as { session?: { openWorkspacePath: (arg: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }> } } | undefined;
-            const remoteSession = remote?.session
-              ?? (ctx.get?.('remote.session') as unknown as { openWorkspacePath: (arg: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }> } | undefined);
-            if (remoteSession?.openWorkspacePath) {
-              await remoteSession.openWorkspacePath({ path: parentDir });
-            }
-          } catch (error) {
-            console.warn('[dsh-better-display] revealFile error:', error);
-          }
-        },
-        forkAt: (seq: number) => {
-          // A missing anchor would silently fork the whole session instead of
-          // the intended turn prefix, so refuse it loudly rather than guessing.
-          if (typeof seq !== 'number' || !Number.isFinite(seq)) {
-            console.warn('[dsh-better-display] fork refused: missing anchor seq');
-            return;
-          }
-          try {
-            const sessionsApi = ctx.sessions as unknown as {
-              fork: (arg: { sessionId: string; atSeq: number; increaseTitle: boolean }) => Promise<string>;
-              open: (sessionId: string) => void;
-            } | undefined;
-            if (sessionsApi?.fork) {
-              sessionsApi.fork({ sessionId, atSeq: seq, increaseTitle: true })
-                .then(childId => { sessionsApi.open?.(childId); })
-                .catch(err => { console.warn('[dsh-better-display] fork failed:', err); });
-            }
-          } catch (error) {
-            console.warn('[dsh-better-display] forkAt error:', error);
-          }
-        },
-        loadThrough: async (seq: unknown) => {
-          try {
-            const current = session() as unknown as { loadThrough?: (seq: unknown) => Promise<void> };
-            if (typeof current?.loadThrough === 'function') {
-              await current.loadThrough(seq);
-            } else {
+            ),
+            officialFileMentions: owner =>
+              ctx.get('chatFileMentions')?.forClosing(owner, sessionId),
+            officialPreviewFile: path => {
+              // Mirrors the Host's own `openFile`: resolve the workspace path first, turn
+              // it into a file address, then hand that to the right-hand panel. The
+              // dependency is read as `ctx.sidebarRight` rather than `ctx.get(...)`
+              // because `sidebarRight` is an injected service name.
+              const sidebar = (ctx as unknown as { sidebarRight?: SidebarRightFace }).sidebarRight;
+              const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd;
+              if (typeof sidebar?.openResource !== 'function') {
+                console.warn('[dsh-better-display] 右侧预览面板不可用，改用默认打开方式。');
+                void openWorkspacePath(ctx, resolveWorkspacePath(cwd, path));
+                return;
+              }
+              try {
+                sidebar.openResource(
+                  (officialFileAddressFor ?? fileAddressFor)(
+                    sessionId,
+                    cwd,
+                    resolveWorkspacePath(cwd, path)
+                  )
+                );
+              } catch (error) {
+                console.warn('[dsh-better-display] 打开文件预览失败:', error);
+              }
+            },
+            officialHost: {
+              getSnapshot: () => ctx.remote.$host,
+              subscribe: listener => ctx.on('connection/reset', listener)
+            },
+            loadOlder: async () => {
               await session().loadOlder();
-            }
-          } catch (error) {
-            console.warn('[dsh-better-display] loadThrough error:', error);
-          }
-        },
-        fillComposer: (text: string) => {
-          // Sanctioned path: the conversation input shell owns the Lexical
-          // editor, so setDraft lands in the draft store deterministically.
-          try {
-            const conversation = (ctx as unknown as { conversation?: ConversationFace }).conversation;
-            const shell = conversation?.input?.shell?.(sessionId);
-            if (shell && typeof shell.setDraft === 'function') {
-              shell.setDraft(text);
-              return true;
-            }
-          } catch {
-            // Fall through to the DOM path below.
-          }
-          try {
-            return fillComposerDom(text);
-          } catch {
-            return false;
-          }
-        },
+            },
+            loadImage: attachment =>
+              readImageAttachment(session() as unknown as AttachmentReader, attachment),
+            openFile: async (path, options) => {
+              try {
+                const cwd = ctx.sessions?.list?.getSnapshot?.()?.byId[sessionId]?.cwd;
+                // `sidebarRight` is an injected service, so it is read off the context.
+                const sidebar = (ctx as unknown as { sidebarRight?: SidebarRightFace })
+                  .sidebarRight;
+                await openDeliverableFile({
+                  path,
+                  mode: modeFromSnapshot(prefs),
+                  sessionId,
+                  cwd,
+                  resolveWorkspacePath,
+                  openExternal: async absolutePath => {
+                    await openWorkspacePath(ctx, absolutePath);
+                  },
+                  openSidebar:
+                    typeof sidebar?.openResource === 'function'
+                      ? address => {
+                          sidebar.openResource!(
+                            address,
+                            options?.line === undefined
+                              ? undefined
+                              : { params: { line: options.line } }
+                          );
+                        }
+                      : undefined,
+                  fileAddressFor: officialFileAddressFor ?? fileAddressFor,
+                  warn: (message, extra) => {
+                    console.warn(message, extra);
+                  }
+                });
+              } catch (error) {
+                console.warn('[dsh-better-display] openFile error:', error);
+              }
+            },
+            revealFile: async (path: string) => {
+              try {
+                const cwd = ctx.sessions?.list?.getSnapshot?.()?.byId[sessionId]?.cwd;
+                const targetPath = resolveWorkspacePath(cwd, path);
+                // 1. Try dedicated host endpoint for native file highlighting (open -R / explorer /select)
+                try {
+                  const res = await fetch('/better-display/reveal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: targetPath, sessionId })
+                  });
+                  if (res.ok) {
+                    const data = await res.json();
+                    if (data.ok) return;
+                  }
+                } catch {
+                  // Server endpoint not yet available, fallback to directory open
+                }
 
-      };
-    },
-    }, Reader);
+                // 2. Fallback to official opener with parent directory
+                const parentDir = dirname(targetPath);
+                if (!isAbsoluteWorkspacePath(parentDir)) {
+                  console.warn(
+                    '[dsh-better-display] reveal failed; refusing to open a relative parent:',
+                    targetPath
+                  );
+                  return;
+                }
+                const remote = ctx.remote as unknown as
+                  | {
+                      session?: {
+                        openWorkspacePath: (arg: {
+                          path: string;
+                        }) => Promise<{ ok: boolean; error?: { message: string } }>;
+                      };
+                    }
+                  | undefined;
+                const remoteSession =
+                  remote?.session ??
+                  (ctx.get?.('remote.session') as unknown as
+                    | {
+                        openWorkspacePath: (arg: {
+                          path: string;
+                        }) => Promise<{ ok: boolean; error?: { message: string } }>;
+                      }
+                    | undefined);
+                if (remoteSession?.openWorkspacePath) {
+                  await remoteSession.openWorkspacePath({ path: parentDir });
+                }
+              } catch (error) {
+                console.warn('[dsh-better-display] revealFile error:', error);
+              }
+            },
+            forkAt: (seq: number) => {
+              // A missing anchor would silently fork the whole session instead of
+              // the intended turn prefix, so refuse it loudly rather than guessing.
+              if (typeof seq !== 'number' || !Number.isFinite(seq)) {
+                console.warn('[dsh-better-display] fork refused: missing anchor seq');
+                return;
+              }
+              try {
+                const sessionsApi = ctx.sessions as unknown as
+                  | {
+                      fork: (arg: {
+                        sessionId: string;
+                        atSeq: number;
+                        increaseTitle: boolean;
+                      }) => Promise<string>;
+                      open: (sessionId: string) => void;
+                    }
+                  | undefined;
+                if (sessionsApi?.fork) {
+                  sessionsApi
+                    .fork({ sessionId, atSeq: seq, increaseTitle: true })
+                    .then(childId => {
+                      sessionsApi.open?.(childId);
+                    })
+                    .catch(err => {
+                      console.warn('[dsh-better-display] fork failed:', err);
+                    });
+                }
+              } catch (error) {
+                console.warn('[dsh-better-display] forkAt error:', error);
+              }
+            },
+            loadThrough: async (seq: unknown) => {
+              try {
+                const current = session() as unknown as {
+                  loadThrough?: (seq: unknown) => Promise<void>;
+                };
+                if (typeof current?.loadThrough === 'function') {
+                  await current.loadThrough(seq);
+                } else {
+                  await session().loadOlder();
+                }
+              } catch (error) {
+                console.warn('[dsh-better-display] loadThrough error:', error);
+              }
+            },
+            fillComposer: (text: string) => {
+              // Sanctioned path: the conversation input shell owns the Lexical
+              // editor, so setDraft lands in the draft store deterministically.
+              try {
+                const conversation = (ctx as unknown as { conversation?: ConversationFace })
+                  .conversation;
+                const shell = conversation?.input?.shell?.(sessionId);
+                if (shell && typeof shell.setDraft === 'function') {
+                  shell.setDraft(text);
+                  return true;
+                }
+              } catch {
+                // Fall through to the DOM path below.
+              }
+              try {
+                return fillComposerDom(text);
+              } catch {
+                return false;
+              }
+            }
+          };
+        }
+      },
+      Reader
+    );
     yield installOfficialSlots(ctx);
     yield installReaderEntry(ctx);
   });

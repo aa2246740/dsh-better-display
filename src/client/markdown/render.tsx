@@ -30,6 +30,7 @@ import { isMcpAppCodeBlock, extractMcpAppTitle, extractMcpAppHeight } from '../m
 import type { MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { PositionedBlock } from './incremental.js';
 import css from './MarkdownText.module.css';
+import { FileGlyph } from './file-glyph.js';
 import { ImageThumb } from '../ImageThumb.js';
 
 export type { MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives';
@@ -140,6 +141,14 @@ export interface MarkdownRenderContext {
   readonly inBlockquote?: boolean;
   /** Inline-code file mentions; absent wherever no opener vocabulary exists. */
   readonly fileMentions: MarkdownFileMentions | undefined;
+  /**
+   * Opens a file chip's target.
+   *
+   * The Host scopes this with `MarkdownDelegateProvider` and its own chip reads it from
+   * there; this renderer is a plain function, so the owner threads the same opener in.
+   * It is the route that reaches the right-hand preview panel.
+   */
+  readonly openFile?: ((path: string, options?: { line?: number }) => void) | undefined;
   readonly pathImages?: MarkdownPathImages;
   /** Inside an anchor's children: interactive mentions must not nest there. */
   readonly inLink?: boolean;
@@ -292,6 +301,9 @@ function renderNode(node: Md.RootContent, key: Key, context: MarkdownRenderConte
       // Inside an anchor the token stays inert — a button cannot nest there.
       const mention = context.inLink === true ? undefined : context.fileMentions?.resolve(value);
       if (mention !== undefined) {
+        // The chip is the button itself, with the file mark in front of the name, which
+        // is the shape the original view uses. Wrapping the text in a span first put a
+        // second box inside the chip and lost both the icon and the link colour.
         const chip = (
           <code key={key}>
             <button
@@ -299,9 +311,10 @@ function renderNode(node: Md.RootContent, key: Key, context: MarkdownRenderConte
               className={css.fileMention}
               title={mention.title}
               aria-label={mention.label}
-              onClick={mention.open}
+              onClick={openHandlerFor(context, value, mention)}
             >
-              {content}
+              <FileGlyph path={value} />
+              {value}
             </button>
           </code>
         );
@@ -569,6 +582,28 @@ function renderAnchor(url: string, children: ReactNode[], key: Key): ReactNode {
 }
 
 /**
+ * The click handler for a file chip.
+ *
+ * The Host's own chip opens through the nearest `MarkdownDelegateProvider`, and that is
+ * the route that reaches the right-hand preview panel. The owner passes that same
+ * opener in as `context.openFile`; a mention's own opener is the fallback for scopes
+ * that provide none.
+ * @param context - the render context.
+ * @param path - the file to open.
+ * @param mention - the vocabulary result, when the token resolved to a known file.
+ * @returns the handler to attach to the chip.
+ */
+function openHandlerFor(
+  context: MarkdownRenderContext,
+  path: string,
+  mention: { open: () => void } | undefined
+): () => void {
+  const openFile = context.openFile;
+  if (typeof openFile === 'function') return () => openFile(path);
+  return mention === undefined ? () => {} : mention.open;
+}
+
+/**
  * The complete inline-code value when it is exactly an absolute HTTP(S) URL
  * (no surrounding whitespace); anything else stays inert code.
  */
@@ -659,7 +694,7 @@ function renderLink(
         className={css.fileMention}
         title={mention.title}
         aria-label={mention.label}
-        onClick={mention.open}
+        onClick={openHandlerFor(context, url, mention)}
       >
         <FileGlyph path={url} />
         {label === '' ? url : label}
@@ -690,32 +725,6 @@ function plainText(children: ReactNode[]): string {
  * and a picture reference should look the same either way — a small mark, then the name.
  * @param props - the destination, whose extension picks the glyph.
  */
-function FileGlyph({ path }: { path: string }) {
-  const image = IMAGE_FILE.test(path.split(/[?#]/u)[0] ?? path);
-  return (
-    <svg
-      className={css.linkIcon}
-      viewBox="0 0 16 16"
-      width="13"
-      height="13"
-      aria-hidden="true"
-      focusable="false"
-    >
-      {image ? (
-        <>
-          <rect x="1.5" y="2.5" width="13" height="11" rx="2" stroke="currentColor" fill="none" />
-          <circle cx="5.5" cy="6" r="1.2" fill="currentColor" />
-          <path d="M2.5 11.5 6 8l3 2.5L12 7l1.5 1.5" stroke="currentColor" fill="none" />
-        </>
-      ) : (
-        <>
-          <path d="M4 1.5h5l3 3v10H4z" stroke="currentColor" fill="none" />
-          <path d="M9 1.5v3h3" stroke="currentColor" fill="none" />
-        </>
-      )}
-    </svg>
-  );
-}
 
 /**
  * The picture a link or mention points at, when it points at an image file.

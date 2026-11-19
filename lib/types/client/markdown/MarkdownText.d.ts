@@ -29,7 +29,7 @@ export type { MarkdownCodeLabels, MarkdownFileMentions } from './render.js';
  * relative links, and unsafe protocols are disabled, while absolute HTTP(S)
  * images render directly.
  */
-export declare const MarkdownText: import("react").MemoExoticComponent<({ text, streaming, codeLabels, fileMentions, pathImages, renderText, renderAtom }: {
+export declare const MarkdownText: import("react").MemoExoticComponent<({ text, streaming, codeLabels, fileMentions, pathImages, renderText, renderAtom, openFile }: {
     text: string;
     streaming?: boolean;
     codeLabels?: MarkdownCodeLabels | undefined;
@@ -37,5 +37,13 @@ export declare const MarkdownText: import("react").MemoExoticComponent<({ text, 
     pathImages?: MarkdownPathImages | undefined;
     renderText?: MarkdownRenderContext["renderText"];
     renderAtom?: MarkdownRenderContext["renderAtom"];
+    /**
+     * Opens a file chip's target.
+     *
+     * The Host scopes this with `MarkdownDelegateProvider` and its own chip reads it from
+     * there; this renderer is a plain function, so the owner threads the same opener in.
+     * It is the route that reaches the right-hand preview panel.
+     */
+    openFile?: MarkdownRenderContext["openFile"];
 }) => import("react").JSX.Element>;
 //# sourceMappingURL=MarkdownText.d.ts.map

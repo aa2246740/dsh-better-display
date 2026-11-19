@@ -6,7 +6,7 @@ export declare function MotionPlainText({ text, enabled, revision }: {
     revision: number;
 }): import("react").JSX.Element;
 /** Native DSH Markdown semantics with a stable text-leaf animation hook. */
-export declare function MotionMarkdown({ text, streaming, enabled, revision, fileMentions, cwd }: {
+export declare function MotionMarkdown({ text, streaming, enabled, revision, fileMentions, cwd, openFile }: {
     text: string;
     streaming: boolean;
     enabled: boolean;
@@ -14,5 +14,9 @@ export declare function MotionMarkdown({ text, streaming, enabled, revision, fil
     fileMentions?: MarkdownFileMentions;
     /** Session workspace, so a relative image destination resolves to a real file. */
     cwd?: string;
+    /** Opens a file chip's target; the route that reaches the right-hand preview panel. */
+    openFile?: (path: string, options?: {
+        line?: number;
+    }) => void;
 }): import("react").JSX.Element;
 //# sourceMappingURL=word-motion.d.ts.map

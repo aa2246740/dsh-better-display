@@ -42,7 +42,8 @@ function renderSettled(
   fileMentions: MarkdownFileMentions | undefined,
   pathImages: MarkdownPathImages | undefined,
   renderText: MarkdownRenderContext['renderText'],
-  renderAtom: MarkdownRenderContext['renderAtom']
+  renderAtom: MarkdownRenderContext['renderAtom'],
+  openFile: MarkdownRenderContext['openFile']
 ): ReactNode[] {
   const root = parseGfmWithMath(text);
   const targets = createReferenceTargets();
@@ -53,6 +54,7 @@ function renderSettled(
     streaming: false,
     codeLabels,
     fileMentions,
+    openFile,
     pathImages,
     targets,
     footnoteOrder: [],
@@ -199,7 +201,8 @@ export const MarkdownText = memo(function MarkdownText({
   fileMentions,
   pathImages,
   renderText,
-  renderAtom
+  renderAtom,
+  openFile
 }: {
   text: string;
   streaming?: boolean;
@@ -208,6 +211,14 @@ export const MarkdownText = memo(function MarkdownText({
   pathImages?: MarkdownPathImages | undefined;
   renderText?: MarkdownRenderContext['renderText'];
   renderAtom?: MarkdownRenderContext['renderAtom'];
+  /**
+   * Opens a file chip's target.
+   *
+   * The Host scopes this with `MarkdownDelegateProvider` and its own chip reads it from
+   * there; this renderer is a plain function, so the owner threads the same opener in.
+   * It is the route that reaches the right-hand preview panel.
+   */
+  openFile?: MarkdownRenderContext['openFile'];
 }) {
   const streamRef = useRef<StreamingRenderer | null>(null);
   const streamImagesRef = useRef(pathImages);
@@ -215,7 +226,15 @@ export const MarkdownText = memo(function MarkdownText({
   const children = useMemo(() => {
     if (!streaming) {
       streamRef.current = null;
-      return renderSettled(text, codeLabels, fileMentions, pathImages, renderText, renderAtom);
+      return renderSettled(
+        text,
+        codeLabels,
+        fileMentions,
+        pathImages,
+        renderText,
+        renderAtom,
+        openFile
+      );
     }
     if (
       streamRef.current === null ||
@@ -227,7 +246,7 @@ export const MarkdownText = memo(function MarkdownText({
       streamImagesRef.current = pathImages;
     }
     return streamRef.current.render(text);
-  }, [text, streaming, codeLabels, fileMentions, pathImages, renderText, renderAtom]);
+  }, [text, streaming, codeLabels, fileMentions, pathImages, renderText, renderAtom, openFile]);
   // The viewer scope lives above the block list (in `Blocks`), not here: one answer
   // arrives as several blocks and each renders its own MarkdownText, so a scope at
   // this level split one answer's pictures into one group per block.

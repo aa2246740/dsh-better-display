@@ -82,6 +82,16 @@ export interface MarkdownRenderContext {
     readonly inBlockquote?: boolean;
     /** Inline-code file mentions; absent wherever no opener vocabulary exists. */
     readonly fileMentions: MarkdownFileMentions | undefined;
+    /**
+     * Opens a file chip's target.
+     *
+     * The Host scopes this with `MarkdownDelegateProvider` and its own chip reads it from
+     * there; this renderer is a plain function, so the owner threads the same opener in.
+     * It is the route that reaches the right-hand preview panel.
+     */
+    readonly openFile?: ((path: string, options?: {
+        line?: number;
+    }) => void) | undefined;
     readonly pathImages?: MarkdownPathImages;
     /** Inside an anchor's children: interactive mentions must not nest there. */
     readonly inLink?: boolean;
