@@ -54,6 +54,7 @@ async function verify() {
       openFile: () => {}, loadOlder: async () => {}, openView: () => {},
     };
     slots.register({ name: 'root', children: {
+      'conversation.chat.turnTail': { kind: 'list', scope: 'session' },
       'conversation.chat.node': { kind: 'keyed', scope: 'session', inject: { hooks: {
         turnData: (_: unknown, context: any) => () => context.turnData,
         disclosure: (_: unknown, context: any) => () => context.disclosureReset,
@@ -193,6 +194,48 @@ async function verify() {
       chat.nodes.delete('assistant-key');
       chat.order = chat.order.filter((key: string) => key !== 'assistant-key');
       store.actions.setExpanded('turn:1:closed:completed', false);
+
+      // #88: a closed turn's tail wrapper carries the host anchor
+      // data-turn-tail={data.turn}, and the turnTail entries render inside it.
+      const tailNode = {
+        key: 'tail-key', kind: 'turn-tail', anchorSeq: 5.1, visibility: 'visible',
+        location: { kind: 'turn', turn },
+        data: { turn: 1, seq: 5, time: 2, closing: null, branchUnavailable: true },
+      };
+      const removeTail = slots.register({ name: 'conversation.chat.turnTail', id: 'fixture-tail' },
+        ({ turn: owner }: { turn: { turn: number } }) => <span data-fixture-tail={owner.turn}>tail for turn {owner.turn}</span>);
+      await new Promise(resolve => queueMicrotask(resolve));
+      html = render();
+      assert.equal(container.querySelectorAll('[data-turn-tail]').length, 0);
+      chat.nodes = new Map(chat.nodes);
+      chat.nodes.set('tail-key', tailNode);
+      chat.order = [...chat.order, 'tail-key'];
+      html = render();
+      const anchors = container.querySelectorAll('[data-turn-tail]');
+      assert.equal(anchors.length, 1);
+      assert.equal(anchors[0]!.getAttribute('data-turn-tail'), '1');
+      assert.ok(anchors[0]!.hasAttribute('data-reader-official-tail'));
+      assert.equal(anchors[0]!.getAttribute('data-actions-reveal'), null);
+      assert.ok(anchors[0]!.closest('[data-reader-turn="1"]'));
+      const tailEntry = container.querySelector('[data-fixture-tail="1"]');
+      assert.ok(tailEntry);
+      assert.ok(anchors[0]!.contains(tailEntry));
+      // The page-wide lookup a per-turn plugin does finds exactly this row.
+      assert.equal(document.querySelector('[data-turn-tail="1"]'), anchors[0]);
+      // A turn that is still open has no tail yet, so it has no anchor either.
+      turn.status = 'open';
+      chat.timeline = { turns: new Map([[1, { ...turn }]]) };
+      html = render();
+      assert.equal(container.querySelectorAll('[data-turn-tail]').length, 0);
+      turn.status = 'closed';
+      chat.timeline = { turns: new Map([[1, turn]]) };
+      chat.nodes = new Map(chat.nodes);
+      chat.nodes.delete('tail-key');
+      chat.order = chat.order.filter((key: string) => key !== 'tail-key');
+      removeTail();
+      await new Promise(resolve => queueMicrotask(resolve));
+      html = render();
+      assert.equal(container.querySelectorAll('[data-turn-tail]').length, 0);
 
       const module = Reflect.get(window, 'easyrewriteModule');
       if (module) {

@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import css from './Reader.module.css';
 import { StreamMotionContext } from './streaming.js';
@@ -171,6 +171,9 @@ export function ProcessFragment({ open, motion, onRead, returnFocusTo, nodeKey, 
 }
 
 /** Retire only narration that was actually visible; historical rows stay folded. */
+/** True inside a turn that left the visible order and is collapsing out. */
+export const RetiringTurnContext = createContext(false);
+
 export function RetiringContent({ visible, children, onRetired }: { visible: boolean; children: ReactNode; onRetired?: () => void }) {
   const { enabled } = useContext(StreamMotionContext);
   const root = useRef<HTMLDivElement>(null);
@@ -240,7 +243,7 @@ export function RetiringContent({ visible, children, onRetired }: { visible: boo
   if (!visible && !present) return null;
   return <div ref={root} className={css.retiringContent} data-reader-retiring={visible ? 'visible' : 'retiring'} data-ud-motion="reader-progress-retire"
     onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setFocusHeld(false); }}>
-    {children}
+    <RetiringTurnContext.Provider value={!visible}>{children}</RetiringTurnContext.Provider>
   </div>;
 }
 

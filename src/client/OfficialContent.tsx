@@ -5,7 +5,7 @@ import type { AssistantBlock, ToolCallBlock } from '@deepseek-ai/dsh-client-ui-c
 type MessageId = AssistantActionOwnerProps['messageId'];
 import { OFFICIAL_SEATS, readerGroupAction } from './official-slots.js';
 import type { BlockRenderProps } from './types.js';
-import { chatSeatProps } from './chat-seat.js';
+import { chatSeatProps, turnTailAnchorProps } from './chat-seat.js';
 import { Blocks } from './Blocks.js';
 import { chatNodeOwner } from './chat-node-owner.js';
 
@@ -90,9 +90,13 @@ export function OfficialAssistantBody({
   });
 }
 
-export function OfficialTail({ official, owner, produced }: Pick<BlockRenderProps, 'official'> & { owner?: TurnTailOwnerProps; produced: readonly string[] }) {
+/**
+ * `anchorTurn` is the turn number for the host's `data-turn-tail` anchor; omit
+ * it and the wrapper carries none. The wrapper stays `display: contents`.
+ */
+export function OfficialTail({ official, owner, produced, anchorTurn }: Pick<BlockRenderProps, 'official'> & { owner?: TurnTailOwnerProps; produced: readonly string[]; anchorTurn?: number }) {
   const tailOwner = owner && official ? { ...owner, openFile: official.officialPreviewFile, readerProducedPaths: produced } : undefined;
-  return official && tailOwner ? <div data-reader-official-tail style={{ display: 'contents' }}>
+  return official && tailOwner ? <div data-reader-official-tail {...turnTailAnchorProps(anchorTurn)} style={{ display: 'contents' }}>
     {official.renderSlot(OFFICIAL_SEATS.tail, tailOwner)}
   </div> : null;
 }

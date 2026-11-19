@@ -1,6 +1,6 @@
 # Extension points
 
-Two seams. Both are display-only. Neither one writes the session, the transcript, or the fold input.
+Two seams and one DOM anchor. All are display-only. None of them writes the session, the transcript, or the fold input.
 
 ## `dsh-better-display.text-transform`
 
@@ -206,3 +206,26 @@ interface ReaderBlockOwner {
 Selectors stay pure. Logging the owner from a selector is a temporary check, not the contract.
 
 Replacing the chain drops the reader fallback for that block, including the text transform above. A translation plugin that wants the reader's motion should use the text-transform service and leave this chain alone.
+
+## Turn anchor: `[data-turn-tail]`
+
+The host's chat view wraps each completed turn's `conversation.chat.turnTail` entries in `<div data-turn-tail="N">` (`TurnTailNodeView`, the same on 0.2.1 and 0.2.2). The reading view renders that slot too, and its wrapper carries the same attribute, so a plugin that finds a turn with `document.querySelector('[data-turn-tail="N"]')` works in both views (#88).
+
+| | Host chat view | Reading view |
+| --- | --- | --- |
+| Element | `<div class="…root" data-turn-tail="N" data-actions-reveal="…">` | `<div data-reader-official-tail data-turn-tail="N" style="display: contents">` |
+| `N` | `data.turn` of the turn's `turn-tail` node, from its `turn/end` | Same field, and only when it equals the turn the reading view groups the rows under |
+| Inside | `turnTail` entries, then the answer actions | `turnTail` entries. The answer actions are elsewhere in the reading view. |
+| When | The turn has closed. With no final answer, only when an entry renders | The turn has closed and has a `turn-tail` node, whether or not an entry renders |
+
+Rules a plugin can rely on:
+
+- At most one element per turn number in a reading view. A turn the view splits around another row still gets one anchor, on the part that holds the tail.
+- A turn that is still running has no anchor. It appears in the same commit as the closed turn's tail.
+- A folded turn keeps its anchor. The tail sits outside the process fold.
+- Rows with no turn (a command between turns, for example) have no anchor.
+- A turn that a rewind removes loses its anchor at once, while it is still collapsing, so a later turn with the same number is the only match.
+- The reading wrapper is `display: contents`. It has no box, so `getBoundingClientRect()` on it returns zeros. Measure a child, or insert your own element as a child; that child lays out in the turn's column.
+- `data-actions-reveal` and the host CSS class are not mirrored. The first styles the host's answer action row, which is not inside this wrapper; the second is a hashed CSS-module name and was never a contract.
+
+Prefer registering on `conversation.chat.turnTail` when you can. The entry renders in both views with the turn in its owner props, and you do not need the DOM lookup at all. `[data-reader-turn]` on the turn section is a Reader implementation detail and its value is not promised; use `[data-turn-tail]`.

@@ -88,7 +88,7 @@ Register during plugin apply, before the reading view paints. A transformer regi
 
 ## Host DOM hooks
 
-Reader replaces ChatView's message list, not the native conversation chrome. The enclosing `[data-conversation-scroll]` and sticky `[data-composer-seat]` stay host-owned. ChatView marks its column with `data-chat-flow=""`. Third-party skins (maid-atelier, phoebe-atelier, and others) treat a scrollport without that hook as inspect-only and hide the composer. Reader keeps the same empty `data-chat-flow` attribute on its column so those skins still see an interactive conversation. Turns stay on `[data-reader-turn]`; Reader does not emit native `[data-chat-flow-kind]` rows.
+Reader replaces ChatView's message list, not the native conversation chrome. The enclosing `[data-conversation-scroll]` and sticky `[data-composer-seat]` stay host-owned. ChatView marks its column with `data-chat-flow=""`. Third-party skins (maid-atelier, phoebe-atelier, and others) treat a scrollport without that hook as inspect-only and hide the composer. Reader keeps the same empty `data-chat-flow` attribute on its column so those skins still see an interactive conversation. Turns stay on `[data-reader-turn]`; Reader does not emit native `[data-chat-flow-kind]` rows. Each closed turn's tail wrapper carries the host anchor `data-turn-tail="N"` (see [docs/extension-points.md](docs/extension-points.md#turn-anchor-data-turn-tail)).
 
 ## Fold choreography contract (2026-09-16)
 
