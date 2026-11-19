@@ -16,23 +16,35 @@ const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as {
   peerDependencies: Record<string, string>;
 };
 
-const HARNESS_PEER = '>=0.2.1-rc.1 <0.2.2';
+// Two Harness lines are supported: 0.2.1 (rc.1 onward, including stable 0.2.1) and
+// 0.2.2 from rc.5 (including stable 0.2.2). The `-0` bounds keep 0.2.2-rc.1..rc.4
+// and every 0.2.3 prerelease out. The Host's installer evaluates `engines.dsh`
+// with `includePrerelease: true` (packages/boot/app-boot/src/plugin-compatibility.ts),
+// so the assertions run under both npm's and the Host's semver semantics.
+const HARNESS_PEER = '>=0.2.1-rc.1 <0.2.2-0 || >=0.2.2-rc.5 <0.2.3-0';
 
-test('Harness 0.2.1 peer range accepts rc.5 and rejects the 0.2.0 series', () => {
+const ACCEPTED = ['0.2.1-rc.1', '0.2.1-rc.5', '0.2.1', '0.2.2-rc.5', '0.2.2-rc.6', '0.2.2'];
+const REJECTED = ['0.2.1-alpha.1', '0.2.0-rc.2', '0.2.0', '0.1.7-rc.2', '0.2.2-alpha.3', '0.2.2-rc.1', '0.2.2-rc.4', '0.2.3-rc.1', '0.2.3'];
+
+test('Harness peer range accepts the 0.2.1 line and 0.2.2 from rc.5, under npm and Host semver', () => {
   const peers = Object.entries(pkg.peerDependencies).filter(([name]) => name.startsWith('@deepseek-ai/dsh-'));
   assert.ok(peers.length >= 12);
-  for (const [name, range] of peers) {
-    assert.equal(range, HARNESS_PEER, name);
-    assert.equal(semver.satisfies('0.2.1-rc.5', range), true, name);
-    assert.equal(semver.satisfies('0.2.1-rc.1', range), true, name);
-    assert.equal(semver.satisfies('0.2.1', range), true, name);
-    assert.equal(semver.satisfies('0.2.1-alpha.1', range), false, name);
-    assert.equal(semver.satisfies('0.2.0-rc.2', range), false, name);
-    assert.equal(semver.satisfies('0.2.0', range), false, name);
-    assert.equal(semver.satisfies('0.1.7-rc.2', range), false, name);
-  }
   const manifest = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as { engines?: { dsh?: string } };
-  assert.equal(manifest.engines?.dsh, HARNESS_PEER);
+  const ranges: [string, string | undefined][] = [...peers, ['engines.dsh', manifest.engines?.dsh]];
+  for (const [name, range] of ranges) {
+    assert.equal(range, HARNESS_PEER, name);
+    for (const includePrerelease of [false, true]) {
+      for (const version of ACCEPTED) assert.equal(semver.satisfies(version, range!, { includePrerelease }), true, `${name} ${version}`);
+      for (const version of REJECTED) assert.equal(semver.satisfies(version, range!, { includePrerelease }), false, `${name} ${version}`);
+    }
+  }
+});
+
+test('cordis peer accepts the cordis line of both Harness lines', () => {
+  const range = pkg.peerDependencies['@deepseek-ai/cordis']!;
+  // 0.2.1-rc.5 packages peer on ~4.0.5; 0.2.2-rc.5 packages peer on ~4.1.0.
+  for (const version of ['4.0.4', '4.0.5', '4.1.0', '4.1.3']) assert.equal(semver.satisfies(version, range), true, version);
+  for (const version of ['4.2.0', '5.0.0', '4.0.3']) assert.equal(semver.satisfies(version, range), false, version);
 });
 
 test('declares dsh.bundle.patch so official add joins the profile layer stack', () => {
