@@ -19,7 +19,7 @@ import { basename, createProducedFileMentions, dirname, getTurnDeliverables, sho
 import { deliverableOpenModeOf, type DeliverableOpenMode } from './open-file.js';
 import { asReadonlyArray, pendingSubmissionImages, type PendingSubmissionEcho } from './pending-submission.js';
 import { WaitingStatus } from './WaitingStatus.js';
-import { handsBackToModel, waitingAnchor } from './waiting-clock.js';
+import { awaitingModel, waitingAnchor } from './waiting-clock.js';
 import { ContextInjectionRow } from './native/ContextInjectionRow.js';
 import { TimelineRail } from './TimelineRail.js';
 import { landTurn, scrollerOf } from './conversation-scroll.js';
@@ -661,7 +661,7 @@ export function Reader(props: ReaderProps) {
     rows.push(...local.values());
     return rows;
   }, [inboxSteering, pendingList, visibleSubmissions]);
-  const waitAnchor = waitingAnchor(renderKeys, key => nodes.get(key), pendingList);
+  const waitAnchor = waitingAnchor(renderKeys, key => nodes.get(key), pendingList, running === true);
   const motionPreference = props.useStore(state => state.motion);
   const motion = useMotionAllowed(motionPreference);
   const prefsSnap = useSyncExternalStore(
@@ -683,36 +683,14 @@ export function Reader(props: ReaderProps) {
   const streamMotion = useMemo(() => ({ enabled: motion, activatedAt: activatedAt.current }), [motion]);
   const groups = useMemo(() => groupNodes(renderKeys, key => nodes.get(key)), [renderKeys, nodes, timeline]);
   const isAwaitingModel = useMemo(() => {
-    // 状态机铁律：「深度求索中」与「正在处理/思考」永远互斥。
-    // 1. 仅空闲发送（!running）的本地回显窗口：用户按下回车第 0 毫秒立即反馈。
-    //    忙碌时的 queued/steering 回显不算等待——模型本来就在工作。
-    if (!running && pendingList.length > 0) return true;
-
-    const lastKey = renderKeys.at(-1);
-    const lastNode = lastKey ? nodes.get(lastKey) : undefined;
-    if (!lastKey || !lastNode) return false;
-
-    // 2. 模型已经产出内容：等待结束，计时器必须立刻消失。
-    //    「产出」= assistant-step 已带 block（正文/思维链/工具调用都算）。
-    if (lastNode.kind === 'assistant-step') {
-      const data = lastNode.data as { status?: string; blocks?: unknown[] };
-      const blocks = data.blocks ?? [];
-      // 空 block 且仍在跑 = 请求已发出、模型还没吐字，正是要计时的那一刻。
-      return blocks.length === 0 && data.status === 'running';
-    }
-
-    // 3. 球在模型脚下：用户刚发言，或工具已返回、上下文已注入、命令已执行。
-    //    这些时刻模型随时可能卡住，正是要计时的地方；工具执行期间不计时，
-    //    因为那时忙的是工具而不是模型。
-    //    handsBackToModel 内部按 chat 层 kind 判定，并区分「工具已返回」与
-    //    「工具仍在跑」——后者不算等待。
-    const modelOwesResponse = handsBackToModel(lastNode);
-    if (!modelOwesResponse) return false;
-
-    // 轮次已结束就没什么可等的。
     const lastGroup = groups.at(-1);
-    const turn = lastGroup?.turn === null || lastGroup?.turn === undefined ? undefined : timeline.turns.get(lastGroup.turn);
-    return turn?.status !== 'closed';
+    return awaitingModel({
+      running: running === true,
+      pending: pendingList,
+      order: renderKeys,
+      get: key => nodes.get(key),
+      lastTurnStatus: lastGroup?.turn === null || lastGroup?.turn === undefined ? undefined : timeline.turns.get(lastGroup.turn)?.status,
+    });
   }, [running, pendingList, renderKeys, nodes, groups, timeline]);
   const scroll = useReadingScroll(root, motion);
   const pinnedKeys = usePinnedSelection(root);
