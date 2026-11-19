@@ -1,6 +1,26 @@
 # 官方能力接入说明
 
-`0.3.0` 在阅读布局上接入官方内容和控件。当前验收目标是 Harness `0.2.1-rc.5`（`dsh-v0.2.1-rc.5`，`b830ec950faba0a46dda564be3e2d854afed94f1`）。`conversation.chat.turnTail` 仍是 `list`。`conversation.message.images` 已拆成 `conversation.chat.message.images` 与 `conversation.chat.user.images`，Reader 分别镜像这两条 single/session 槽。`ChatNodeOwnerProps` 不再带 `openSkill` / `renderMessageImages`；`conversation.chat.node` 的 `hookContext` 需要 `useGroupAction`。`schedule-created` 和 `schedule_update` 继续走已有镜像座位，Reader 不另写这两张卡片。图标仍使用 `*Regular` 名称。开发者消息里的工具增减行用官方标题和计数，本地 Markdown 图片接受 Desktop 文件路由 `dsh-app://app/api/file`。阅读页自己呈现模型重试和进行中的过程行，所以这两处官方视图变化不改阅读布局。后续仍需维护的自有展示逻辑和升级边界见下文。
+`0.3.0` 在阅读布局上接入官方内容和控件。当前验收目标是 Harness `0.2.2-rc.5`（`dsh-v0.2.2-rc.5`，`9c2670d3bce5275e0d1610272958121af87787bb`），0.2.1 线仍受支持；0.2.2 的变化见下文「Harness 0.2.2 适配」。以下是 `0.2.1-rc.5` 时的接入要点：`conversation.chat.turnTail` 仍是 `list`。`conversation.message.images` 已拆成 `conversation.chat.message.images` 与 `conversation.chat.user.images`，Reader 分别镜像这两条 single/session 槽。`ChatNodeOwnerProps` 不再带 `openSkill` / `renderMessageImages`；`conversation.chat.node` 的 `hookContext` 需要 `useGroupAction`。`schedule-created` 和 `schedule_update` 继续走已有镜像座位，Reader 不另写这两张卡片。图标仍使用 `*Regular` 名称。开发者消息里的工具增减行用官方标题和计数，本地 Markdown 图片接受 Desktop 文件路由 `dsh-app://app/api/file`。阅读页自己呈现模型重试和进行中的过程行，所以这两处官方视图变化不改阅读布局。后续仍需维护的自有展示逻辑和升级边界见下文。
+
+## Harness 0.2.2 适配
+
+`0.4.0` 以 `0.2.2-rc.5` 重新记录兼容基线。逐个读过的变化和处理方式：
+
+| 上游变化 | 处理 |
+| --- | --- |
+| `session.readAttachment` 从 attachment id 改为完整 `ImageAttachmentRef` | `image-source.ts` 先按引用形式调用，失败再用 id 形式，并记住宿主接受的那种（#95）。两种形式都有测试。 |
+| `ChatNodeOwnerProps` 去掉 `fileMentions`，改由 `assistant-step` 注册自己注入 `fileMentions(owner, getFileTriggerProps)` | Reader 不再把 `fileMentions` 当 owner prop 传给镜像节点。owner prop 在注入之后展开，留着会遮住渲染器注入的同名函数。owner 构造集中在 `chat-node-owner.ts`。 |
+| `user` 注册声明 chain 子座位 `conversation.chat.user.before`；`steering` 共用组件并注入空的 `renderSlotChain` | 由通用镜像接住：子座位改名为 `dsh-better-display.official.nodes/conversation.chat.user.before`，selector、priority、inject 原样保留。浏览器 fixture 验证 Reader 用户行和宿主行渲染同样的来源装饰。 |
+| ui-slots 新增 `hoc` 槽类型 | Reader 用到的十个宿主槽的 kind/scope 都没变。镜像条目若声明 hoc 子座位，层的 `id`、`key`、`order` 原样保留（有单测）。 |
+| 原地替换已登记条目的 `component`（如 dsh-rewind 0.21+ 装饰用户行） | keyed 镜像在下一次账本通知时发现组件身份变化，就释放并重建该格（#96）。list/chain 仍只跟登记顺序。 |
+| 新工具 `apply_patch`、`meta.stopped` | 工具行 fork 把 `apply_patch` 归为编辑行，按补丁头列出文件；`stopped: true` 记为失败。`meta.diffs` 本来就读。 |
+| Markdown：`singleTilde: false`、Windows 路径目标保留反斜杠、文件路由图片带 `load` 参数 | 已移植到 Reader 的 fork，见 `src/client/markdown/upstream.json`。 |
+| Markdown：`sanitizeUrl` 从白名单改黑名单；fence 委托（`conversation.chat.markdown.fence` hoc 层，diff/patch/math）；右键菜单、拖拽、`omitHtml`、复制为 TeX | 未移植。Reader 保留更严的链接白名单；fence 仍走原生 CodeBlock，阅读页里的 ```diff 不显示官方的差异行。 |
+| `ChatViewInjected`（`consumeOlder`、`dispatchInteraction`、text-interaction 槽等） | Reader 不消费 ChatView 的注入。`loadOlder()` 不带参数时仍立即发布，行为不变。 |
+| `Deliverables` 用 `useContextMenu` | 官方组件经官方渲染器运行，由标准 kit 提供，无需改动。 |
+| 新增注册：`team` 命令视图，`apply_patch`、`office_*`、`schedule_view/edit`、`subagent_fork` 工具视图 | 通过既有 keyed 镜像自动进入阅读页。 |
+| 插件安装器按含预发布的语义检查 `engines.dsh`（`@deepseek-ai/dsh-*` peer 仅在没有 `engines.dsh` 时检查） | 区间用 `-0` 上界，npm 与宿主两种语义结果一致；测试分别在两种语义下检查。`@deepseek-ai/cordis` peer 接受 `~4.1.0`。 |
+| `tools/dshx` 从 Harness 移除 | 构建用仓库内的 `tools/client-build.js`；其 `__ModuleLoader__.load({ id, factory })` 交接和平台模块表与 0.2.2 一致。`link-harness-dependencies.mjs` 的检出判断改为 `packages/client/ui-slots`。 |
 
 ## 一个具体例子
 

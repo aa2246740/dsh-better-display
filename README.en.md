@@ -12,7 +12,7 @@ Open **Settings → Plugins → Add plugin** and enter this in “Package name o
 github:aa2246740/dsh-better-display#v0.3.12
 ```
 
-The desktop plugin manager owns the Desktop profile and its bundled package manager. `v0.3.12` is the latest tagged install target whose manifest accepts Harness `0.2.1-rc.5`. This tag includes built `lib/`; normal use needs no clone, build, or DSHX installation. Follow the app if it asks you to reload or reopen after installation.
+The desktop plugin manager owns the Desktop profile and its bundled package manager. `v0.3.12` is the latest tagged install target and targets Harness `0.2.1-rc.5`. The Host checks `engines.dsh` with prereleases included, so it also installs on 0.2.2 RCs, but tool-result images fail to load there. Harness 0.2.2 support is in 0.4.0, which is not tagged yet; until then, install from a local checkout on 0.2.2 as shown below. This tag includes built `lib/`; normal use needs no clone, build, or DSHX installation. Follow the app if it asks you to reload or reopen after installation.
 
 ### Web CLI
 
@@ -28,7 +28,7 @@ Another plugin can rewrite reasoning and answer text for display only, for examp
 
 A ````mcp-app` fence in the final answer mounts as an interactive card in the reading view, inside `<iframe sandbox="allow-scripts allow-forms">` without `allow-same-origin`. The card can fill the next prompt via JSON-RPC. The skill pack is [`skills/generative-mcpapps/`](skills/generative-mcpapps/). Settings → **Better Display** can preview deliverables in the right Sidebar (system app remains the default), turn on translucent frosted glass (off by default), toggle process auto-folding (On is the default), and reports whether that skill is installed in a harness skill root.
 
-Targets DeepSeek Harness **0.2.1-rc.5** (`dsh-v0.2.1-rc.5`, `b830ec950faba0a46dda564be3e2d854afed94f1`). Display only. It does not change Agent execution, the SDK, or credentials. Node.js `^22.19.0 || >=24`. New sessions default to reading. The `@deepseek-ai/dsh-*` peer range and `engines.dsh` are `>=0.2.1-rc.1 <0.2.2`: they accept `0.2.1-rc.5` and stable `0.2.1`, reject `0.2.1` alphas, and reject the `0.2.0` series.
+Targets DeepSeek Harness **0.2.2-rc.5** (`dsh-v0.2.2-rc.5`, `9c2670d3bce5275e0d1610272958121af87787bb`) and keeps supporting the 0.2.1 line. Display only. It does not change Agent execution, the SDK, or credentials. Node.js `^22.19.0 || >=24`. New sessions default to reading. The `@deepseek-ai/dsh-*` peer range and `engines.dsh` are `>=0.2.1-rc.1 <0.2.2-0 || >=0.2.2-rc.5 <0.2.3-0`: they accept the 0.2.1 line from `0.2.1-rc.1` (stable `0.2.1` included) and the 0.2.2 line from `0.2.2-rc.5` (stable `0.2.2` included), and reject the untested `0.2.2-rc.1`–`rc.4`, `0.2.3` and its prereleases, `0.2.1` alphas, and the `0.2.0` series. Differences between the two lines, such as the `session.readAttachment` argument, are handled at runtime.
 
 **0.3.0** keeps the existing reading layout, folding, and motion while using official feedback, tool details, file cards, and file links. It also fixes process content staying expanded after auto-folding is re-enabled. See the [official integration notes](docs/official-rendering-bridge.md) for coverage and upgrade checks.
 
@@ -36,7 +36,7 @@ From a local checkout or tarball (development/local testing):
 
 ```sh
 dsh plugin --profile web add ./dsh-better-display
-dsh plugin --profile web add ./dsh-better-display-0.3.12.tgz
+dsh plugin --profile web add ./dsh-better-display-0.4.0.tgz
 ```
 
 `dsh.bundle` is captured at Host boot. Do not also insert the same row by hand in the profile `cordis.patch.yml`, or it will mount twice.
