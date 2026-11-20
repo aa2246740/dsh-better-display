@@ -76,6 +76,7 @@
 - Accept Harness `0.2.0-rc.1` (`dsh-v0.2.0-rc.1`, `4878cdabd87d4041bdaff61d04c966883b9fd07a`). Peer range is `>=0.2.0-rc.1 <0.2.1`. That range accepts `0.2.0-rc.1` and stable `0.2.0`, rejects `0.2.0` alphas, and rejects `0.1.7-rc.2`.
 - `conversation.chat.turnTail` stays a list slot. Icon imports stay on the `*Regular` names. Official registrations are unchanged from `0.1.7-rc.2`.
 - Stock chat `MessageItem` wraps an active model-retry line in `TextShimmer`, and `TurnProcessNodeView` renders only after the turn closes. Reader already owns those rows, so the reading layout is unchanged. `compat/harness-rc2.json` is re-recorded against this tag after that review.
+- A same-version follow-up also built against Harness `0.2.0-rc.2` (`639ed015397290b3745d163aafe02ffee4aa3f84`) on macOS arm64. It reviewed scoped-slot ancestor memoization, user-question panel types, and turn-duration rendering; official slot composition and automatic-fold fixtures passed. That pass did not claim Windows or Linux. Later ranges reject `0.2.0-rc.2`.
 
 ## 0.3.3 — 2026-09-24
 
