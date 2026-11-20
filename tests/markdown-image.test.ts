@@ -81,7 +81,7 @@ test('a relative image path resolves against the Session workspace', () => {
   assert.notEqual(element.type, UnavailableImage);
   assert.equal(
     (element.props as { src: string }).src,
-    'http://127.0.0.1:43127/api/file?path=C%3A%5Crepo%5Cshots%5Cplan.png'
+    'http://127.0.0.1:43127/api/file?path=C%3A%5Crepo%5Cshots%2Fplan.png'
   );
 });
 
@@ -127,7 +127,7 @@ test('the resolver itself never rewrites a remote or data destination', () => {
   assert.equal(resolveImagePath(String.raw`C:\repo`, 'data:image/png;base64,AA'), undefined);
   assert.equal(
     resolveImagePath(String.raw`C:\repo`, 'shots/a.png'),
-    String.raw`C:\repo\shots\a.png`
+    String.raw`C:\repo\shots/a.png`
   );
 });
 
