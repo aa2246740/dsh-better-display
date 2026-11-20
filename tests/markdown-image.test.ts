@@ -35,6 +35,7 @@ type MarkdownPathImages = import('../src/client/markdown/render.js').MarkdownPat
 type MarkdownRenderContext = import('../src/client/markdown/render.js').MarkdownRenderContext;
 type MarkdownFileMentions = import('../src/client/markdown/render.js').MarkdownFileMentions;
 const { readerPathImagesFor, resolveImagePath } = await import('../src/client/platform-media.js');
+const { localFilePath } = await import('../src/client/markdown/local-path.js');
 
 /**
  * A local path the resolver cannot turn into a URL must still occupy the
@@ -543,20 +544,21 @@ test('an inline-code file mention keeps the original chip shape', () => {
   assert.notEqual(button, undefined, 'the button is present');
 });
 
-test('a produced file opens in the right-hand panel, as the original view does', () => {
-  // `openFile` follows the reader's deliverable-open preference and can hand the file to
-  // an external editor. The original view always opens the right-hand panel, so the
-  // mention resolver must use that route, not the preference-driven one.
+test('inline-code mentions come only from the Host vocabulary', () => {
+  // The reader used to add a resolver over the turn's deliverables, which included files
+  // inferred from write/edit calls. That made a plain token like `path-box.tsx` a
+  // clickable chip merely because this turn had created the file — the over-match the
+  // reader reported. Only the Host's rule decides now, which is the original view's rule.
   const reader = readFileSync(resolve(root, 'src/client/Reader.tsx'), 'utf8');
   assert.match(
     reader,
-    /createProducedFileMentions\(deliverables, props\.officialPreviewFile\)/u,
-    'mentions open through the panel, not through the preference'
+    /props\.officialFileMentions\(tailOwner\)/u,
+    'the Host vocabulary is the source'
   );
   assert.doesNotMatch(
     reader,
-    /createProducedFileMentions\(deliverables, props\.openFile\)/u,
-    'the external-editor route must not be used for mentions'
+    /createProducedFileMentions/u,
+    'no reader-side resolver over the deliverables'
   );
 });
 
@@ -841,6 +843,160 @@ test('a picture reference in a list item still takes its own line', () => {
   const rendered = renderParagraph([pictureLink]);
   assert.equal(blockInInline(rendered), undefined);
   assert.notEqual(pictureSrc(rendered), undefined);
+});
+
+test('a file chip carries the destination in its tooltip, with no block beneath it', () => {
+  // The reader asked for the name only: the destination belongs in the tooltip, not in a
+  // block that pushes the sentence apart.
+  const target = String.raw`G:\BE72PRO\router-backup\immortalwrt-sysupgrade.bin`;
+  const rendered = renderFileLink('sysupgrade.bin', target, resolveWith(String.raw`C:\repo`));
+  const flat = rendered.flatMap(node => (Array.isArray(node) ? node : [node]));
+  const button = findElementTag(flat, 'button');
+  assert.notEqual(button, undefined, 'the chip is there');
+  // With a mention the title comes from it; either way it names the file.
+  const title = String((button!.props as { title?: string }).title ?? '');
+  assert.match(title, /immortalwrt-sysupgrade\.bin/u, 'the tooltip names the file');
+  // Nothing was added under the sentence.
+  assert.equal(containsComponentNamed(rendered, 'PathBox'), false, 'no path block');
+});
+
+test('a path with no vocabulary still gets a chip', () => {
+  // This is the case that shipped broken: the file is not in the turn's deliverables, so
+  // `fileMentions.resolve` returns undefined. The chip must appear anyway.
+  const target = String.raw`G:\BE72PRO\PY803\router-backup\x\sysupgrade.bin`;
+  const blocks = [
+    {
+      key: 0,
+      node: {
+        type: 'paragraph',
+        children: [
+          { type: 'text', value: '记住固件位置：' },
+          {
+            type: 'link',
+            url: target,
+            children: [{ type: 'text', value: 'immortalwrt-…-sysupgrade.bin' }],
+            position: { start: { offset: 0 }, end: { offset: 5 } }
+          }
+        ],
+        position: { start: { offset: 0 }, end: { offset: 10 } }
+      }
+    }
+  ] as unknown as Parameters<typeof renderBlocks>[0];
+  const rendered = renderBlocks(blocks, {
+    ...context(resolveWith(String.raw`C:\repo`)),
+    fileMentions: undefined
+  });
+  const flat = rendered.flatMap(node => (Array.isArray(node) ? node : [node]));
+  const tags = flat.flatMap(node => renderedTags(node));
+  assert.equal(tags.includes('button'), true, 'the chip renders without the vocabulary');
+  assert.equal(containsComponentNamed(rendered, 'FileGlyph'), true, 'and its icon with it');
+});
+
+test('the host decides a link is a file from the path, not from a deliverables list', () => {
+  // The reader's real sentence linked to `G:\…\sysupgrade.bin`, a file the answer only
+  // mentions. The file vocabulary knows nothing about it, so the link rendered as a plain
+  // anchor: no chip, no icon, no path box. The Host's own renderer decides from the
+  // destination alone, which is what `localFilePath` reproduces.
+  assert.equal(
+    localFilePath(String.raw`G:\BE72PRO\PY803\router-backup\x\sysupgrade.bin`),
+    String.raw`G:\BE72PRO\PY803\router-backup\x\sysupgrade.bin`
+  );
+  assert.equal(localFilePath('docs/openapi.yaml'), 'docs/openapi.yaml');
+  // A URL stays a link.
+  assert.equal(localFilePath('https://example.com/a.png'), undefined);
+  assert.equal(localFilePath('mailto:a@b.c'), undefined);
+  // A line suffix is not part of the path; a UNC share is.
+  assert.equal(localFilePath('C:\\x\\y.png:12'), 'C:\\x\\y.png');
+  assert.equal(localFilePath(String.raw`\\host\share\a.bin`), String.raw`\\host\share\a.bin`);
+});
+
+test('a path with no vocabulary still gets a chip and its path box', () => {
+  // This is the case that shipped broken: the file is not in the turn's deliverables, so
+  // `fileMentions.resolve` returns undefined. The chip and box must appear anyway.
+  const target = String.raw`G:\BE72PRO\PY803\router-backup\x\sysupgrade.bin`;
+  const blocks = [
+    {
+      key: 0,
+      node: {
+        type: 'paragraph',
+        children: [
+          { type: 'text', value: '记住固件位置：' },
+          {
+            type: 'link',
+            url: target,
+            children: [{ type: 'text', value: 'immortalwrt-…-sysupgrade.bin' }],
+            position: { start: { offset: 0 }, end: { offset: 5 } }
+          }
+        ],
+        position: { start: { offset: 0 }, end: { offset: 10 } }
+      }
+    }
+  ] as unknown as Parameters<typeof renderBlocks>[0];
+  const rendered = renderBlocks(blocks, {
+    ...context(resolveWith(String.raw`C:\repo`)),
+    fileMentions: undefined
+  });
+  const flat = rendered.flatMap(node => (Array.isArray(node) ? node : [node]));
+  const tags = flat.flatMap(node => renderedTags(node));
+  assert.equal(tags.includes('button'), true, 'the chip renders without the vocabulary');
+  assert.equal(containsComponentNamed(rendered, 'FileGlyph'), true, 'and its icon');
+});
+
+test('a URL link to a non-picture stays a plain anchor', () => {
+  // The other side of the same rule: a URL that names no picture is not a file, so it
+  // keeps its anchor and gains nothing.
+  const rendered = renderLink('docs', 'https://example.com/docs', resolveWith(String.raw`C:\repo`));
+  const flat = rendered.flatMap(node => (Array.isArray(node) ? node : [node]));
+  assert.equal(containsComponentNamed(rendered, 'PathBox'), false, 'no path box for a URL');
+  assert.equal(findElementTag(flat, 'button'), undefined, 'no chip for a URL');
+});
+
+test('a bare file name stays code even when the vocabulary would match it', () => {
+  // The case that shipped broken. The Host's vocabulary resolves a bare name, so this
+  // turn writing `deliverables.ts` made every mention of it a chip. The original view
+  // leaves it as code: a sentence naming a file in passing is not offering a link.
+  //
+  // All four combinations matter — with and without a vocabulary, bare name and full
+  // path — and an earlier round only covered two of them, which is how the bug survived.
+  const bare = 'deliverables.ts';
+  const full = 'src/client/deliverables.ts';
+  const vocabulary = (matchAs: string) => ({
+    resolve: (value: string) =>
+      value === matchAs ? { label: `打开 ${matchAs}`, title: full, open: () => {} } : undefined
+  });
+
+  const cases: { name: string; token: string; mentions: unknown; chip: boolean }[] = [
+    // No vocabulary: nothing resolves, so no chip either way.
+    { name: 'bare, no vocabulary', token: bare, mentions: undefined, chip: false },
+    { name: 'path, no vocabulary', token: full, mentions: undefined, chip: false },
+    // With a vocabulary that matches the bare name: still just code.
+    { name: 'bare, vocabulary matches', token: bare, mentions: vocabulary(bare), chip: false },
+    // With a vocabulary that matches the full path: a chip, because the token is a path.
+    { name: 'path, vocabulary matches', token: full, mentions: vocabulary(full), chip: true }
+  ];
+
+  for (const testCase of cases) {
+    const blocks = [
+      {
+        key: 0,
+        node: {
+          type: 'paragraph',
+          children: [
+            { type: 'text', value: '见 ' },
+            { type: 'inlineCode', value: testCase.token, position: { start: { offset: 0 }, end: { offset: 5 } } }
+          ],
+          position: { start: { offset: 0 }, end: { offset: 9 } }
+        }
+      }
+    ] as unknown as Parameters<typeof renderBlocks>[0];
+    const rendered = renderBlocks(blocks, {
+      ...context(resolveWith(String.raw`C:\repo`)),
+      fileMentions: testCase.mentions as never
+    });
+    const flat = rendered.flatMap(node => (Array.isArray(node) ? node : [node]));
+    const chip = findElementTag(flat, 'button') !== undefined;
+    assert.equal(chip, testCase.chip, `${testCase.name}: chip=${String(testCase.chip)}`);
+  }
 });
 
 test('the failed state keeps the same visible placeholder', () => {

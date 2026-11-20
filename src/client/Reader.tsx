@@ -14,7 +14,7 @@ import { preparingLabel, readerFlow } from './tool-activity.js';
 import { Disclosure, ProcessFragment, RetiringTurns, StatusText, useMotionAllowed, usePinnedSelection, useReadingScroll } from './motion.js';
 import { StreamMotionContext } from './streaming.js';
 import { boundaryOf, forkAnchorSeq, groupNodes, hasProcessContent, processChoiceKey, processExpanded, terminalLabel } from './projection.js';
-import { basename, createProducedFileMentions, dirname, getTurnDeliverables, showDeliverablesRow } from './deliverables.js';
+import { basename, dirname, getTurnDeliverables, showDeliverablesRow } from './deliverables.js';
 import { deliverableOpenModeOf, type DeliverableOpenMode } from './open-file.js';
 import { asReadonlyArray, pendingSubmissionImages, type PendingSubmissionEcho } from './pending-submission.js';
 import { WaitingStatus } from './WaitingStatus.js';
@@ -536,17 +536,15 @@ const TurnGroup = memo(function TurnGroup({ group, motion, autoFold, pinnedKeys,
   const tailOwner = useMemo(() => turn && tailData ? {
     turn, seq: tailData.closing?.finalNode.seq ?? tailData.seq, openFile: props.openFile,
   } : undefined, [turn, tailData, props.openFile]);
-  const fileMentions = useMemo(() => {
-    const official = tailOwner ? props.officialFileMentions(tailOwner) : undefined;
-    // A produced file opens in the right-hand panel, which is what the original view
-    // does. `props.openFile` follows the reader's deliverable-open preference and can
-    // hand the file to an external editor instead, so it is the wrong route here.
-    const reader =
-      deliverables.length > 0
-        ? createProducedFileMentions(deliverables, props.officialPreviewFile)
-        : undefined;
-    return official || reader ? { resolve: (value: string) => official?.resolve(value) ?? reader?.resolve(value) } : undefined;
-  }, [tailOwner, props.officialFileMentions, deliverables, props.officialPreviewFile]);
+  // Only the Host's vocabulary decides what an inline-code token names. The reader used
+  // to add its own resolver over the turn's deliverables, which included files inferred
+  // from write/edit calls — so a plain token like `path-box.tsx` became a clickable chip
+  // merely because this turn had created that file. The Host's rule is the original view's
+  // rule, and it does not over-match.
+  const fileMentions = useMemo(
+    () => (tailOwner === undefined ? undefined : props.officialFileMentions(tailOwner)),
+    [tailOwner, props.officialFileMentions]
+  );
   const official = useMemo(() => ({
     renderSlot: props.renderSlot, renderSlotChain: props.renderSlotChain,
     officialImageLoader: props.officialImageLoader, officialFileMentions: props.officialFileMentions,

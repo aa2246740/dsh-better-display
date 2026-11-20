@@ -1,20 +1,4 @@
-/**
- * Where a picture reference's picture goes.
- *
- * The same decision is made for a link and for an inline-code mention, and it depends on
- * the context the reference appears in:
- *
- *  - prose — the name on one line, the picture on the next;
- *  - a heading — the heading emits the picture below itself, so nothing is added here;
- *  - `strong` / `em` / `del` / an anchor — inline only, because a block box there is
- *    invalid nesting and the browser hoists it out of the paragraph.
- *
- * Getting this wrong is what split headings in two, and would have done the same to bold
- * text. Keeping the rule in one place stops the two call sites drifting apart.
- *
- * @module
- */
-import type { ReactNode } from 'react';
+import type { Key, ReactNode } from 'react';
 /** The sheet's classes for the three picture placements. */
 export declare const SHOT_CLASSES: ShotClasses;
 /** How a picture should be placed relative to its reference. */
@@ -52,7 +36,7 @@ export declare function shotClassFor(placement: ShotPlacement, classes: ShotClas
  * @param props - the chip, the picture, the context and the sheet's classes.
  * @returns the nodes to render.
  */
-export declare function ChipWithPicture({ chip, picture, context, classes }: {
+export declare function ChipWithPicture({ chip, picture, context, classes, nodeKey }: {
     chip: ReactNode;
     picture: ReactNode | undefined;
     context: {
@@ -60,5 +44,7 @@ export declare function ChipWithPicture({ chip, picture, context, classes }: {
         readonly inInlineOnly?: boolean;
     };
     classes: ShotClasses;
+    /** Applied to the fragments, so a list of references keeps stable keys. */
+    nodeKey?: Key;
 }): ReactNode;
 //# sourceMappingURL=picture-placement.d.ts.map

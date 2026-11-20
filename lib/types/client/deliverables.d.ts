@@ -1,5 +1,4 @@
 import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
-import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { ReaderFlowEntry } from './tool-activity.js';
 /** Extract standard filename without directory components. */
 export declare function basename(path: string): string;
@@ -16,9 +15,4 @@ export declare function showDeliverablesRow(status: 'open' | 'closed' | 'unknown
  * inspecting successful write/edit tool invocations in the turn flow.
  */
 export declare function getTurnDeliverables(turn: TurnLocation | undefined, flow?: readonly ReaderFlowEntry[]): readonly string[];
-/**
- * File-mention resolver: converts inline-code tokens matching produced paths
- * into clickable file references that open the corresponding file on the host.
- */
-export declare function createProducedFileMentions(paths: readonly string[], openFile: (path: string) => void): MarkdownFileMentions;
 //# sourceMappingURL=deliverables.d.ts.map

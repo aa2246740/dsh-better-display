@@ -1,5 +1,4 @@
 import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client';
-import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { ReaderFlowEntry } from './tool-activity.js';
 import { inputFields, stringValue, toolIdentity } from './tool-activity.js';
 
@@ -31,8 +30,11 @@ export function dirname(path: string): string {
  * The produced-files chip row waits for turn close. Live writes still
  * accumulate, but the row must not interrupt an in-progress process.
  */
-export function showDeliverablesRow(status: 'open' | 'closed' | 'unknown', paths: readonly string[]): boolean {
-  return status === 'closed' && paths.length > 0
+export function showDeliverablesRow(
+  status: 'open' | 'closed' | 'unknown',
+  paths: readonly string[]
+): boolean {
+  return status === 'closed' && paths.length > 0;
 }
 
 /**
@@ -40,12 +42,17 @@ export function showDeliverablesRow(status: 'open' | 'closed' | 'unknown', paths
  * Respects official deliverables data when available, and falls back to
  * inspecting successful write/edit tool invocations in the turn flow.
  */
-export function getTurnDeliverables(turn: TurnLocation | undefined, flow?: readonly ReaderFlowEntry[]): readonly string[] {
+export function getTurnDeliverables(
+  turn: TurnLocation | undefined,
+  flow?: readonly ReaderFlowEntry[]
+): readonly string[] {
   const paths: string[] = [];
   const seen = new Set<string>();
 
   // 1. Check official deliverables turn data from @deepseek-ai/dsh-client-ui-deliverables
-  const deliverables = (turn?.data as { get(key: string): unknown } | undefined)?.get('deliverables') as DeliverablesData | undefined;
+  const deliverables = (turn?.data as { get(key: string): unknown } | undefined)?.get(
+    'deliverables'
+  ) as DeliverablesData | undefined;
   if (deliverables?.produced && Array.isArray(deliverables.produced)) {
     for (const item of deliverables.produced) {
       if (typeof item?.path === 'string' && item.path.trim().length > 0) {
@@ -67,8 +74,16 @@ export function getTurnDeliverables(turn: TurnLocation | undefined, flow?: reado
       // Skip failed tool results
       if ('isError' in item.block && item.block.isError) continue;
       const { name, raw } = toolIdentity(item);
-      const toolName = name !== '工具调用' ? name : ((item.block as unknown as { name?: string }).name || (item.block as unknown as { call?: { name?: string } }).call?.name);
-      const toolRaw = raw || ((item.block as unknown as { argsRaw?: string }).argsRaw || (item.block as unknown as { call?: { argsRaw?: string } }).call?.argsRaw || '');
+      const toolName =
+        name !== '工具调用'
+          ? name
+          : (item.block as unknown as { name?: string }).name ||
+            (item.block as unknown as { call?: { name?: string } }).call?.name;
+      const toolRaw =
+        raw ||
+        (item.block as unknown as { argsRaw?: string }).argsRaw ||
+        (item.block as unknown as { call?: { argsRaw?: string } }).call?.argsRaw ||
+        '';
       if (toolName === 'write' || toolName === 'edit' || toolName === 'apply_patch') {
         const args = inputFields(toolRaw);
         const target = stringValue(args, 'file_path', 'path', 'filename', 'filePath');
@@ -91,33 +106,4 @@ export function getTurnDeliverables(turn: TurnLocation | undefined, flow?: reado
   }
 
   return paths;
-}
-
-/** The single produced path whose basename is exactly value, or undefined. */
-function onlyPathWithBasename(paths: readonly string[], value: string): string | undefined {
-  const matches = paths.filter(path => basename(path) === value);
-  return matches.length === 1 ? matches[0] : undefined;
-}
-
-/**
- * File-mention resolver: converts inline-code tokens matching produced paths
- * into clickable file references that open the corresponding file on the host.
- */
-export function createProducedFileMentions(
-  paths: readonly string[],
-  openFile: (path: string) => void,
-): MarkdownFileMentions {
-  return {
-    resolve(value: string) {
-      if (!value || value.includes('\n')) return undefined;
-      const clean = value.trim();
-      const path = paths.includes(clean) ? clean : onlyPathWithBasename(paths, clean);
-      if (path === undefined) return undefined;
-      return {
-        open: () => { openFile(path); },
-        label: `打开 ${path}`,
-        title: path,
-      };
-    },
-  };
 }

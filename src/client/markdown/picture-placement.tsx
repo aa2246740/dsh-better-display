@@ -14,7 +14,8 @@
  *
  * @module
  */
-import type { ReactNode } from 'react';
+import { Fragment } from 'react';
+import type { Key, ReactNode } from 'react';
 import css from './MarkdownText.module.css';
 
 /** The sheet's classes for the three picture placements. */
@@ -77,27 +78,30 @@ export function ChipWithPicture({
   chip,
   picture,
   context,
-  classes
+  classes,
+  nodeKey
 }: {
   chip: ReactNode;
   picture: ReactNode | undefined;
   context: { readonly inHeading?: boolean; readonly inInlineOnly?: boolean };
   classes: ShotClasses;
+  /** Applied to the fragments, so a list of references keeps stable keys. */
+  nodeKey?: Key;
 }): ReactNode {
   const placement = shotPlacementOf(context);
   if (picture === undefined || placement === 'none') return chip;
   const shot = <span className={shotClassFor(placement, classes)}>{picture}</span>;
   if (placement === 'inline')
     return (
-      <>
+      <Fragment key={nodeKey}>
         {chip}
         {shot}
-      </>
+      </Fragment>
     );
   return (
-    <>
+    <Fragment key={nodeKey}>
       <span className={classes.line}>{chip}</span>
       {shot}
-    </>
+    </Fragment>
   );
 }
