@@ -118,5 +118,23 @@ export async function readImageAttachment(
       mediaType: value.attachment?.mediaType ?? attachment.mediaType ?? 'application/octet-stream'
     };
   }
-  throw new Error(`Unable to read the session image (${failures.join('; ')})`);
+  throw new Error(`无法读取会话图片（${failures.join('; ')}）`);
+}
+
+/**
+ * Blob for an image block. The read above already copied the Host bytes, so
+ * this must not copy them again.
+ * @param data - bytes from {@link readImageAttachment}.
+ * @param mediaType - blob type.
+ * @returns a blob of exactly those bytes.
+ */
+export function imageBlob(data: Uint8Array, mediaType: string): Blob {
+  const end = data.byteOffset + data.byteLength;
+  // An exact buffer is the copy readImageAttachment already made. A view has
+  // to be sliced so the blob does not include the bytes around it.
+  const bytes =
+    data.byteOffset === 0 && end === data.buffer.byteLength
+      ? data.buffer
+      : data.buffer.slice(data.byteOffset, end);
+  return new Blob([bytes as ArrayBuffer], { type: mediaType });
 }
