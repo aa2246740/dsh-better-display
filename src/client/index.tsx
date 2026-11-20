@@ -34,6 +34,15 @@ interface SidebarRightFace {
   openResource?: (address: string, options?: { params?: { line?: number } }) => void;
 }
 
+/** `forClosing` as both Harness lines can be called: the third argument is 0.2.2-only. */
+interface FileMentionClosing {
+  forClosing: (
+    owner: Parameters<ReaderInjected['officialFileMentions']>[0],
+    sessionId: SessionId,
+    getFileTriggerProps?: (path: string) => unknown,
+  ) => ReturnType<ReaderInjected['officialFileMentions']>;
+}
+
 const officialFileAddressFor = (workspacePathPkg as {
   fileAddressFor?: typeof fileAddressFor;
 }).fileAddressFor;
@@ -101,7 +110,8 @@ export function apply(ctx: Context): void {
           (attachment: ImageAttachmentRef) => ctx.uiConversation.imageUrl(sessionId, attachment),
           { peek: (attachment: ImageAttachmentRef) => ctx.uiConversation.peekImageUrl(sessionId, attachment) },
         ),
-        officialFileMentions: owner => ctx.get('chatFileMentions')?.forClosing(owner, sessionId),
+        officialFileMentions: (owner, getFileTriggerProps) =>
+          (ctx.get('chatFileMentions') as FileMentionClosing | undefined)?.forClosing(owner, sessionId, getFileTriggerProps),
         officialPreviewFile: path => {
           const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd;
           const sidebar = ctx.get('sidebarRight') as SidebarRightFace | undefined;

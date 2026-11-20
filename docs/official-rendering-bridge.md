@@ -9,7 +9,7 @@
 | 上游变化 | 处理 |
 | --- | --- |
 | `session.readAttachment` 从 attachment id 改为完整 `ImageAttachmentRef` | `image-source.ts` 先按引用形式调用，失败再用 id 形式，并记住宿主接受的那种（#95）。两种形式都有测试。 |
-| `ChatNodeOwnerProps` 去掉 `fileMentions`，改由 `assistant-step` 注册自己注入 `fileMentions(owner, getFileTriggerProps)` | Reader 不再把 `fileMentions` 当 owner prop 传给镜像节点。owner prop 在注入之后展开，留着会遮住渲染器注入的同名函数。owner 构造集中在 `chat-node-owner.ts`。 |
+| `ChatNodeOwnerProps` 去掉 `fileMentions`，改由 `assistant-step` 注册自己注入 `fileMentions(owner, getFileTriggerProps)` | Reader 不镜像官方 priority 0 的 assistant-step，所以那条 inject 不会被 owner 盖住。0.2.1 的 `ChatNodeOwnerProps.fileMentions` 仍是必填，owner 继续提供它，并把可选的第二个参数转给 `forClosing`，0.2.2 的文件菜单因此还在。owner 构造集中在 `chat-node-owner.ts`。 |
 | `user` 注册声明 chain 子座位 `conversation.chat.user.before`；`steering` 共用组件并注入空的 `renderSlotChain` | 由通用镜像接住：子座位改名为 `dsh-better-display.official.nodes/conversation.chat.user.before`，selector、priority、inject 原样保留。浏览器 fixture 验证 Reader 用户行和宿主行渲染同样的来源装饰。 |
 | ui-slots 新增 `hoc` 槽类型 | Reader 用到的十个宿主槽的 kind/scope 都没变。镜像条目若声明 hoc 子座位，层的 `id`、`key`、`order` 原样保留（有单测）。 |
 | 原地替换已登记条目的 `component`（如 dsh-rewind 0.21+ 装饰用户行） | keyed 镜像在下一次账本通知时发现组件身份变化，就释放并重建该格（#96）。list/chain 仍只跟登记顺序。 |
