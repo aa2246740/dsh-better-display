@@ -1,6 +1,7 @@
 /**
- * Harness 0.2.2 contract points that the Reader adapter depends on.
- * Each test names the upstream change it pins.
+ * Harness contract points that the Reader adapter depends on.
+ * A test whose title starts with `guard:` also passes against the 0.2.1 line.
+ * The others name a 0.2.2 change.
  */
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
@@ -39,9 +40,10 @@ function registry() {
   return { core, slots, register };
 }
 
-// ui-chat 0.2.2: the `user` registration declares the `conversation.chat.user.before`
-// chain seat; `steering` shares the component and injects a null renderSlotChain.
-test('user.before chain seat is mirrored with its selectors, and steering keeps its inject', () => {
+// Guard. `user` declaring `conversation.chat.user.before`, and `steering`
+// injecting a null chain, are true on 0.2.1 as well as 0.2.2. This keeps the
+// mirror from dropping the seat; it is not evidence that only 0.2.2 was checked.
+test('guard: user.before chain seat stays mirrored with its selectors, and steering keeps its inject', () => {
   const { core, slots, register } = registry();
   const UserView = memo(() => null);
   const steeringInject = () => ({ renderSlotChain: () => null });
@@ -82,9 +84,10 @@ test('user.before chain seat is mirrored with its selectors, and steering keeps 
   assert.equal(core.entriesOfSlot('conversation.chat.user.before').length, 1);
 });
 
-// ui-slots 0.2.2 adds the `hoc` kind. A mirrored entry that declares a hoc child
-// keeps each layer's id, dispatch key and nesting order.
-test('a hoc child seat mirrors layer id, key and order', () => {
+// Guard. Mirroring a hoc child keeps each layer's id, key and order. The same
+// mirror behaviour holds on the 0.2.1 line; 0.2.2 is just where hoc was added
+// to the slot kinds the host itself registers.
+test('guard: a hoc child seat mirrors layer id, key and order', () => {
   const { core, slots, register } = registry();
   register(
     { name: 'source', key: 'command', children: { fence: { kind: 'hoc', scope: 'session' } } },
