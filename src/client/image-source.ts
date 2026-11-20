@@ -52,6 +52,20 @@ export function resetAttachmentForm(): void {
   preferred = 'reference';
 }
 
+/**
+ * Bind a session lookup to an image loader. The returned function is async so
+ * a closed session rejects the promise. A synchronous throw inside ImageBlock's
+ * effect would hit the block boundary, skip the image retry state, and leave
+ * the 20s timer set.
+ * @param session - returns the live session, or throws when that session is gone.
+ * @returns the loader the Reader passes to image blocks.
+ */
+export function sessionImageLoader(
+  session: () => AttachmentReader
+): (attachment: AttachmentRefLike) => Promise<ResolvedImage> {
+  return async attachment => readImageAttachment(session(), attachment);
+}
+
 /** Which call shape the next read tries first. */
 export function preferredAttachmentForm(): Form {
   return preferred;

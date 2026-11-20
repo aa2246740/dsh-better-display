@@ -4,6 +4,7 @@ import {
   preferredAttachmentForm,
   readImageAttachment,
   resetAttachmentForm,
+  sessionImageLoader,
   type AttachmentReceipt
 } from '../src/client/image-source.js';
 
@@ -26,6 +27,22 @@ function receipt(argument: unknown): AttachmentReceipt {
         error: { code: 'session/attachment-invalid', message: 'Invalid attachment reference' }
       };
 }
+
+test('a closed session rejects the image load instead of throwing into the effect', async () => {
+  const loadImage = sessionImageLoader(() => {
+    throw new Error('阅读页对应的会话已关闭。');
+  });
+  let thrown: unknown;
+  let pending: Promise<unknown> | undefined;
+  try {
+    pending = loadImage(REF);
+  } catch (error) {
+    thrown = error;
+  }
+  assert.equal(thrown, undefined);
+  assert.ok(pending instanceof Promise);
+  await assert.rejects(pending, /阅读页对应的会话已关闭/);
+});
 
 test('0.2.2 Hosts read the complete reference, which is what the plugin tries first', async () => {
   resetAttachmentForm();
