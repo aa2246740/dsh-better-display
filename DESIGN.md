@@ -34,7 +34,7 @@ While a turn is still open, a later reasoning step may collapse each earlier rea
 
 ## Long reasoning
 
-A neutral card bounds the transcript without replacing it. The viewport mask is 28px. Follow advances by two actual line heights every 840ms, with a 500ms transform using `cubic-bezier(.22,1,.36,1)`; clamp only at the current real end. Never accelerate through a burst, clone the transcript or loop old text.
+A neutral card bounds the transcript without replacing it. The viewport mask is 28px. At a reading pace, follow advances by two actual line heights and then holds 840ms, using a 500ms transform with `cubic-bezier(.22,1,.36,1)`, and clamps at the current real end. When more than two lines are unpainted, one step covers that backlog up to 40 lines and the next step waits 40ms. Do not clone the transcript or loop old text.
 
 Expanding changes viewport size and preserves position and follow state. Wheel, touch, viewport focus or selection pause following. The explicit follow control resumes only when no text is selected. Completed history stays static. The full source text remains available.
 
@@ -90,7 +90,7 @@ Register during plugin apply, before the reading view paints. A transformer regi
 
 ## Host DOM hooks
 
-Reader replaces ChatView's message list, not the native conversation chrome. The enclosing `[data-conversation-scroll]` and sticky `[data-composer-seat]` stay host-owned. ChatView marks its column with `data-chat-flow=""`. Third-party skins (maid-atelier, phoebe-atelier, and others) treat a scrollport without that hook as inspect-only and hide the composer. Reader keeps the same empty `data-chat-flow` attribute on its column so those skins still see an interactive conversation. Turns stay on `[data-reader-turn]`; Reader does not emit native `[data-chat-flow-kind]` rows. Each closed turn's tail wrapper carries the host anchor `data-turn-tail="N"` (see [docs/extension-points.md](docs/extension-points.md#turn-anchor-data-turn-tail)).
+Reader replaces ChatView's message list, not the native conversation chrome. The enclosing `[data-conversation-scroll]` and sticky `[data-composer-seat]` stay host-owned. ChatView marks its column with `data-chat-flow=""`. Third-party skins (maid-atelier, phoebe-atelier, and others) treat a scrollport without that hook as inspect-only and hide the composer. Reader keeps the same empty `data-chat-flow` attribute on its column so those skins still see an interactive conversation. Turns stay on `[data-reader-turn]`. User and steering rows also emit the host seat, including `[data-chat-flow-kind]`. Each closed turn's tail wrapper carries the host anchor `data-turn-tail="N"` (see [docs/extension-points.md](docs/extension-points.md#turn-anchor-data-turn-tail)).
 
 ## Fold choreography contract (2026-09-16)
 

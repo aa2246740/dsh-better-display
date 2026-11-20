@@ -6,73 +6,13 @@ import { createRequire } from 'node:module';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { inflateSync } from 'node:zlib';
 import { test } from 'vitest';
+import { pngPixel } from './png-pixel.js';
 
 const browserRuntime = join(homedir(), '.codex/playwright-runtime/runtime.mjs');
 const skip = existsSync(browserRuntime) ? false : 'pinned Chromium runtime not available';
 const root = resolve(import.meta.dirname, '..');
 const shots = '/tmp/issue-66-sticky-lanes';
-
-function paeth(left: number, up: number, upLeft: number) {
-  const estimate = left + up - upLeft;
-  const leftDistance = Math.abs(estimate - left);
-  const upDistance = Math.abs(estimate - up);
-  const diagonal = Math.abs(estimate - upLeft);
-  if (leftDistance <= upDistance && leftDistance <= diagonal) return left;
-  if (upDistance <= diagonal) return up;
-  return upLeft;
-}
-
-function pngPixel(buffer: Buffer, x: number, y: number) {
-  let offset = 8;
-  const chunks: Buffer[] = [];
-  let width = 0;
-  let height = 0;
-  let colorType = 0;
-  while (offset < buffer.length) {
-    const length = buffer.readUInt32BE(offset);
-    const type = buffer.toString('ascii', offset + 4, offset + 8);
-    const data = buffer.subarray(offset + 8, offset + 8 + length);
-    if (type === 'IHDR') {
-      width = data.readUInt32BE(0);
-      height = data.readUInt32BE(4);
-      colorType = data[9] ?? 0;
-    } else if (type === 'IDAT') chunks.push(data);
-    else if (type === 'IEND') break;
-    offset += 12 + length;
-  }
-  const bytesPerPixel = colorType === 6 ? 4 : 3;
-  const raw = inflateSync(Buffer.concat(chunks));
-  const stride = width * bytesPerPixel;
-  let source = 0;
-  let previous = Buffer.alloc(stride);
-  const rows: Buffer[] = [];
-  for (let rowIndex = 0; rowIndex < height; rowIndex += 1) {
-    const filter = raw[source] ?? 0;
-    source += 1;
-    const row = Buffer.alloc(stride);
-    for (let index = 0; index < stride; index += 1) {
-      const value = raw[source] ?? 0;
-      source += 1;
-      const left = index >= bytesPerPixel ? row[index - bytesPerPixel] ?? 0 : 0;
-      const up = previous[index] ?? 0;
-      const upLeft = index >= bytesPerPixel ? previous[index - bytesPerPixel] ?? 0 : 0;
-      let decoded = value;
-      if (filter === 1) decoded = value + left;
-      else if (filter === 2) decoded = value + up;
-      else if (filter === 3) decoded = value + Math.floor((left + up) / 2);
-      else if (filter === 4) decoded = value + paeth(left, up, upLeft);
-      else if (filter !== 0) throw new Error(`unsupported png filter ${filter}`);
-      row[index] = decoded & 255;
-    }
-    rows.push(row);
-    previous = row;
-  }
-  const pixel = rows[y];
-  const start = x * bytesPerPixel;
-  return [pixel?.[start] ?? 0, pixel?.[start + 1] ?? 0, pixel?.[start + 2] ?? 0];
-}
 
 function dist(a: number[], b: number[]) {
   return Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!);

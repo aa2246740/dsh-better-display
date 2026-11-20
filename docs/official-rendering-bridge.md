@@ -36,7 +36,7 @@
 | `OfficialContent.tsx`            | 将回答身份、工具、节点和产物上下文传给官方控件。这里只组合，不处理业务请求。                                                        |
 | `Reader.tsx`、`ToolActivity.tsx` | 原有阅读布局、过程组织、摘要和交互。工具详情里的控件采用官方形式。                                                                  |
 | `platform-media.ts`              | RC2 的本地媒体 URL 约定；读取授权仍由 Host 文件 API 负责。                                                                          |
-| `compat/harness-rc2.json`        | 已验收的官方接口、被自有展示覆盖的实现和注册清单基线。                                                                              |
+| `compat/harness.json`            | 已验收的官方接口、被自有展示覆盖的实现和注册清单基线。版本只写在 `harnessVersion`。                                                  |
 
 ## 为什么有插槽映射
 
@@ -76,7 +76,7 @@ npm run test:auto-fold
 
 `test:official` 使用测试目标里的真实官方 SlotRegistry、React renderer、反馈插件、ReadRow 和 Deliverables，只有远程业务服务使用内存替身。测试私有源码仅用于验证，不进入交付 bundle。浏览器验证使用本机固定的 Codex Playwright runtime，不附着用户会话。
 
-CI 的 `verify` 只克隆 `dsh-v0.2.2-rc.5`，跑单元测试、覆盖率和兼容构建。它不跑 `browser-runtime`，也不跑 `test:official`：runner 上没有这套固定 Chromium，再准备一棵装好依赖的 Harness 也放不进 10 分钟的作业。2026-11-20 在本机跑过：`browser-runtime`（3 个测试，用户/steering 镜像）在 0.2.1-rc.5 和 0.2.2-rc.5 都通过。`test:official` 两条线都没有通过。0.2.2 的夹具在官方 `MessageFeedbackActions`（`props.useAccess is not a function`）和 `ReadRow`（`args.complete`）里崩溃，随后等不到「好的回答」。0.2.1 的打包解析不到已安装 store 包旁边的 `zustand` 和 `immer`。没有在真实 Host 会话里点过阅读页。
+CI 的 `verify` 从 `compat/harness.json` 的 `harnessVersion` 拼出 `dsh-v` 标签再克隆（当前是 `dsh-v0.2.2-rc.5`），跑单元测试、覆盖率和兼容构建。它不跑 `browser-runtime`，也不跑 `test:official`：runner 上没有这套固定 Chromium，再准备一棵装好依赖的 Harness 也放不进 10 分钟的作业。2026-11-20 在本机跑过：`browser-runtime`（3 个测试，用户/steering 镜像）在 0.2.1-rc.5 和 0.2.2-rc.5 都通过。`test:official` 两条线都没有通过。0.2.2 的夹具在官方 `MessageFeedbackActions`（`props.useAccess is not a function`）和 `ReadRow`（`args.complete`）里崩溃，随后等不到「好的回答」。0.2.1 的打包解析不到已安装 store 包旁边的 `zustand` 和 `immer`。没有在真实 Host 会话里点过阅读页。
 
 `test:auto-fold` 使用真实 Reader 和独立的全局、会话 store，验证关闭后阅读再开启、此前步骤、设置同步、文本选择及连续切换；分别覆盖普通动画和减少动态效果。
 
