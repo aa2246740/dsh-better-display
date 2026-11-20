@@ -7,6 +7,7 @@ import { ComposerFillContext, McpAppFrame } from './McpAppFrame.js';
 import { formatMessageClock } from './message-chrome.js';
 import { markdownLabels, truncatedJsonLabel } from './primitive-labels.js';
 import type { BlockRenderProps, ReaderBlockOwner } from './types.js';
+import { imageBlob } from './image-source.js';
 import { useStreamingText } from './streaming.js';
 import { MotionMarkdown, MotionPlainText } from './word-motion.js';
 import { activeTextTransform, displayStreaming, originalAnswerText, readerBlockOwner, useDisplayText } from './text-transform.js';
@@ -53,8 +54,7 @@ export const ImageBlock = memo(function ImageBlock({ attachment, loadImage }: {
       if (!active) return;
       clearTimeout(timeout);
       if (!IMAGE_TYPES.has(result.mediaType)) throw new Error(`不支持的图片类型：${result.mediaType}`);
-      const bytes = Uint8Array.from(result.data);
-      owned = URL.createObjectURL(new Blob([bytes.buffer], { type: result.mediaType }));
+      owned = URL.createObjectURL(imageBlob(result.data, result.mediaType));
       setUrl(owned);
     }).catch((reason: unknown) => {
       clearTimeout(timeout);

@@ -1,9 +1,12 @@
+import { readFileSync } from 'node:fs';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
+  imageBlob,
   preferredAttachmentForm,
   readImageAttachment,
   resetAttachmentForm,
+  sessionImageLoader,
   type AttachmentReceipt
 } from '../src/client/image-source.js';
 
@@ -26,6 +29,44 @@ function receipt(argument: unknown): AttachmentReceipt {
         error: { code: 'session/attachment-invalid', message: 'Invalid attachment reference' }
       };
 }
+
+test('an image block uses the host bytes without copying them again', () => {
+  const source = Uint8Array.of(9, 8, 7, 6);
+  const view = source.subarray(1, 3);
+  const copy = Uint8Array.from;
+  let copies = 0;
+  Uint8Array.from = ((...args: Parameters<typeof Uint8Array.from>) => {
+    copies += 1;
+    return copy(...(args as [ArrayLike<number>]));
+  }) as typeof Uint8Array.from;
+  try {
+    const blob = imageBlob(view, 'image/png');
+    assert.equal(copies, 0);
+    assert.equal(blob.size, 2);
+    assert.equal(blob.type, 'image/png');
+  } finally {
+    Uint8Array.from = copy;
+  }
+  const blocks = readFileSync(new URL('../src/client/Blocks.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(blocks, /Uint8Array\.from\(result\.data\)/);
+  assert.match(blocks, /imageBlob\(result\.data, result\.mediaType\)/);
+});
+
+test('a closed session rejects the image load instead of throwing into the effect', async () => {
+  const loadImage = sessionImageLoader(() => {
+    throw new Error('阅读页对应的会话已关闭。');
+  });
+  let thrown: unknown;
+  let pending: Promise<unknown> | undefined;
+  try {
+    pending = loadImage(REF);
+  } catch (error) {
+    thrown = error;
+  }
+  assert.equal(thrown, undefined);
+  assert.ok(pending instanceof Promise);
+  await assert.rejects(pending, /阅读页对应的会话已关闭/);
+});
 
 test('0.2.2 Hosts read the complete reference, which is what the plugin tries first', async () => {
   resetAttachmentForm();
@@ -104,7 +145,7 @@ test('a read that fails in both forms names every reason instead of staying sile
       },
       REF
     ),
-    /Unable to read the session image \(reference: session\/attachment-invalid: gone; id: session\/attachment-invalid: gone\)/u
+    /无法读取会话图片（reference: session\/attachment-invalid: gone; id: session\/attachment-invalid: gone）/u
   );
   // A rejected read teaches nothing: the preferred form is unchanged.
   assert.equal(preferredAttachmentForm(), 'reference');

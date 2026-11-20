@@ -9,7 +9,7 @@
 // The block union's defining home is runtime (fold-product types); this
 // contract only forwards it (type-definition authority stays with the layer
 // that produces the values).
-import { abbreviateHomePath } from '@deepseek-ai/dsh-util-workspace-path'
+import { abbreviateHomePath, isAbsoluteWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
 import { patchSummary, patchTargets, stoppedFromMeta } from './patch-targets.js'
 // Top-level fields of complete or still-streaming argument JSON.
 import { inputFields, stringValue } from '../tool-activity.js'
@@ -190,6 +190,19 @@ const FILE_PATH_KEYS = ['path', 'file_path'] as const
 /** File-tool variants whose summary may be an openable workspace path. */
 const FILE_PATH_VARIANTS: ReadonlySet<ToolRowVariant> = new Set(['read', 'write', 'edit'])
 
+/**
+ * Whether one apply_patch file may be a link. Upstream links an absolute path
+ * at every stage, and a relative path only after a successful top-level call.
+ * A failed call or a still-running relative path would point at a file that
+ * may not exist.
+ */
+function openablePatchPath(path: string | undefined, block: ToolCallBlock): string | undefined {
+  if (path === undefined) return undefined
+  if (isAbsoluteWorkspacePath(path)) return path
+  if (!('kind' in block) || block.isError || block.parentCallId !== undefined) return undefined
+  return path
+}
+
 function deriveFilePath(variant: ToolRowVariant, argsRaw: string): string | undefined {
   if (!FILE_PATH_VARIANTS.has(variant)) return undefined
   const parsed = parseArgs(argsRaw)
@@ -198,7 +211,9 @@ function deriveFilePath(variant: ToolRowVariant, argsRaw: string): string | unde
   return picked === undefined ? undefined : firstLine(picked)
 }
 
-function deriveBody(variant: ToolRowVariant, argsRaw: string): string | null {
+function deriveBody(toolName: string, variant: ToolRowVariant, argsRaw: string): string | null {
+  // The official apply_patch row shows the diff, not the JSON-escaped patch text.
+  if (toolName === 'apply_patch') return null
   if (argsRaw === '') return null
   const parsed = parseArgs(argsRaw)
   if (parsed === undefined) return argsRaw
@@ -251,9 +266,11 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
     summary,
     // Only a lone added or updated file without a move links the whole summary.
     filePath: patch !== undefined
-      ? patch.length === 1 && patch[0]!.kind !== 'delete' && patch[0]!.from === undefined ? patch[0]!.path : undefined
+      ? patch.length === 1 && patch[0]!.kind !== 'delete' && patch[0]!.from === undefined
+        ? openablePatchPath(patch[0]!.path, block)
+        : undefined
       : deriveFilePath(variant, argsRaw),
-    body: deriveBody(variant, argsRaw),
+    body: deriveBody(toolName, variant, argsRaw),
     output,
     errorSummary,
     state,

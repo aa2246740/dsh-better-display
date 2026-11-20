@@ -9,7 +9,7 @@
 | 上游变化 | 处理 |
 | --- | --- |
 | `session.readAttachment` 从 attachment id 改为完整 `ImageAttachmentRef` | `image-source.ts` 先按引用形式调用，失败再用 id 形式，并记住宿主接受的那种（#95）。两种形式都有测试。 |
-| `ChatNodeOwnerProps` 去掉 `fileMentions`，改由 `assistant-step` 注册自己注入 `fileMentions(owner, getFileTriggerProps)` | Reader 不再把 `fileMentions` 当 owner prop 传给镜像节点。owner prop 在注入之后展开，留着会遮住渲染器注入的同名函数。owner 构造集中在 `chat-node-owner.ts`。 |
+| `ChatNodeOwnerProps` 去掉 `fileMentions`，改由 `assistant-step` 注册自己注入 `fileMentions(owner, getFileTriggerProps)` | Reader 不镜像官方 priority 0 的 assistant-step，所以那条 inject 不会被 owner 盖住。0.2.1 的 `ChatNodeOwnerProps.fileMentions` 仍是必填，owner 继续提供它，并把可选的第二个参数转给 `forClosing`，0.2.2 的文件菜单因此还在。owner 构造集中在 `chat-node-owner.ts`。 |
 | `user` 注册声明 chain 子座位 `conversation.chat.user.before`；`steering` 共用组件并注入空的 `renderSlotChain` | 由通用镜像接住：子座位改名为 `dsh-better-display.official.nodes/conversation.chat.user.before`，selector、priority、inject 原样保留。浏览器 fixture 验证 Reader 用户行和宿主行渲染同样的来源装饰。 |
 | ui-slots 新增 `hoc` 槽类型 | Reader 用到的十个宿主槽的 kind/scope 都没变。镜像条目若声明 hoc 子座位，层的 `id`、`key`、`order` 原样保留（有单测）。 |
 | 原地替换已登记条目的 `component`（如 dsh-rewind 0.21+ 装饰用户行） | keyed 镜像在下一次账本通知时发现组件身份变化，就释放并重建该格（#96）。list/chain 仍只跟登记顺序。 |
@@ -55,7 +55,7 @@ RC2 的一个子插槽只能有一个声明者，只有声明它的组件能获�
 | 显式 `present` 产物          | 官方 turnTail 中的文件卡片和菜单，保留官方状态和打开操作。                                                                                                                                                            |
 | 已修改文件快捷操作           | 保持原 Reader 的复制、定位和打开模式；仅从 Reader 的官方 tail 展示参数中排除重复的 produced chips，不改变官方源数据。未知匹配结构原样呈现。                                                                           |
 | 文件行号和正文文件链接       | 保留工具传来的行号；正文优先采用官方 file-mention 服务，现有路径匹配作为补充。                                                                                                                                        |
-| 本地 Markdown 图片           | 和 RC2 相同的同源文件 API，加载失败保留替代文本，危险协议不直接渲染。                                                                                                                                                 |
+| 本地 Markdown 图片           | 和宿主 `fileMediaUrl` 一样的同源文件 API。UNC、设备路径、协议相对地址在解码后拒绝，拼到工作区之后再拒绝一次。加载失败保留替代文本，危险协议不直接渲染。                                                                |
 | 用户与 steering 消息         | 镜像 `conversation.chat.node` 的 keyed renderer，保留 `sessionId`、turn hook 和 Reader 跳转属性；未注册对应 key 时通过插槽 `fallback` 呈现 Reader 气泡。renderer 主动返回 `null` 时不补画气泡。                       |
 | 回答正文上的第三方替换渲染器 | 只镜像 priority 低于官方 `assistant-step`（priority 0）的注册。正文段交给该渲染器，`groupPart` 为 `response`，blocks 只有这一段。思考、折叠、动效和回答外框仍由 Reader 绘制。没有这类注册时正文仍走 Reader Markdown。 |
 | 命令、新节点类型             | 接入官方节点渲染及其子插槽；无可用渲染器时保留记录并提供“在对话中查看”。                                                                                                                                              |
@@ -75,6 +75,8 @@ npm run test:auto-fold
 ```
 
 `test:official` 使用测试目标里的真实官方 SlotRegistry、React renderer、反馈插件、ReadRow 和 Deliverables，只有远程业务服务使用内存替身。测试私有源码仅用于验证，不进入交付 bundle。浏览器验证使用本机固定的 Codex Playwright runtime，不附着用户会话。
+
+CI 的 `verify` 只克隆 `dsh-v0.2.2-rc.5`，跑单元测试、覆盖率和兼容构建。它不跑 `browser-runtime`，也不跑 `test:official`：runner 上没有这套固定 Chromium，再准备一棵装好依赖的 Harness 也放不进 10 分钟的作业。2026-11-20 在本机跑过：`browser-runtime`（3 个测试，用户/steering 镜像）在 0.2.1-rc.5 和 0.2.2-rc.5 都通过。`test:official` 两条线都没有通过。0.2.2 的夹具在官方 `MessageFeedbackActions`（`props.useAccess is not a function`）和 `ReadRow`（`args.complete`）里崩溃，随后等不到「好的回答」。0.2.1 的打包解析不到已安装 store 包旁边的 `zustand` 和 `immer`。没有在真实 Host 会话里点过阅读页。
 
 `test:auto-fold` 使用真实 Reader 和独立的全局、会话 store，验证关闭后阅读再开启、此前步骤、设置同步、文本选择及连续切换；分别覆盖普通动画和减少动态效果。
 

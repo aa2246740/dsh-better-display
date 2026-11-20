@@ -15,7 +15,7 @@ import { createReaderStore } from './store.js';
 import { installReaderEntry } from './entry.js';
 import { installBetterDisplaySettings } from './settings.js';
 import { fillComposerDom } from './mcp-app.js';
-import { readImageAttachment, type AttachmentReader } from './image-source.js';
+import { sessionImageLoader, type AttachmentReader } from './image-source.js';
 import { fileAddressFor, modeFromSnapshot, openDeliverableFile } from './open-file.js';
 import type { ReaderInjected } from './types.js';
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment';
@@ -32,6 +32,15 @@ interface ConversationFace {
 
 interface SidebarRightFace {
   openResource?: (address: string, options?: { params?: { line?: number } }) => void;
+}
+
+/** `forClosing` as both Harness lines can be called: the third argument is 0.2.2-only. */
+interface FileMentionClosing {
+  forClosing: (
+    owner: Parameters<ReaderInjected['officialFileMentions']>[0],
+    sessionId: SessionId,
+    getFileTriggerProps?: (path: string) => unknown,
+  ) => ReturnType<ReaderInjected['officialFileMentions']>;
 }
 
 const officialFileAddressFor = (workspacePathPkg as {
@@ -101,7 +110,8 @@ export function apply(ctx: Context): void {
           (attachment: ImageAttachmentRef) => ctx.uiConversation.imageUrl(sessionId, attachment),
           { peek: (attachment: ImageAttachmentRef) => ctx.uiConversation.peekImageUrl(sessionId, attachment) },
         ),
-        officialFileMentions: owner => ctx.get('chatFileMentions')?.forClosing(owner, sessionId),
+        officialFileMentions: (owner, getFileTriggerProps) =>
+          (ctx.get('chatFileMentions') as FileMentionClosing | undefined)?.forClosing(owner, sessionId, getFileTriggerProps),
         officialPreviewFile: path => {
           const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd;
           const sidebar = ctx.get('sidebarRight') as SidebarRightFace | undefined;
@@ -113,8 +123,7 @@ export function apply(ctx: Context): void {
           subscribe: listener => ctx.on('connection/reset', listener),
         },
         loadOlder: async () => { await session().loadOlder(); },
-        loadImage: attachment =>
-          readImageAttachment(session() as unknown as AttachmentReader, attachment),
+        loadImage: sessionImageLoader(() => session() as unknown as AttachmentReader),
         openFile: async (path, options) => {
           try {
             const cwd = ctx.sessions?.list?.getSnapshot?.()?.byId[sessionId]?.cwd;
