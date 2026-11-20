@@ -3,7 +3,10 @@ import { dirname, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 
 const root = resolve(process.argv[2] || process.env.DSH_REPO || '');
-if (!root || !existsSync(join(root, 'tools/dshx/src/client-build.js'))) throw new Error('Pass a prepared Harness checkout, or set DSH_REPO.');
+// Harness 0.2.2 removed tools/dshx, so check for a package tree present on both lines.
+if (!root || !existsSync(join(root, 'packages/client/ui-slots/package.json')) || !existsSync(join(root, 'node_modules'))) {
+  throw new Error('Pass a prepared (dependency-installed) Harness checkout, or set DSH_REPO.');
+}
 const local = resolve('node_modules');
 mkdirSync(local, { recursive: true });
 const shared = {

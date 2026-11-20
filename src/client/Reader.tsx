@@ -9,6 +9,7 @@ import { BlockBoundary, Blocks, contentBlocks, UserMessageActions } from './Bloc
 import { AssistantNode } from './AssistantNode.js';
 import { ToolActivity, ToolMedia } from './ToolActivity.js';
 import { OfficialNode, OfficialTail } from './OfficialContent.js';
+import { chatNodeOwner } from './chat-node-owner.js';
 import { OFFICIAL_SEATS, readerGroupAction } from './official-slots.js';
 import { preparingLabel, readerFlow } from './tool-activity.js';
 import { Disclosure, ProcessFragment, RetiringTurns, StatusText, useMotionAllowed, usePinnedSelection, useReadingScroll } from './motion.js';
@@ -195,15 +196,7 @@ const MainNode = memo(function MainNode({ useChat, nodeKey, boundary, pinned, pr
     let rendered: ReactNode = fallback;
     if (official) {
       const turn = node.location.kind === 'turn' || node.location.kind === 'step' ? node.location.turn : undefined;
-      const owner: ChatNodeOwnerProps & Pick<ReaderProps, 'sessionId'> = {
-        cwd: render.cwd,
-        openFile: render.openFile ?? (() => {}),
-        forkAt: render.forkAt ?? (() => {}),
-        inspectCall: callId => official.openView('trajectory', callId),
-        loadImage: official.officialImageLoader,
-        fileMentions: official.officialFileMentions,
-        sessionId: render.sessionId,
-      };
+      const owner: ChatNodeOwnerProps & Pick<ReaderProps, 'sessionId'> = { ...chatNodeOwner(render, official), sessionId: render.sessionId };
       const options = { hookContext: { turnData: turn?.data, disclosureReset, useGroupAction: readerGroupAction }, fallback };
       rendered = node.kind === 'user'
         ? official.renderSlot(OFFICIAL_SEATS.nodes, { ...owner, node }, { ...options, entryKey: 'user' })

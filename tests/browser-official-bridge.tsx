@@ -90,6 +90,9 @@ await ctx.plugin({ name: 'fixture-official-feedback', inject: ['slots', 'remote'
 slots.register({ name: 'tool.call.toolview', key: 'read', locale: 'conversation' }, ReadRow);
 readImageToolview.apply(ctx);
 slots.provideRoot({ hooks: { sessions: source({ byId: { 'session-a': { cwd: '/fixture' } } }) } });
+// Harness 0.2.2 Deliverables reads the global `useContextMenu` standard prop, which ui-context-menu
+// provides to every scope. A no-op binding keeps the fixture on both Harness lines.
+slots.provideRoot({ props: { useContextMenu: () => ({ getTriggerProps: () => ({}) }) } });
 const artifact = { path: '/fixture/report.pdf', description: '演示报告', seq: 42, index: 0 };
 const presentedOpen = source({});
 const presentedHost = source({ available: true, fileManager: 'finder' });

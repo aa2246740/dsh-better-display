@@ -27,6 +27,7 @@
     "micromark-factory-space",
     "micromark-util-character",
     "micromark-util-classify-character",
+    "micromark-util-decode-string",
     "micromark-util-sanitize-uri",
     "micromark-util-symbol"
   ]

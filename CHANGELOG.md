@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.0 — unreleased
+
+- **Support DeepSeek Harness 0.2.2.** Built against `0.2.2-rc.5` (`dsh-v0.2.2-rc.5`, `9c2670d3bce5275e0d1610272958121af87787bb`); the 0.2.1 line stays supported. The `@deepseek-ai/dsh-*` peers and `engines.dsh` are `>=0.2.1-rc.1 <0.2.2-0 || >=0.2.2-rc.5 <0.2.3-0`: the 0.2.1 line from rc.1 (stable `0.2.1` included) and the 0.2.2 line from rc.5 (stable `0.2.2` included). `0.2.2-rc.1`–`rc.4`, which were not tested, and `0.2.3` are rejected. The `-0` bounds make npm and the Host installer, which checks `engines.dsh` with prereleases included, give the same answer. The `@deepseek-ai/cordis` peer also accepts `~4.1.0`, which the 0.2.2 packages use. The compat baseline (`compat/harness-rc2.json`) is re-recorded on 0.2.2-rc.5 after reviewing every changed file. See [Harness 0.2.2 适配](docs/official-rendering-bridge.md#harness-022-适配).
+- Read durable images with both `session.readAttachment` contracts. 0.2.2 takes the complete `ImageAttachmentRef`, 0.2.1 takes the id. Reader tries the reference, falls back to the id, and remembers which one the Host accepted, so tool-result images load on both lines. A failed image shows the Host's reason. Thanks @hansomgar (#95).
+- Render Windows drive, UNC and workspace-relative image paths in answers, and keep an image that cannot be resolved visible with its authored path instead of dropping it to alt text. Thanks @hansomgar (#95, #94).
+- Follow a keyed official renderer whose component is replaced in place, as `dsh-rewind` 0.21+ does for user rows. The mirror re-registers that cell on the next ledger notification. List and chain cells keep the registration-only path. Thanks @SiriLee (#96).
+- Stop passing `fileMentions` as a chat-node owner prop. 0.2.2 moved it into the assistant renderer's own inject, and the owner prop would have shadowed it.
+- Show 0.2.2 `apply_patch` calls as file edits. The row names the files from the patch headers (`a.ts, old.ts → new.ts`), including while the arguments stream. A result with `meta.stopped: true` (a partly applied patch) is a failed step, as in the official row.
+- Port three 0.2.2 Markdown fixes into the Reader fork: a single `~` no longer strikes through (`10~20`); Windows-path link and image destinations keep their backslashes; a file-route image gets a per-mount `load` value, so a rewritten file does not show cached bytes. Adds `micromark-util-decode-string` as a direct dependency (already in the tree).
+- `scripts/link-harness-dependencies.mjs` accepts a 0.2.2 Harness tree, which no longer has `tools/dshx`.
+- CI and the publish workflow clone `dsh-v0.2.2-rc.5` for the compat check.
+- Dev dependencies: vitest and @vitest/coverage-v8 5.0.5 → 5.1.0 together (#91, #90), tsdown → 0.23.7 (#92), knip → 6.44.2 (#89). @types/node stays on 22 because engines.node still includes Node 22 (#85 declined).
+
 ## 0.3.12 — 2026-11-03
 
 - Bump KaTeX from 0.16.47 to 0.19.1 (`^0.19.1`, lockfile 0.19.1). Reader still renders with the host's KaTeX CSS and does not vendor private fonts (#78).

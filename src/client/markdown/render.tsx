@@ -31,6 +31,8 @@ import type { MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PositionedBlock } from './incremental.js'
 import css from './MarkdownText.module.css'
 
+export type { MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives'
+
 /** Copy-button labels forwarded to fence CodeBlocks (this package is cordis-free, so copy arrives via props). */
 export interface MarkdownCodeLabels {
   /** Copy-button idle label. */
@@ -529,18 +531,63 @@ function renderImage(url: string, alt: string, key: Key, context: MarkdownRender
     } catch { /* A vocabulary result must be an absolute URL. */ }
   }
   if (imageSrc === undefined) {
-    return <span key={key} className={css.imageAlt}>{alt}</span>
+    return <UnavailableImage key={key} alt={alt} destination={url} state="unresolved" />
   }
   return <MarkdownImage key={`${key}:${imageSrc}`} src={imageSrc} alt={alt} destination={url} />
 }
 
+/**
+ * A local image destination that resolved to no displayable URL, or an image
+ * that failed to decode. Both stay visible: a silently missing picture is
+ * indistinguishable from an answer that never had one, which is exactly the
+ * report this placeholder answers. The authored destination is shown so the
+ * path can be copied even when it cannot be rendered.
+ */
+export function UnavailableImage({ alt, destination, state }: { alt: string; destination: string; state: 'unresolved' | 'failed' }): ReactNode {
+  return (
+    <span className={css.imageUnavailable} data-markdown-image-unavailable={state} role="img" aria-label={alt || destination}>
+      <span className={css.imageUnavailableGlyph} aria-hidden="true">🖼</span>
+      <span className={css.imageUnavailableCopy}>
+        <span>{state === 'failed' ? '图片加载失败' : '此图片无法在阅读页显示'}</span>
+        {alt && <span className={css.imageUnavailableAlt}>{alt}</span>}
+        {destination && <code className={css.imageUnavailablePath}>{destination}</code>}
+      </span>
+    </span>
+  )
+}
+
+// Harness 0.2.2-rc.5 render.tsx, ported: a module counter, not useId. useId
+// derives from tree position, so images at the same position in two sessions
+// would share a URL.
+let imageLoads = 0
+const nextImageLoad = (): number => ++imageLoads
+
+/**
+ * Tag a Host file-route image URL with its mount's load number. Browsers reuse
+ * a same-URL image within one document despite `no-store`, so without the tag
+ * a newly rendered image of a rewritten file would show the earlier bytes.
+ * @param url - Absolute resolved image URL; URLs outside the `api/file` route stay unchanged.
+ * @param load - Number allocated once per mounted image.
+ * @returns The URL with a `load` query parameter, or the unchanged URL.
+ */
+export function freshImageUrl(url: string, load: number): string {
+  let fresh: URL
+  try { fresh = new URL(url) }
+  catch { return url }
+  if (!fresh.pathname.endsWith('/api/file')) return url
+  // Appending preserves the resolver's existing query encoding.
+  fresh.search = `${fresh.search === '' ? '?' : `${fresh.search}&`}load=${load}`
+  return fresh.href
+}
+
 function MarkdownImage({ src, alt, destination }: { src: string; alt: string; destination: string }): ReactNode {
   const [failed, setFailed] = useState(false)
-  if (failed) return <span className={css.imageAlt}>{alt || destination}</span>
+  const [load] = useState(nextImageLoad)
+  if (failed) return <UnavailableImage alt={alt} destination={destination} state="failed" />
   return (
     <img
       className={css.image}
-      src={src}
+      src={freshImageUrl(src, load)}
       alt={alt}
       onError={() => { setFailed(true) }}
       loading="lazy"

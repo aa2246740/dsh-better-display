@@ -3,6 +3,7 @@ import type { ChatConversationViewNode } from '@deepseek-ai/dsh-client-ui-chat/c
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type { ReaderGroup } from './projection.js';
 import { anchorSeqOf, cutContains, rewindCutSpans, type CutChatNode } from './rewind-cut.js';
+import { patchTargets, stoppedFromMeta } from './native/patch-targets.js';
 
 export type ToolDraft = Extract<AssistantBlock, { kind: 'tool-call' }>;
 export type ToolPhase = 'preparing' | 'running' | 'returned' | 'succeeded' | 'failed' | 'interrupted';
@@ -315,7 +316,8 @@ export function activityPhase(entry: Pick<ToolActivityEntry, 'block' | 'draft'>,
   // RC1 publishes canonical cancellation as an error result with a typed code.
   if (entry.block.error?.code === 'ABORTED' || entry.block.error?.code === 'interrupted') return 'interrupted';
   const facts = executionFacts(entry.block);
-  if (entry.block.isError || facts.signal || (facts.exitCode !== undefined && facts.exitCode !== 0)
+  // 0.2.2 apply_patch reports a partly applied patch as `meta.stopped: true` without isError.
+  if (entry.block.isError || stoppedFromMeta(entry.block.meta) || facts.signal || (facts.exitCode !== undefined && facts.exitCode !== 0)
     || entry.block.subCalls.some(block => activityPhase({ block }, turnClosed) === 'failed')) return 'failed';
   if (facts.exitCode === 0) return 'succeeded';
   return 'returned';
@@ -367,7 +369,9 @@ export function activitySummary(entry: Pick<ToolActivityEntry, 'block' | 'draft'
   const { name, raw } = toolIdentity(entry);
   const parsed = parseInputFields(raw);
   const args = parsed.fields;
-  const target = stringValue(args, 'file_path', 'path', 'filename', 'filePath');
+  // apply_patch (0.2.2) names its files in patch headers; a single file becomes the target.
+  const patched = name === 'apply_patch' ? patchTargets(stringValue(args, 'input')) : [];
+  const target = stringValue(args, 'file_path', 'path', 'filename', 'filePath') ?? (patched.length === 1 ? patched[0]!.label : undefined);
   const command = stringValue(args, 'command', 'cmd', 'script');
   const description = stringValue(args, 'description');
   const file = target?.split(/[/\\]/).at(-1);

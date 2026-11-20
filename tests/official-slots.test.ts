@@ -96,6 +96,40 @@ test('new registrations do not remount existing cards; winner changes and unload
   assert.equal(core.entriesOfSlot('reader').length, 0);
 });
 
+test('a keyed source component replaced in place is re-mirrored', async () => {
+  const { core, slots, register } = registry();
+  const official = memo(() => null);
+  const decorated = memo(() => null);
+  register({ name: 'source', key: 'user' }, official);
+  const stop = mirrorOfficialSlot(slots, 'source', 'reader', 'reader.children');
+  const sourceEntry = core.entriesOfSlot('source')[0];
+  assert.ok(sourceEntry);
+  sourceEntry.component = decorated;
+  // A decorator that replaces the component in place also nudges the ledger.
+  register({ name: 'source', key: 'nudge' }, () => null)();
+  await changed();
+  assert.equal(core.entriesOfSlot('reader').find(entry => entry.options.key === 'user')?.component, decorated);
+  stop();
+});
+
+test('a list source component replaced in place keeps the registration-only path', async () => {
+  const { core, slots, register } = registry('list');
+  const official = memo(() => null);
+  const decorated = memo(() => null);
+  register({ name: 'source', id: 'row' }, official);
+  const stop = mirrorOfficialSlot(slots, 'source', 'reader', 'reader.children');
+  const mirrored = core.entriesOfSlot('reader')[0];
+  assert.ok(mirrored);
+  const sourceEntry = core.entriesOfSlot('source')[0];
+  assert.ok(sourceEntry);
+  sourceEntry.component = decorated;
+  register({ name: 'source', id: 'nudge' }, () => null)();
+  await changed();
+  assert.equal(core.entriesOfSlot('reader')[0], mirrored);
+  assert.equal(mirrored.component, official);
+  stop();
+});
+
 test('a lower-priority assistant-step replacement is mirrored and the official renderer is not', () => {
   const { core, slots, register } = registry();
   const official = memo(() => null);

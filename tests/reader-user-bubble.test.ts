@@ -30,6 +30,8 @@ interface BubbleResult {
   readerSlot?: string;
   nativeSlot?: string;
   rows?: Row[];
+  readerSources?: (string | null)[];
+  nativeSources?: (string | null)[];
 }
 
 test('reader user and steering bubbles match the host column cap', { skip, timeout: 120_000 }, async () => {
@@ -108,6 +110,15 @@ test('reader user and steering bubbles match the host column cap', { skip, timeo
       assert.equal(result.readerSlot, OFFICIAL_SEATS.nodes);
       assert.equal(result.nativeSlot, OFFICIAL_SLOTS.nodes);
       assert.notEqual(result.readerSlot, 'conversation.chat.node');
+      // conversation.chat.user.before (Harness 0.2.2): the Reader's mirrored user row
+      // renders the same message-source decorations as the host row, and steering
+      // rows render none. A 0.2.1 component does not render the seat, so both are empty there.
+      assert.deepEqual(result.readerSources, result.nativeSources);
+      assert.equal(result.readerSources?.every(kind => kind === 'user'), true);
+      const chatVersion = (JSON.parse(readFileSync(join(harness, 'packages/client/ui-chat/package.json'), 'utf8')) as { version: string }).version;
+      if (!/^0\.2\.[01]-/u.test(chatVersion) && !/^0\.2\.[01]$/u.test(chatVersion)) {
+        assert.equal(result.readerSources?.length, result.rows?.length, `user.before seat rendered in every Reader user row on ${chatVersion}`);
+      }
       for (const row of result.rows ?? []) {
         assert.equal(row.user.w, row.nativeUser.w, `${row.name} user width ${row.user.w} != ${row.nativeUser.w} ${row.readerHtml}`);
         assert.equal(row.user.h, row.nativeUser.h, `${row.name} user height`);

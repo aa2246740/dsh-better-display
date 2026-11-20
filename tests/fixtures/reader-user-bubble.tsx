@@ -204,8 +204,20 @@ async function verify() {
     slots.registerFactory({
       name: 'conversation.user.text', scope: 'session', locale: 'chat',
     }, ({ text }: { text: string }) => <>{text}</>);
-    slots.register({ name: 'conversation.chat.node', key: 'user', locale: 'chat' }, HostUser);
-    slots.register({ name: 'conversation.chat.node', key: 'steering', locale: 'chat' }, HostUser);
+    // Harness 0.2.2 registration shape (ui-chat register-node-renderers.ts): the user
+    // entry declares the message-source chain seat its bubble renders, and the
+    // steering entry shares the component with a null seat. 0.2.1's component
+    // ignores both.
+    slots.register({ name: 'conversation.chat.node', key: 'user', locale: 'chat',
+      children: { 'conversation.chat.user.before': { kind: 'chain', scope: 'session' } } }, HostUser);
+    slots.register({ name: 'conversation.chat.node', key: 'steering', locale: 'chat',
+      inject: () => ({ renderSlotChain: () => null }) }, HostUser);
+    // A message-source decoration on the 0.2.2 seat. Hidden, so it does not change
+    // the measured bubble boxes; the result counts where it rendered.
+    slots.register({
+      name: 'conversation.chat.user.before',
+      select: (owner: { kind: string }) => owner.kind === 'user' ? owner : null,
+    }, ({ matched }: { matched: { kind: string } }) => <span hidden data-fixture-source={matched.kind} />);
     const stopMirror = installOfficialSlots(ctx);
     run = async () => {
       await new Promise(resolve => queueMicrotask(resolve));
@@ -231,8 +243,11 @@ async function verify() {
           readerHtml: mount?.querySelector('[data-reader-key="user-key"]')?.innerHTML.slice(0, 400) ?? '',
         };
       });
+      const sources = (selector: string) => [...container.querySelectorAll(`${selector} [data-fixture-source]`)].map(node => node.getAttribute('data-fixture-source'));
+      const readerSources = sources('[data-reader-mount]');
+      const nativeSources = sources('[data-native-case]');
       stopMirror();
-      Object.assign(window, { readerBubbleResult: { readerSlot, nativeSlot, expectedReaderSlot: OFFICIAL_SEATS.nodes, expectedNativeSlot: OFFICIAL_SLOTS.nodes, rows } });
+      Object.assign(window, { readerBubbleResult: { readerSlot, nativeSlot, expectedReaderSlot: OFFICIAL_SEATS.nodes, expectedNativeSlot: OFFICIAL_SLOTS.nodes, rows, readerSources, nativeSources } });
     };
   } });
   await run();

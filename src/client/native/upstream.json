@@ -4,7 +4,8 @@
   "adaptations": [
     "Public type import in place of private type-only path",
     "ESM .js import suffixes",
-    "Local ReferenceIcon location"
+    "Local ReferenceIcon location",
+    "Harness 0.2.2-rc.5 (9c2670d3bce5275e0d1610272958121af87787bb) tool-call-model.ts behaviour ported by hand: apply_patch is an edit row, its summary names the files from patch headers (patch-targets.ts, no dsh-fs-patch dependency), and result meta.stopped marks the row as an error"
   ],
   "files": [
     {

@@ -1,5 +1,5 @@
 import { useCallback, useState, useSyncExternalStore, type ReactNode } from 'react';
-import type { AssistantActionOwnerProps, ChatConversationViewNode, ChatNode, ChatNodeOwnerProps, TurnTailOwnerProps, UseDisclosure } from '@deepseek-ai/dsh-client-ui-chat/client';
+import type { AssistantActionOwnerProps, ChatConversationViewNode, ChatNode, TurnTailOwnerProps, UseDisclosure } from '@deepseek-ai/dsh-client-ui-chat/client';
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store';
 import type { AssistantBlock, ToolCallBlock } from '@deepseek-ai/dsh-client-ui-conversation/client';
 type MessageId = AssistantActionOwnerProps['messageId'];
@@ -7,6 +7,7 @@ import { OFFICIAL_SEATS, readerGroupAction } from './official-slots.js';
 import type { BlockRenderProps } from './types.js';
 import { chatSeatProps } from './chat-seat.js';
 import { Blocks } from './Blocks.js';
+import { chatNodeOwner } from './chat-node-owner.js';
 
 export function OfficialActions({ official, messageId }: Pick<BlockRenderProps, 'official'> & { messageId?: MessageId }) {
   if (!official || !messageId) return null;
@@ -36,17 +37,6 @@ export function OfficialTool({ official, block, toolName, cwd, openFile, fallbac
       inspect: () => official.openView('trajectory', block.callId),
     }, { entryKey: toolName, hookContext: { callId: block.callId, assistant: undefined }, fallback })}
   </div>;
-}
-
-function chatNodeOwner(render: BlockRenderProps, official: NonNullable<BlockRenderProps['official']>): ChatNodeOwnerProps {
-  return {
-    cwd: render.cwd,
-    openFile: render.openFile ?? (() => {}),
-    forkAt: render.forkAt ?? (() => {}),
-    inspectCall: callId => official.openView('trajectory', callId),
-    loadImage: official.officialImageLoader,
-    fileMentions: official.officialFileMentions,
-  };
 }
 
 function nodeHookContext(turnData: unknown, disclosureReset: ReturnType<typeof createSnapshotStore<number>>) {
