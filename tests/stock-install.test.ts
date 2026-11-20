@@ -14,6 +14,10 @@ const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as {
   files: string[];
   dsh: { bundle?: { patch?: string } };
   peerDependencies: Record<string, string>;
+  peerDependenciesMeta?: Record<string, { optional?: boolean }>;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  engines?: { dsh?: string };
 };
 
 // Two Harness lines are supported: 0.2.1 (rc.1 onward, including stable 0.2.1) and
@@ -45,6 +49,60 @@ test('cordis peer accepts the cordis line of both Harness lines', () => {
   // 0.2.1-rc.5 packages peer on ~4.0.5; 0.2.2-rc.5 packages peer on ~4.1.0.
   for (const version of ['4.0.4', '4.0.5', '4.1.0', '4.1.3']) assert.equal(semver.satisfies(version, range), true, version);
   for (const version of ['4.2.0', '5.0.0', '4.0.3']) assert.equal(semver.satisfies(version, range), false, version);
+});
+
+// #93. An installer that resolves each peer from the profile's installation
+// closure treats a peer as required unless peerDependenciesMeta marks it optional
+// (or it is also a regular dependency). On a Desktop whose host packages live in
+// app.asar, none of them resolve from that closure, so every unmarked peer failed
+// the install. The bundles never load a peer through Node (see the next test),
+// so every peer is optional. The version gate is unchanged: `engines.dsh` is what
+// the Harness installer checks, and npm and pnpm still check an optional peer's
+// range whenever the peer is present.
+test('every peer is optional and keeps its range, so a host-less closure installs and the gate stays', () => {
+  const peers = Object.keys(pkg.peerDependencies);
+  assert.ok(peers.length >= 14);
+  const meta = pkg.peerDependenciesMeta ?? {};
+  assert.deepEqual(Object.keys(meta).sort(), [...peers].sort(), 'peerDependenciesMeta names exactly the peers');
+  for (const name of peers) {
+    assert.deepEqual(meta[name], { optional: true }, name);
+    assert.equal(Object.hasOwn(pkg.dependencies ?? {}, name), false, `${name} is not also a regular dependency`);
+    // The installer's own rule, as quoted in #93.
+    const requiredPeer = Object.hasOwn(pkg.peerDependencies, name) && meta[name]?.optional !== true;
+    assert.equal(requiredPeer, false, name);
+    assert.ok(semver.validRange(pkg.peerDependencies[name]!), `${name} keeps a real range`);
+  }
+  assert.equal(pkg.engines?.dsh, HARNESS_PEER);
+  assert.equal(semver.satisfies('0.2.2-rc.1', pkg.engines!.dsh!, { includePrerelease: true }), false);
+});
+
+test('optional peers are still installed for development at a version their range accepts', () => {
+  // npm stops auto-installing a peer once it is optional, and the build inlines
+  // dsh-session and dsh-util-workspace-path, so each peer is also a dev dependency.
+  for (const [name, range] of Object.entries(pkg.peerDependencies)) {
+    const dev = pkg.devDependencies?.[name];
+    assert.ok(dev, `${name} is a dev dependency`);
+    const pinned = semver.minVersion(dev);
+    assert.ok(pinned && semver.satisfies(pinned, range, { includePrerelease: true }), `${name} dev ${dev} is inside ${range}`);
+  }
+});
+
+test('the built bundles load no peer through Node', () => {
+  // client.js is evaluated by the web client module loader. Its require() calls
+  // are served from the platform module table, never from node_modules.
+  const build = readFileSync(resolve(root, 'tools/client-build.js'), 'utf8');
+  const table = /const PLATFORM_MODULES = \[([\s\S]*?)\]/.exec(build)?.[1] ?? '';
+  const platform = new Set([...table.matchAll(/'([^']+)'/g)].map(match => match[1]));
+  assert.ok(platform.has('react') && platform.has('@deepseek-ai/dsh-client-store'));
+  const client = readFileSync(resolve(root, 'lib/client.js'), 'utf8');
+  const required = new Set([...client.matchAll(/\brequire\("([^"]+)"\)/g)].map(match => match[1]));
+  assert.ok(required.size > 0);
+  for (const name of required) assert.ok(platform.has(name), `lib/client.js requires ${name}, which the platform table does not serve`);
+  // The host entry runs in Node and imports only Node built-ins.
+  const host = readFileSync(resolve(root, 'lib/dsh-better-display.js'), 'utf8');
+  const imported = [...host.matchAll(/(?:^|\n)\s*(?:import|export)\b[^;]*?\bfrom\s*"([^"]+)"|\bimport\(\s*"([^"]+)"\s*\)/g)].map(match => match[1] ?? match[2]);
+  assert.ok(imported.length > 0);
+  for (const name of imported) assert.match(name!, /^node:/, `lib/dsh-better-display.js imports ${name}`);
 });
 
 test('declares dsh.bundle.patch so official add joins the profile layer stack', () => {

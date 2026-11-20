@@ -31,9 +31,14 @@ type AssistantBodyProps = BlockRenderProps & {
  * The caller keeps reasoning blocks on the reading card.
  */
 export declare function OfficialAssistantBody({ node, blocks, streaming, holdFormatting, startedAt, interrupted, liveText, ...render }: AssistantBodyProps): string | number | boolean | Iterable<ReactNode> | import("react").JSX.Element | null | undefined;
-export declare function OfficialTail({ official, owner, produced }: Pick<BlockRenderProps, 'official'> & {
+/**
+ * `anchorTurn` is the turn number for the host's `data-turn-tail` anchor; omit
+ * it and the wrapper carries none. The wrapper stays `display: contents`.
+ */
+export declare function OfficialTail({ official, owner, produced, anchorTurn }: Pick<BlockRenderProps, 'official'> & {
     owner?: TurnTailOwnerProps;
     produced: readonly string[];
+    anchorTurn?: number;
 }): import("react").JSX.Element | null;
 export {};
 //# sourceMappingURL=OfficialContent.d.ts.map

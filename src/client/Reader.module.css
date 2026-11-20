@@ -627,6 +627,42 @@
   background-image: var(--reader-lane-plate);
   background-repeat: no-repeat;
 }
+/* #87. The opaque plate above is the fallback. A wallpaper theme sees it as
+   a solid band of --dsw-alias-bg-base across the column, because CSS cannot
+   tell that theme's opaque token from a plain theme's. By default the lanes
+   are a frosted wash instead: 60% of the theme surface over a 30% Canvas
+   floor (so a cleared token still has a surface), with the backdrop blurred
+   so text scrolling beneath stays illegible. On a plain theme the wash sits
+   on the same colour and looks the same. The opaque plate stays where the
+   wash cannot hide text: no backdrop-filter, or reduced transparency (a
+   browser that cannot report that preference also keeps the plate). Glass
+   mode has its own rules below and is not affected. */
+@media (prefers-reduced-transparency: no-preference) {
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .root:not([data-reader-glass]) {
+      --reader-lane-tint: color-mix(in srgb, var(--dsw-alias-bg-base) 60%, transparent);
+      --reader-lane-floor: color-mix(in srgb, Canvas 30%, transparent);
+    }
+    .root:not([data-reader-glass]) :is(.toolbar, .turnStickyLanes, .turnProcessSticky, .liveFoldContainer, .flowCell[data-flow-summary], .closedProcessSummary) {
+      background-color: transparent;
+      background-image: linear-gradient(var(--reader-lane-tint), var(--reader-lane-tint)), linear-gradient(var(--reader-lane-floor), var(--reader-lane-floor));
+      -webkit-backdrop-filter: blur(16px) saturate(140%);
+      backdrop-filter: blur(16px) saturate(140%);
+    }
+    /* .turnStickyLanes is the sticky surface for the lanes inside it. A
+       second wash on those lanes would double the tint. */
+    .root:not([data-reader-glass]) .turnStickyLanes :is(.turnProcessSticky, .closedProcessSummary) {
+      background: none;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      box-shadow: none;
+    }
+    /* The gap extensions above take the tint, not an opaque plate. */
+    .root:not([data-reader-glass]) .turnProcessSticky { box-shadow: 0 -14px 0 var(--reader-lane-tint), var(--reader-control-width, 148px) 0 0 var(--reader-lane-tint); }
+    .root:not([data-reader-glass]) .flowCell[data-flow-summary] { box-shadow: 0 -16px 0 var(--reader-lane-tint); }
+    .root:not([data-reader-glass]) .closedProcessSummary { box-shadow: 0 -14px 0 var(--reader-lane-tint); }
+  }
+}
 /* Skin mode is opt-in, and it has one job: some readers run a skinned host
    (wallpaper / theme), and the reader's own opaque rows hide that skin. On =
    every surface the reader paints becomes a thin token-derived wash and the

@@ -48,6 +48,8 @@ Busy labels use a 2-second glyph-only shimmer and a short state swap. Initial, b
 
 Keep the existing in-flow positions. The auto-fold control receives a full-column, 40px-minimum lane from initial render, native page background and seamless spacing, without divider lines or replacement shadows (user preference). The status retains its source position and shares the top lane's left side only when it reaches the scrollport top. The original summary row (never a duplicate) sticks below the greater measured toolbar/status height. Expanded and collapsed live summaries remain discoverable; completed summaries obey the same sticky offset. Scope is the current flow/turn, so subsequent turns replace earlier statistics rather than displaying unrelated counts forever.
 
+Lane surface (2026-11-20, #87): by default the lanes are a frosted wash, 60% of `--dsw-alias-bg-base` over a 30% `Canvas` floor with the backdrop blurred, so a wallpaper theme shows through instead of meeting a solid band, and text scrolling beneath stays illegible. On a plain theme the wash sits on the same colour and looks the same at rest. Under `prefers-reduced-transparency: reduce`, in a browser that cannot report that preference, or without `backdrop-filter`, the lanes keep the opaque Canvas-backed plate (#66). Glass mode keeps its own transparent lanes.
+
 Taste checkpoint: native reading chrome, not floating badges; one column, no new card family, no shadows or rounded background tiles; existing typography. Active responsive-interaction binding: real ResizeObserver lane geometry → StickyLane + CSS offsets → verify desktop/320px, wrapped statistics, no overlap, and return to original position on reverse scroll. Preserve prior measured fold choreography and zero-height empty wrappers.
 
 ## Reading and accessibility
@@ -88,7 +90,7 @@ Register during plugin apply, before the reading view paints. A transformer regi
 
 ## Host DOM hooks
 
-Reader replaces ChatView's message list, not the native conversation chrome. The enclosing `[data-conversation-scroll]` and sticky `[data-composer-seat]` stay host-owned. ChatView marks its column with `data-chat-flow=""`. Third-party skins (maid-atelier, phoebe-atelier, and others) treat a scrollport without that hook as inspect-only and hide the composer. Reader keeps the same empty `data-chat-flow` attribute on its column so those skins still see an interactive conversation. Turns stay on `[data-reader-turn]`; Reader does not emit native `[data-chat-flow-kind]` rows.
+Reader replaces ChatView's message list, not the native conversation chrome. The enclosing `[data-conversation-scroll]` and sticky `[data-composer-seat]` stay host-owned. ChatView marks its column with `data-chat-flow=""`. Third-party skins (maid-atelier, phoebe-atelier, and others) treat a scrollport without that hook as inspect-only and hide the composer. Reader keeps the same empty `data-chat-flow` attribute on its column so those skins still see an interactive conversation. Turns stay on `[data-reader-turn]`; Reader does not emit native `[data-chat-flow-kind]` rows. Each closed turn's tail wrapper carries the host anchor `data-turn-tail="N"` (see [docs/extension-points.md](docs/extension-points.md#turn-anchor-data-turn-tail)).
 
 ## Fold choreography contract (2026-09-16)
 

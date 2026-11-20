@@ -33,9 +33,12 @@ export declare const HANDOVER_KINDS: readonly ["user", "steering", "context", "m
  *
  * A tool or command that is *still running* is not a wait — the tool is the one
  * working. Only its returned form hands control back, which is exactly the moment
- * the model can stall.
+ * the model can stall. A settled command also needs `running`; see
+ * {@link commandHandsOver}.
+ *
+ * @param running - the host's session running bit.
  */
-export declare function handsBackToModel(node: InputNode): boolean;
+export declare function handsBackToModel(node: InputNode, running: boolean): boolean;
 /**
  * The moment the current wait began.
  *
@@ -44,6 +47,23 @@ export declare function handsBackToModel(node: InputNode): boolean;
  * user's message alone made the readout count the entire turn, so a wait that had
  * only just begun showed the minutes the tools had already spent.
  */
-export declare function waitingAnchor(order: readonly string[], get: (key: string) => InputNode | undefined, pending?: readonly Submission[]): WaitingAnchor;
+export declare function waitingAnchor(order: readonly string[], get: (key: string) => InputNode | undefined, pending: readonly Submission[], running: boolean): WaitingAnchor;
+export interface AwaitingModelInput {
+    /** The host's session running bit. */
+    running: boolean;
+    /** Local submission echoes (`SessionSnapshot.pendingSubmissions`). */
+    pending: readonly Submission[];
+    /** Rendered chat keys, oldest first. */
+    order: readonly string[];
+    get: (key: string) => InputNode | undefined;
+    /** Status of the turn the last rendered group belongs to; undefined when that group has no turn. */
+    lastTurnStatus: string | undefined;
+}
+/**
+ * Should the reader show the "深度求索中" wait after the last row?
+ *
+ * 状态机铁律：「深度求索中」与「正在处理/思考」永远互斥。
+ */
+export declare function awaitingModel({ running, pending, order, get, lastTurnStatus }: AwaitingModelInput): boolean;
 export {};
 //# sourceMappingURL=waiting-clock.d.ts.map

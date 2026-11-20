@@ -59,6 +59,8 @@ function mount(options?: { containsFocus?: boolean; hidden?: boolean }) {
     require: createRequire(import.meta.url),
     css: { retiringContent: 'retiring' },
     StreamMotionContext: {},
+    // Declared above the sliced component; it only needs a Provider type here.
+    RetiringTurnContext: { Provider: 'RetiringTurnContext.Provider' },
     HTMLElement: globalThis.HTMLElement,
     Element: globalThis.Element,
     document: {

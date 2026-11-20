@@ -28,7 +28,7 @@ dsh plugin --profile web add github:aa2246740/dsh-better-display#v0.3.12
 
 最终回答里的 ````mcp-app` 代码块会在阅读视图里挂成交互卡片，跑在 `<iframe sandbox="allow-scripts allow-forms">` 里，没有 `allow-same-origin`。卡片可以通过 JSON-RPC 把下一轮 prompt 填进输入框。技能包在 [`skills/generative-mcpapps/`](skills/generative-mcpapps/)。设置里的 **Better Display** 可把产物改为右侧栏预览（默认仍用系统应用），打开半透明毛玻璃（默认关），设置过程自动折叠开关（默认开），并检测该技能是否已装进宿主技能目录。
 
-面向 DeepSeek Harness **0.2.2-rc.5**（`dsh-v0.2.2-rc.5`，`9c2670d3bce5275e0d1610272958121af87787bb`），并继续支持 0.2.1 线。只改展示，不改 Agent 执行、SDK 或模型凭据。Node.js `^22.19.0 || >=24`。新会话默认进阅读。`@deepseek-ai/dsh-*` peer 与 `engines.dsh` 是 `>=0.2.1-rc.1 <0.2.2-0 || >=0.2.2-rc.5 <0.2.3-0`：接受 `0.2.1-rc.1` 起的 0.2.1 线（含稳定版 `0.2.1`），以及 `0.2.2-rc.5` 起的 0.2.2 线（含稳定版 `0.2.2`）；拒绝未经测试的 `0.2.2-rc.1`–`rc.4`、`0.2.3` 及其预发布、`0.2.1` alpha 和 `0.2.0` 系列。两条线的差别（例如 `session.readAttachment` 的参数形式）在运行时适配。
+面向 DeepSeek Harness **0.2.2-rc.5**（`dsh-v0.2.2-rc.5`，`9c2670d3bce5275e0d1610272958121af87787bb`），并继续支持 0.2.1 线。只改展示，不改 Agent 执行、SDK 或模型凭据。Node.js `^22.19.0 || >=24`。新会话默认进阅读。`@deepseek-ai/dsh-*` peer 与 `engines.dsh` 是 `>=0.2.1-rc.1 <0.2.2-0 || >=0.2.2-rc.5 <0.2.3-0`：接受 `0.2.1-rc.1` 起的 0.2.1 线（含稳定版 `0.2.1`），以及 `0.2.2-rc.5` 起的 0.2.2 线（含稳定版 `0.2.2`）；拒绝未经测试的 `0.2.2-rc.1`–`rc.4`、`0.2.3` 及其预发布、`0.2.1` alpha 和 `0.2.0` 系列。两条线的差别（例如 `session.readAttachment` 的参数形式）在运行时适配。所有 peer 都在 `peerDependenciesMeta` 里标为 optional：宿主包不必能从插件的安装目录解析（Desktop 的 asar 分发就解析不到），版本门槛由 `engines.dsh` 把关，peer 存在时 npm 和 pnpm 仍按区间检查。
 
 **0.3.0** 保留现有阅读布局、折叠和动效，接入官方反馈、工具详情、文件卡片及文件链接；并修复重新开启自动折叠后仍保持展开的问题。接入范围和升级检查见 [官方能力接入说明](docs/official-rendering-bridge.md)。
 
