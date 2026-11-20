@@ -1,14 +1,8 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": [
-    "src/dsh-better-display.ts",
-    "src/client/index.tsx",
-    "tests/**/*.ts",
-    "scripts/**/*.mjs",
-    "tools/**/*.js"
-  ],
+  "entry": ["tests/**/*.ts", "scripts/**/*.mjs", "tools/**/*.js"],
   "project": ["src/**/*.{ts,tsx}", "!src/client/markdown/**", "!src/client/native/**"],
-  "ignore": ["lib/**", "src/client/markdown/**", "src/client/native/**"],
+  "ignore": ["lib/**"],
   "ignoreExportsUsedInFile": true,
   "ignoreIssues": {
     "src/client/McpAppFrame.tsx": ["exports"],
@@ -20,7 +14,6 @@
   "ignoreDependencies": [
     "clsx",
     "katex",
-    "lightningcss",
     "mdast-util-math",
     "micromark-core-commonmark",
     "micromark-extension-gfm",
