@@ -76,6 +76,8 @@ export interface ReaderInjected {
   };
   /** Reveal and highlight a workspace file in macOS Finder or Windows Explorer. */
   revealFile?: (path: string) => Promise<void> | void;
+  /** Publishes the running clock row to the Host's composer dock. */
+  clockLane?: import('./turn-clock-lane.js').ClockLane;
   /** Fork the conversation at a specific message sequence into a new branch session. */
   forkAt?: (seq: number) => void;
   /** Load session history through a target sequence number. */
