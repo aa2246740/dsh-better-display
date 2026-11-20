@@ -100,6 +100,39 @@ test('apply_patch rows are edit rows that name their files, never the patch text
   assert.equal(deletion.filePath, undefined);
 });
 
+test('a single-file apply_patch links an absolute path, or a relative path only after success', () => {
+  const relative = JSON.stringify({
+    input: '*** Begin Patch\n*** Add File: src/a.ts\n+x\n*** End Patch\n'
+  });
+  const absolute = JSON.stringify({
+    input: '*** Begin Patch\n*** Add File: /work/src/a.ts\n+x\n*** End Patch\n'
+  });
+  assert.equal(
+    toolRowModel('apply_patch', result(relative, {}, true), '/work').filePath,
+    undefined
+  );
+  assert.equal(
+    toolRowModel('apply_patch', result(absolute, {}, true), '/work').filePath,
+    '/work/src/a.ts'
+  );
+  assert.equal(toolRowModel('apply_patch', result(relative), '/work').filePath, 'src/a.ts');
+  const running = {
+    phase: 'start',
+    callId: 'p1',
+    name: 'apply_patch',
+    argsRaw: relative
+  } as unknown as ToolCallBlock;
+  assert.equal(toolRowModel('apply_patch', running, '/work').filePath, undefined);
+  const nested = result(relative) as { parentCallId?: string };
+  nested.parentCallId = 'parent';
+  assert.equal(
+    toolRowModel('apply_patch', nested as unknown as ToolCallBlock, '/work').filePath,
+    undefined
+  );
+  // The official row does not expand the JSON-escaped patch. The diff is the body.
+  assert.equal(toolRowModel('apply_patch', result(absolute), '/work').body, null);
+});
+
 test('a streaming apply_patch row reads files from incomplete argument JSON', () => {
   const partial = JSON.stringify({ input: PATCH }).slice(
     0,
