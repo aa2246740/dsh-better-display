@@ -4,3 +4,15 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      vitest:
+        patterns:
+          - vitest
+          - '@vitest/coverage-v8'
+    ignore:
+      - dependency-name: '@deepseek-ai/*'
+      - dependency-name: '@types/node'
+        update-types:
+          - version-update:semver-major
