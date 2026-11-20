@@ -53,7 +53,7 @@ export interface ReaderInjected {
     /** Open a workspace file or directory; mode comes from the Better Display setting. */
     openFile: (path: string, options?: OpenFileOptions) => Promise<void> | void;
     officialImageLoader: MessageImageLoader;
-    officialFileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined;
+    officialFileMentions: (owner: TurnTailOwnerProps, getFileTriggerProps?: (path: string) => unknown) => MarkdownFileMentions | undefined;
     officialPreviewFile: (path: string) => void;
     officialHost: {
         getSnapshot: () => {

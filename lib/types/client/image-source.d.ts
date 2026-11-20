@@ -48,6 +48,15 @@ export interface AttachmentReader {
 type Form = 'reference' | 'id';
 /** Forget the learned form (tests, or a Host reconnect that swapped versions). */
 export declare function resetAttachmentForm(): void;
+/**
+ * Bind a session lookup to an image loader. The returned function is async so
+ * a closed session rejects the promise. A synchronous throw inside ImageBlock's
+ * effect would hit the block boundary, skip the image retry state, and leave
+ * the 20s timer set.
+ * @param session - returns the live session, or throws when that session is gone.
+ * @returns the loader the Reader passes to image blocks.
+ */
+export declare function sessionImageLoader(session: () => AttachmentReader): (attachment: AttachmentRefLike) => Promise<ResolvedImage>;
 /** Which call shape the next read tries first. */
 export declare function preferredAttachmentForm(): Form;
 /**
@@ -57,5 +66,13 @@ export declare function preferredAttachmentForm(): Form;
  * @returns decoded bytes plus the media type the Host verified.
  */
 export declare function readImageAttachment(reader: AttachmentReader, attachment: AttachmentRefLike): Promise<ResolvedImage>;
+/**
+ * Blob for an image block. The read above already copied the Host bytes, so
+ * this must not copy them again.
+ * @param data - bytes from {@link readImageAttachment}.
+ * @param mediaType - blob type.
+ * @returns a blob of exactly those bytes.
+ */
+export declare function imageBlob(data: Uint8Array, mediaType: string): Blob;
 export {};
 //# sourceMappingURL=image-source.d.ts.map

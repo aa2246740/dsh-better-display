@@ -4,9 +4,18 @@
  * Answers fetched from a model routinely point at local files — on Windows as
  * `C:\shots\plan.png`, sometimes URL-escaped (`C:\a%20b.png`) or carrying a
  * line locator (`notes.md:12`, `#L12`). The Harness file route serves bytes
- * only for an absolute path passed as `?path=`, so every destination is
- * decoded once, stripped of its locator, validated, and then rewritten into
- * that route. Relative destinations resolve against the Session workspace.
+ * only for an absolute path passed as `?path=`. Every destination is decoded,
+ * stripped of its query, fragment and locator, then handed to the host's own
+ * `resolveWorkspacePath` and `fileMediaUrl`. Those two functions are the same
+ * gate the host chat view uses (`@deepseek-ai/dsh-util-workspace-path`,
+ * identical `fileMediaUrl` on 0.2.1-rc.5 and 0.2.2-rc.5). The package is not
+ * in the platform module table; the client build inlines it (`INLINE_SAFE`),
+ * which is how this bundle already ships `abbreviateHomePath`.
+ *
+ * A path the host's `fileMediaUrl` refuses — UNC (`\\host\share`), a device
+ * path (`\\?\`, `\\.\`), a protocol-relative URL, or the same shapes after
+ * percent-decoding — never becomes an `api/file` URL. The check runs on the
+ * decoded text and again on the path joined to the session workspace.
  *
  * Authorization stays Host-side: this module only names a URL.
  *
@@ -15,15 +24,15 @@
 /**
  * Reduce an authored image destination to the local path it names.
  * @param value - authored destination, with or without `#L12` / `:12` suffixes.
- * @returns an absolute native path, or undefined when the destination is not
- * a local path (a remote URL, a `data:` URL, a bare word, …).
+ * @returns an absolute native path the host file route accepts, or undefined
+ * when the destination is not one (a remote URL, a UNC path, a `data:` URL, …).
  */
 export declare function localImagePath(value: string): string | undefined;
 /**
  * Resolve an authored image destination against the Session workspace.
  * @param cwd - the Session's working directory, when the Host reported one.
  * @param value - authored destination.
- * @returns an absolute native path, or undefined when it names none.
+ * @returns an absolute native path the host file route accepts, or undefined.
  */
 export declare function resolveImagePath(cwd: string | undefined, value: string): string | undefined;
 /**
@@ -32,7 +41,8 @@ export declare function resolveImagePath(cwd: string | undefined, value: string)
  * `dsh-app://app/` in the desktop shell, exactly as `document.baseURI` holds it.
  * @param path - absolute native path, already decoded.
  * @param load - cache-busting counter for a lazily mounted image.
- * @returns the URL, or undefined for an unsupported transport or path.
+ * @returns the URL, or undefined for an unsupported transport or a path the
+ * host's own `fileMediaUrl` refuses.
  */
 export declare function fileMediaUrlForBase(base: string, path: string, load?: number): string | undefined;
 /**
