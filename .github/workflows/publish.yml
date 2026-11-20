@@ -29,7 +29,6 @@ jobs:
     timeout-minutes: 30
     env:
       DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
-      HARNESS_REF: dsh-v0.2.2-rc.5
     steps:
       - uses: actions/checkout@v4
 
@@ -52,7 +51,8 @@ jobs:
       - name: Prepare DSH Harness source and dshx adapter
         run: |
           H="$RUNNER_TEMP/harness"
-          git clone --quiet --depth 1 --branch "$HARNESS_REF" https://github.com/deepseek-ai/deepseek-harness.git "$H"
+          ver=$(node -p "JSON.parse(require('node:fs').readFileSync('compat/harness.json','utf8')).harnessVersion")
+          git clone --quiet --depth 1 --branch "dsh-v${ver}" https://github.com/deepseek-ai/deepseek-harness.git "$H"
           git clone --quiet --depth 1 https://github.com/aa2246740/dsh-external-plugin-devkit.git "$H/tools/dshx"
           npm ci --prefix "$H/tools/dshx" --ignore-scripts --no-audit --no-fund
           echo "DSHX_HARNESS=$H" >> "$GITHUB_ENV"
