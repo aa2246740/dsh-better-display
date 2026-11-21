@@ -486,8 +486,38 @@
 .imageFigure figcaption { color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 20px; margin-top: 6px; overflow-wrap: anywhere; }
 .imageDialog { border: 1px solid var(--dsw-alias-border-l2); padding: 38px 20px 20px; border-radius: 16px; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); max-width: 90vw; max-height: 90vh; }
 .imageDialog::backdrop { background: var(--dsw-alias-bg-mask-photo); }
-.imageDialog img { max-width: 82vw; max-height: 75vh; display: block; object-fit: contain; }
+/* A picture in the dialog keeps its own size: the stage owns the viewport box and the
+   viewer scales the img explicitly. A `max-width` here would cap the zoom at whatever
+   already fits, which is exactly what the viewer exists to escape. */
+.imageDialog img { display: block; object-fit: contain; }
 .dialogClose { position: absolute; right: 8px; top: 4px; border: 0; background: transparent; color: inherit; width: 32px; height: 32px; border-radius: 8px; font-size: 24px; }
+/* The viewer's own layout. The dialog's `img` rule above caps the fitted size, so the
+   stage takes over: it owns the viewport box and the picture is scaled inside it. A
+   `max-width` on the img itself would cap the zoom at whatever already fits. */
+.imageStage { display: flex; align-items: center; justify-content: center; overflow: auto;
+  width: 82vw; height: 75vh; touch-action: none; cursor: default;
+  overscroll-behavior: contain; scrollbar-width: thin; }
+.imageStage[data-zoomed] { cursor: grab; }
+.imageStage[data-dragging] { cursor: grabbing; }
+.imageStageInner { display: flex; align-items: center; justify-content: center;
+  width: max-content; min-width: 100%; height: max-content; min-height: 100%;
+  margin: auto; will-change: transform; }
+.imageStageInner img { max-width: none; max-height: none; display: block; object-fit: contain;
+  user-select: none; -webkit-user-drag: none; }
+.lightboxHeader { display: flex; flex-direction: column; align-items: center; gap: 8px;
+  margin-bottom: 10px; }
+.lightboxCaption { max-width: 100%; border: 0; background: transparent; color: inherit;
+  font: inherit; font-size: 12px; line-height: 18px; padding: 2px 6px; border-radius: 6px;
+  cursor: copy; overflow-wrap: anywhere; text-align: center;
+  /* Keep a path's punctuation at the ends where it belongs. */
+  direction: rtl; unicode-bidi: plaintext; }
+.lightboxCaption:hover { background: var(--dsw-alias-interactive-bg-hover, transparent); }
+.lightboxCaption[data-copied] { color: var(--dsw-alias-state-business-primary); }
+.lightboxToolbar { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.lightboxButton { min-width: 52px; height: 26px; padding: 0 8px; border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 7px; background: transparent; color: var(--dsw-alias-label-secondary);
+  font-size: 12px; line-height: 1; cursor: pointer; font-variant-numeric: tabular-nums; }
+.lightboxButton:hover { background: var(--dsw-alias-interactive-bg-hover, transparent); color: var(--dsw-alias-label-primary); }
 .jumpDock { position: sticky; bottom: calc(var(--dsh-composer-height, 152px) + 16px); height: 0; z-index: 8; display: flex; justify-content: flex-end; pointer-events: none; }
 .deliverablesRoot { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: start; column-gap: 10px; margin-top: 14px; font-size: 13px; line-height: 22px; }
 .deliverablesLabel { grid-column: 1; grid-row: 1; color: var(--dsw-alias-label-tertiary); font-size: 12px; padding-top: 2px; font-weight: 500; }
