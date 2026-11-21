@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment';
 import type { AssistantBlock, UserMessageNode } from '@deepseek-ai/dsh-client-ui-conversation/client';
 import { JsonBlock, MarkdownText, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives';
+import { ImageLightbox } from './ImageLightbox.js';
 import { ComposerFillContext, McpAppFrame } from './McpAppFrame.js';
 import { formatMessageClock } from './message-chrome.js';
 import { markdownLabels, truncatedJsonLabel } from './primitive-labels.js';
@@ -41,8 +42,7 @@ export const ImageBlock = memo(function ImageBlock({ attachment, loadImage }: {
   // The Host's own reason, so a failed read is diagnosable instead of a
   // bare "could not load" that looks like a transient network problem.
   const [detail, setDetail] = useState('');
-  const dialog = useRef<HTMLDialogElement>(null);
-  const opener = useRef<HTMLButtonElement>(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
   useEffect(() => {
     let active = true;
     let owned: string | null = null;
@@ -69,7 +69,7 @@ export const ImageBlock = memo(function ImageBlock({ attachment, loadImage }: {
   const height = Number.isFinite(attachment.height) && attachment.height > 0 ? attachment.height : 3;
   return <figure className={css.imageFigure} data-reader-image data-image-state={error ? 'error' : decoded ? 'ready' : 'loading'}>
     <div className={css.imageFrame} style={{ aspectRatio: `${width} / ${height}` }}>
-      {!error && url && <button ref={opener} type="button" className={css.imageOpen} aria-label={`放大图片${attachment.name ? `：${attachment.name}` : ''}`} onClick={() => dialog.current?.showModal()}>
+      {!error && url && <button type="button" className={css.imageOpen} aria-label={`放大图片${attachment.name ? `：${attachment.name}` : ''}`} onClick={() => setViewerOpen(true)}>
         <img src={url} alt={attachment.name ?? '会话图片'} width={width} height={height} onLoad={() => setDecoded(true)} onError={() => { setDetail('浏览器无法解码这些字节'); setError(true); }} data-ready={decoded} />
       </button>}
       {(!decoded || error) && <div className={css.imagePlaceholder}>
@@ -79,10 +79,7 @@ export const ImageBlock = memo(function ImageBlock({ attachment, loadImage }: {
       </div>}
     </div>
     {attachment.name && <figcaption>{attachment.name}</figcaption>}
-    <dialog ref={dialog} className={css.imageDialog} aria-label="图片预览" onClose={() => opener.current?.focus()} onClick={event => { if (event.target === dialog.current) dialog.current?.close(); }}>
-      <button type="button" autoFocus className={css.dialogClose} aria-label="关闭图片预览" onClick={() => dialog.current?.close()}>×</button>
-      {url && <img src={url} alt={attachment.name ?? '会话图片'} />}
-    </dialog>
+    {url && <ImageLightbox open={viewerOpen} src={url} alt={attachment.name ?? '会话图片'} caption={attachment.name ?? '会话图片'} onClose={() => setViewerOpen(false)} />}
   </figure>;
 });
 
