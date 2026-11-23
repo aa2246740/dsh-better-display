@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1 — 2026-11-23
+
+- Full-screen image lightbox (`ImageLightbox`) for reader image attachments: opens at fitted 100% while small images keep natural pixels; wheel zooms `0.5×–8×` around the pointer (safe under rapid same-frame wheel bursts, ignores `deltaY === 0` horizontal wheel); drag pans 1:1 with a 15% keep-visible clamp on release; `Space`, `0`, or the zoom button resets to 100% centred; double-clicking the caption copies the path through `writeClipboard`; mounts `<dialog>` only while open and restores focus to the opener button on close. Includes unit and headless Chromium browser tests. Thanks @hansomgar (#106, #108).
+- Make `tests/skill-status.test.ts` skill-root path assertions platform-independent so Windows checkouts no longer fail against hardcoded POSIX paths (#107).
+- Update `README.md` and `README.en.md` install targets to `v0.4.1`, and bump dev dependencies (`prettier` 3.10.1, `jscpd` 5.4.3, `knip` 6.45.1, `typescript-eslint` 8.72.2; #101–#104).
+
 ## 0.4.0 — 2026-11-20
 
 - **Support DeepSeek Harness 0.2.2.** Built against `0.2.2-rc.5` (`dsh-v0.2.2-rc.5`, `9c2670d3bce5275e0d1610272958121af87787bb`); the 0.2.1 line stays supported. The `@deepseek-ai/dsh-*` peers and `engines.dsh` are `>=0.2.1-rc.1 <0.2.2-0 || >=0.2.2-rc.5 <0.2.3-0`: the 0.2.1 line from rc.1 (stable `0.2.1` included) and the 0.2.2 line from rc.5 (stable `0.2.2` included). `0.2.2-rc.1`–`rc.4`, which were not tested, and `0.2.3` are rejected. The `-0` bounds make npm and the Host installer, which checks `engines.dsh` with prereleases included, give the same answer. The `@deepseek-ai/cordis` peer also accepts `~4.1.0`, which the 0.2.2 packages use. The compat baseline (`compat/harness.json`, renamed from `compat/harness-rc2.json`) is re-recorded on 0.2.2-rc.5 after reviewing every changed file. The Harness tag CI and publish clone is `dsh-v` plus that file's `harnessVersion`. See [Harness 0.2.2 适配](docs/official-rendering-bridge.md#harness-022-适配).
