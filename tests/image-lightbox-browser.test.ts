@@ -11,7 +11,31 @@ import { test } from 'vitest';
 // so the file skips there instead of failing. On this machine the runtime is present and
 // the test has to drive a real page.
 const browserRuntime = join(homedir(), '.codex/playwright-runtime/runtime.mjs');
-const skip = existsSync(browserRuntime) ? false : 'pinned Chromium runtime not available';
+const harnessPointer = join(homedir(), '.config/dshx/harness');
+const harness =
+  process.env.DSHX_HARNESS?.trim() ||
+  (existsSync(harnessPointer) ? readFileSync(harnessPointer, 'utf8').trim() : '');
+const webPackage = harness ? join(harness, 'packages/client/web/package.json') : '';
+
+function resolveReactDeps(): { react: string; reactDom: string } | null {
+  if (!webPackage || !existsSync(webPackage)) return null;
+  try {
+    const webRequire = createRequire(webPackage);
+    return {
+      react: dirname(webRequire.resolve('react/package.json')),
+      reactDom: dirname(webRequire.resolve('react-dom/package.json'))
+    };
+  } catch {
+    return null;
+  }
+}
+
+const reactDeps = resolveReactDeps();
+const skip = !existsSync(browserRuntime)
+  ? 'pinned Chromium runtime not available'
+  : reactDeps === null
+    ? 'Harness web react-dom not available'
+    : false;
 const root = resolve(import.meta.dirname, '..');
 
 interface Box {
@@ -30,19 +54,9 @@ test(
   'the image lightbox fits, zooms about the pointer, pans, and returns focus',
   { skip, timeout: 60_000 },
   async () => {
-    const harnessPointer = join(homedir(), '.config/dshx/harness');
-    const harness =
-      process.env.DSHX_HARNESS?.trim() ||
-      (existsSync(harnessPointer) ? readFileSync(harnessPointer, 'utf8').trim() : '');
+    assert.ok(reactDeps !== null);
     const require = createRequire(join(root, 'package.json'));
     const { build } = createRequire(require.resolve('tsx'))('esbuild');
-    const webPackage = join(harness, 'packages/client/web/package.json');
-    assert.equal(
-      existsSync(webPackage),
-      true,
-      'Harness web package is required to resolve react-dom'
-    );
-    const webRequire = createRequire(webPackage);
     const styles: string[] = [];
     const out = mkdtempSync(join(tmpdir(), 'image-lightbox-'));
     let browser: { close(): Promise<void> } | undefined;
@@ -58,8 +72,8 @@ test(
         jsx: 'automatic',
         alias: {
           // One React for the fixture and for react-dom. Two copies throw on every hook.
-          react: dirname(webRequire.resolve('react/package.json')),
-          'react-dom': dirname(webRequire.resolve('react-dom/package.json'))
+          react: reactDeps.react,
+          'react-dom': reactDeps.reactDom
         },
         plugins: [
           {
@@ -219,11 +233,42 @@ test(
         const box = image.getBoundingClientRect();
         return { u: (x - box.left) / box.width, v: (y - box.top) / box.height };
       }, pointer);
-      await page.mouse.move(pointer.x, pointer.y);
-      for (let step = 0; step < 8; step += 1) {
-        await page.mouse.wheel(0, -120);
-        await frames();
-      }
+      // Horizontal-only wheel (`deltaY === 0`) must not zoom or shrink the picture.
+      await page.evaluate(({ x, y }) => {
+        const stage = document.querySelector('.imageStage');
+        if (stage === null) throw new Error('missing stage');
+        stage.dispatchEvent(
+          new WheelEvent('wheel', {
+            bubbles: true,
+            cancelable: true,
+            clientX: x,
+            clientY: y,
+            deltaX: 120,
+            deltaY: 0
+          })
+        );
+      }, pointer);
+      await frames();
+      assert.equal(await percent(), 100, 'horizontal wheel must leave scale at 100%');
+
+      // Burst 8 wheel events synchronously in one frame (before layout commits scrollLeft)
+      // to verify rapid trackpad zooming does not drift the pointer anchor.
+      await page.evaluate(({ x, y }) => {
+        const stage = document.querySelector('.imageStage');
+        if (stage === null) throw new Error('missing stage');
+        for (let step = 0; step < 8; step += 1) {
+          stage.dispatchEvent(
+            new WheelEvent('wheel', {
+              bubbles: true,
+              cancelable: true,
+              clientX: x,
+              clientY: y,
+              deltaY: -120
+            })
+          );
+        }
+      }, pointer);
+      await frames();
       const zoomedPercent = await percent();
       assert.ok(zoomedPercent > 200, `expected a scale above 200%, got ${zoomedPercent}%`);
       const scrolled = await page.evaluate(() => {
@@ -246,11 +291,11 @@ test(
       );
       assert.ok(
         Math.abs(anchored.x - pointer.x) <= 4,
-        `anchor x moved to ${anchored.x}, pointer ${pointer.x}`
+        `burst wheel anchor x moved to ${anchored.x}, pointer ${pointer.x}`
       );
       assert.ok(
         Math.abs(anchored.y - pointer.y) <= 4,
-        `anchor y moved to ${anchored.y}, pointer ${pointer.y}`
+        `burst wheel anchor y moved to ${anchored.y}, pointer ${pointer.y}`
       );
 
       const beforeDrag = await readBox('.imageStage img');
@@ -271,7 +316,7 @@ test(
         `drag dy ${afterDrag.top - beforeDrag.top}`
       );
 
-      const shove = async (dx: number): Promise<number> => {
+      const shove = async (dx: number): Promise<{ overlap: number; image: Box; stage: Box }> => {
         await page.evaluate(distance => {
           const stage = document.querySelector('.imageStage');
           if (stage === null) throw new Error('missing stage');
@@ -301,15 +346,19 @@ test(
         await frames();
         const image = await readBox('.imageStage img');
         const stage = await readBox('.imageStage');
-        return overlapWidth(image, stage);
+        return { overlap: overlapWidth(image, stage), image, stage };
       };
-      const leftOverlap = await shove(-4000);
-      const stageWidth = (await readBox('.imageStage')).width;
-      assert.ok(leftOverlap >= stageWidth * 0.14, `left overlap ${leftOverlap} of ${stageWidth}`);
-      const rightOverlap = await shove(4000);
+      const leftShove = await shove(-4000);
       assert.ok(
-        rightOverlap >= stageWidth * 0.14,
-        `right overlap ${rightOverlap} of ${stageWidth}`
+        leftShove.overlap >= leftShove.stage.width * 0.14 &&
+          leftShove.overlap <= leftShove.stage.width * 0.2,
+        `left shove overlap ${leftShove.overlap} of ${leftShove.stage.width}`
+      );
+      const rightShove = await shove(4000);
+      assert.ok(
+        rightShove.overlap >= rightShove.stage.width * 0.14 &&
+          rightShove.overlap <= rightShove.stage.width * 0.2,
+        `right shove overlap ${rightShove.overlap} of ${rightShove.stage.width}`
       );
 
       const stageBox = await page.locator('.imageStage').boundingBox();

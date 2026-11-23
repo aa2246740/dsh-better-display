@@ -342,6 +342,8 @@ test('zoom anchors in layout, and a drag measures from where the pointer went do
   const lightbox = readFileSync(resolve(root, 'src/client/ImageLightbox.tsx'), 'utf8');
   const code = lightbox.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/\/\/[^\n]*/gu, '');
   assert.match(code, /writeClipboard\(caption\)/u);
+  assert.match(code, /if \(event\.deltaY === 0\) return/u);
+  assert.match(code, /pending\?\.left \?\? node\.scrollLeft/u);
   assert.match(code, /state\.startLeft - dx/u);
   assert.doesNotMatch(code, /scrollLeft - dx/u);
   assert.match(code, /hasPointerCapture/u);

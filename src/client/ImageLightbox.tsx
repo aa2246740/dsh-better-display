@@ -247,7 +247,9 @@ export function ImageLightbox({
   const drag = useRef<DragState | null>(null);
   /** Swallow the click that ends a drag, so it cannot reach the backdrop. */
   const dragged = useRef(false);
+  const dragResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mounted = useRef(true);
   const seenSrc = useRef<string | null>(null);
 
   const baseSize = useMemo(
@@ -344,8 +346,9 @@ export function ImageLightbox({
   }, [centre]);
 
   // Apply a zoom's pending scroll after the picture has its new size. Anything else
-  // (first open, reset) lands in the middle. Never write scroll from a setScale updater:
-  // the image has not been laid out yet, and the old scroll range clips the anchor.
+  // (first open, reset, stage resize) lands in the middle without carrying a stale free offset.
+  // Never write scroll from a setScale updater: the image has not been laid out yet, and the
+  // old scroll range clips the anchor.
   useLayoutEffect(() => {
     if (!open || stage.current === null) return;
     const node = stage.current;
@@ -356,6 +359,10 @@ export function ImageLightbox({
       node.scrollTop = pending.top;
       return;
     }
+    if (freeRef.current.x !== 0 || freeRef.current.y !== 0) {
+      freeRef.current = { x: 0, y: 0 };
+      setFree(freeRef.current);
+    }
     centre();
   }, [scale, baseSize, open, centre]);
 
@@ -365,6 +372,7 @@ export function ImageLightbox({
     if (node === null || !open) return;
     const onWheel = (event: WheelEvent): void => {
       event.preventDefault();
+      if (event.deltaY === 0) return;
       const currentScale = scaleRef.current;
       const base = baseSizeRef.current;
       const nextScale = clampScale(currentScale * (event.deltaY < 0 ? 1.12 : 1 / 1.12));
@@ -372,13 +380,14 @@ export function ImageLightbox({
       const rect = node.getBoundingClientRect();
       const pointerX = event.clientX - rect.left;
       const pointerY = event.clientY - rect.top;
+      const pending = pendingScrollRef.current;
       const settled = zoomAroundPoint({
         currentScale,
         nextScale,
         pointerX,
         pointerY,
-        scrollLeft: node.scrollLeft,
-        scrollTop: node.scrollTop,
+        scrollLeft: pending?.left ?? node.scrollLeft,
+        scrollTop: pending?.top ?? node.scrollTop,
         freeX: freeRef.current.x,
         freeY: freeRef.current.y,
         baseWidth: base.width,
@@ -396,17 +405,23 @@ export function ImageLightbox({
     return () => node.removeEventListener('wheel', onWheel);
   }, [open]);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
       if (copyTimer.current !== null) clearTimeout(copyTimer.current);
-    },
-    []
-  );
+      if (dragResetTimer.current !== null) clearTimeout(dragResetTimer.current);
+    };
+  }, []);
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
     if (event.button !== 0) return;
     const node = stage.current;
     if (node === null) return;
+    if (dragResetTimer.current !== null) {
+      clearTimeout(dragResetTimer.current);
+      dragResetTimer.current = null;
+    }
     dragged.current = false;
     setDragging(true);
     drag.current = {
@@ -487,7 +502,9 @@ export function ImageLightbox({
     // A drag that ends outside the dialog never produces a click, so the guard would
     // otherwise swallow the next backdrop click. A click from this gesture is dispatched
     // before the timeout, and the click handler consumes the flag first.
-    setTimeout(() => {
+    if (dragResetTimer.current !== null) clearTimeout(dragResetTimer.current);
+    dragResetTimer.current = setTimeout(() => {
+      dragResetTimer.current = null;
       dragged.current = false;
     }, 0);
   };
@@ -533,12 +550,12 @@ export function ImageLightbox({
           data-copied={copied || undefined}
           onDoubleClick={() => {
             void writeClipboard(caption).then(ok => {
-              if (ok !== true) return;
+              if (!mounted.current || ok !== true) return;
               setCopied(true);
               if (copyTimer.current !== null) clearTimeout(copyTimer.current);
               copyTimer.current = setTimeout(() => {
                 copyTimer.current = null;
-                setCopied(false);
+                if (mounted.current) setCopied(false);
               }, 1200);
             });
           }}
