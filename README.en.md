@@ -9,15 +9,15 @@
 Open **Settings → Plugins → Add plugin** and enter this in “Package name or address”:
 
 ```text
-github:aa2246740/dsh-better-display#v0.3.12
+github:aa2246740/dsh-better-display#v0.4.1
 ```
 
-The desktop plugin manager owns the Desktop profile and its bundled package manager. `v0.3.12` is the latest tagged install target and targets Harness `0.2.1-rc.5`. The Host checks `engines.dsh` with prereleases included, so it also installs on 0.2.2 RCs, but tool-result images fail to load there. Harness 0.2.2 support is in 0.4.0, which is not tagged yet; until then, install from a local checkout on 0.2.2 as shown below. This tag includes built `lib/`; normal use needs no clone, build, or DSHX installation. Follow the app if it asks you to reload or reopen after installation.
+The desktop plugin manager owns the Desktop profile and its bundled package manager. `v0.4.1` is the latest tagged install target, and it supports both the DeepSeek Harness `0.2.1` line (`>=0.2.1-rc.1`) and the `0.2.2` line (`>=0.2.2-rc.5`). It includes the built `lib/`; normal use needs no clone, build, or DSHX installation. Follow the app if it asks you to reload or reopen after installation.
 
 ### Web CLI
 
 ```sh
-dsh plugin --profile web add github:aa2246740/dsh-better-display#v0.3.12
+dsh plugin --profile web add github:aa2246740/dsh-better-display#v0.4.1
 ```
 
 This official CLI command writes only the `web` profile; it cannot modify the Desktop App profile. **pnpm** must be on PATH. For an already-running Web Host, reopen that Host once and reload the page because bundles are read at boot.
@@ -36,7 +36,7 @@ From a local checkout or tarball (development/local testing):
 
 ```sh
 dsh plugin --profile web add ./dsh-better-display
-dsh plugin --profile web add ./dsh-better-display-0.4.0.tgz
+dsh plugin --profile web add ./dsh-better-display-0.4.1.tgz
 ```
 
 `dsh.bundle` is captured at Host boot. Do not also insert the same row by hand in the profile `cordis.patch.yml`, or it will mount twice.
