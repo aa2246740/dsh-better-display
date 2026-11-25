@@ -15,7 +15,7 @@ import { createReaderStore } from './store.js';
 import { installReaderEntry } from './entry.js';
 import { installBetterDisplaySettings } from './settings.js';
 import { fillComposerDom } from './mcp-app.js';
-import { sessionImageLoader, type AttachmentReader } from './image-source.js';
+import { resetAttachmentForm, sessionImageLoader, type AttachmentReader } from './image-source.js';
 import { fileAddressFor, modeFromSnapshot, openDeliverableFile } from './open-file.js';
 import type { ReaderInjected } from './types.js';
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment';
@@ -80,6 +80,11 @@ export function apply(ctx: Context): void {
   const restoreTextTransform = installTextTransformRegistry(textTransform);
   ctx.provide(TEXT_TRANSFORM_SERVICE, textTransform);
   ctx.effect(() => restoreTextTransform);
+  // The learned readAttachment form is module scope, so it outlives every
+  // mounted Reader. An in-place Host upgrade can swap that call shape, and the
+  // connection reset is the only signal a still-open Reader gets; without this
+  // every image keeps reading through the stale shape until the page reloads.
+  ctx.effect(() => ctx.on('connection/reset', resetAttachmentForm));
   const store = createReaderStore();
   // conversation.view is session-scoped, so session persist keys are
   // `dsh.reader.v1.<sessionId>`. One root instance keeps glass, fold

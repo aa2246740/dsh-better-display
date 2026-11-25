@@ -47,7 +47,11 @@ type Form = 'reference' | 'id';
 // Module-scoped because every Reader image shares the Host version in this tab.
 let preferred: Form = 'reference';
 
-/** Forget the learned form (tests, or a Host reconnect that swapped versions). */
+/**
+ * Forget the learned form. Tests call it directly; the client also wires it to
+ * the Host's `/connection/reset`, because an in-place Host upgrade can swap the
+ * call shape while this Reader stays mounted.
+ */
 export function resetAttachmentForm(): void {
   preferred = 'reference';
 }
@@ -118,7 +122,13 @@ export async function readImageAttachment(
       mediaType: value.attachment?.mediaType ?? attachment.mediaType ?? 'application/octet-stream'
     };
   }
-  throw new Error(`无法读取会话图片（${failures.join('; ')}）`);
+  // Both shapes were rejected. A Host that moved this contract breaks every
+  // Reader image at once, and from the block alone it looks like one transient
+  // failure, so name that suspicion first: the block truncates the detail and
+  // the per-shape reasons go last for whoever still wants them.
+  throw new Error(
+    `无法读取会话图片：宿主 readAttachment 契约可能与当前插件版本不匹配，请升级 dsh-better-display 或核对 Harness 版本（${failures.join('; ')}）`
+  );
 }
 
 /**

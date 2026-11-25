@@ -145,7 +145,7 @@ test('a read that fails in both forms names every reason instead of staying sile
       },
       REF
     ),
-    /无法读取会话图片（reference: session\/attachment-invalid: gone; id: session\/attachment-invalid: gone）/u
+    /无法读取会话图片：宿主 readAttachment 契约可能与当前插件版本不匹配，请升级 dsh-better-display 或核对 Harness 版本（reference: session\/attachment-invalid: gone; id: session\/attachment-invalid: gone）/u
   );
   // A rejected read teaches nothing: the preferred form is unchanged.
   assert.equal(preferredAttachmentForm(), 'reference');
@@ -167,4 +167,41 @@ test('a thrown read is retried in the other form instead of aborting', async () 
   );
   assert.deepEqual([...image.data], [5]);
   assert.equal(preferredAttachmentForm(), 'id');
+});
+
+test('a Host that swaps the contract mid-session is re-probed after the reset', async () => {
+  resetAttachmentForm();
+  // A 0.2.1 Host answers only the legacy id form, so the plugin learns 'id'.
+  await readImageAttachment(
+    {
+      readAttachment: async argument =>
+        argument === REF.attachmentId
+          ? { ok: true, value: { attachment: { mediaType: 'image/png' }, data: Uint8Array.of(4) } }
+          : { ok: false, error: { code: 'session/attachment-invalid', message: 'bad reference' } }
+    },
+    REF
+  );
+  assert.equal(preferredAttachmentForm(), 'id');
+  // The same tab upgraded to a 0.2.2 Host: after the reset the learned form is
+  // gone, so the first read of the new Host is the complete reference.
+  resetAttachmentForm();
+  const upgraded: unknown[] = [];
+  const image = await readImageAttachment(
+    {
+      readAttachment: async argument => {
+        upgraded.push(argument);
+        return receipt(argument);
+      }
+    },
+    REF
+  );
+  assert.deepEqual(upgraded, [REF]);
+  assert.deepEqual([...image.data], [1, 2, 3]);
+});
+
+test('the client forgets the learned form when the Host connection resets', () => {
+  // The form is module scope, so it outlives every mounted Reader; the reset
+  // subscription is the only thing that clears it without a page reload.
+  const index = readFileSync(new URL('../src/client/index.tsx', import.meta.url), 'utf8');
+  assert.match(index, /ctx\.on\('connection\/reset', resetAttachmentForm\)/u);
 });
